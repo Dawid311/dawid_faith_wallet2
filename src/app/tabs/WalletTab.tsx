@@ -95,11 +95,11 @@ export default function WalletTab() {
     decimals: 18,
     symbol: "DFAITH"
   };
-  
-  const MATIC_TOKEN = {
+
+  const POL_TOKEN = {
     address: "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270", // WMATIC
     decimals: 18,
-    symbol: "MATIC"
+    symbol: "POL"
   };
 
   useEffect(() => {
@@ -180,8 +180,8 @@ export default function WalletTab() {
 
   const formatAddress = (address: string) => `${address.slice(0, 6)}...${address.slice(-4)}`;
 
-  // Funktion zum Abrufen eines Preisangebots
-  const fetchQuote = async () => {
+  // Funktion zum Abrufen des besten Preisangebots
+  const fetchBestQuote = async () => {
     if (!swapAmount || parseFloat(swapAmount) <= 0) {
       setEstimatedOutput("0");
       setExchangeRate("0");
@@ -191,53 +191,62 @@ export default function WalletTab() {
     setIsLoading(true);
     
     try {
-      let quote;
-      
-      if (selectedProvider === "paraswap") {
-        // ParaSwap API Call
-        const response = await axios.get(`https://apiv5.paraswap.io/prices`, {
+      // Parallele Anfragen an beide APIs
+      const [paraswapPromise, openoceanPromise] = [
+        axios.get(`https://apiv5.paraswap.io/prices`, {
           params: {
             srcToken: DFAITH_TOKEN.address,
-            destToken: MATIC_TOKEN.address,
+            destToken: POL_TOKEN.address,
             amount: (parseFloat(swapAmount) * Math.pow(10, DFAITH_TOKEN.decimals)).toString(),
             srcDecimals: DFAITH_TOKEN.decimals,
-            destDecimals: MATIC_TOKEN.decimals,
+            destDecimals: POL_TOKEN.decimals,
             side: "SELL",
             network: 137, // Polygon
           }
-        });
+        }).catch(error => null), // Fehlerbehandlung für ParaSwap
         
-        quote = response.data;
-        
-        // Extrahiere den Wert und berechne den Wechselkurs
-        const outputAmount = parseFloat(quote.priceRoute.destAmount) / Math.pow(10, MATIC_TOKEN.decimals);
-        setEstimatedOutput(outputAmount.toFixed(6));
-        
-        const rate = outputAmount / parseFloat(swapAmount);
-        setExchangeRate(rate.toFixed(6));
-      } else {
-        // OpenOcean API Call
-        const response = await axios.get(`https://open-api.openocean.finance/v3/137/quote`, {
+        axios.get(`https://open-api.openocean.finance/v3/137/quote`, {
           params: {
             chain: "polygon",
             inTokenAddress: DFAITH_TOKEN.address,
-            outTokenAddress: MATIC_TOKEN.address,
+            outTokenAddress: POL_TOKEN.address,
             amount: swapAmount,
             gasPrice: "30",
             slippage: slippage
           }
-        });
-        
-        quote = response.data.data;
-        
-        // Extrahiere den Wert
-        setEstimatedOutput(quote.outAmount);
-        
-        const rate = parseFloat(quote.outAmount) / parseFloat(swapAmount);
+        }).catch(error => null) // Fehlerbehandlung für OpenOcean
+      ];
+      
+      // Warte auf beide Antworten
+      const [paraswapResponse, openoceanResponse] = await Promise.all([paraswapPromise, openoceanPromise]);
+      
+      // Berechne die Ergebnisse beider Anbieter
+      let paraswapAmount = 0;
+      let openoceanAmount = 0;
+      
+      if (paraswapResponse?.data) {
+        paraswapAmount = parseFloat(paraswapResponse.data.priceRoute.destAmount) / Math.pow(10, POL_TOKEN.decimals);
+      }
+      
+      if (openoceanResponse?.data?.data) {
+        openoceanAmount = parseFloat(openoceanResponse.data.data.outAmount);
+      }
+      
+      // Wähle den besseren Kurs
+      if (paraswapAmount > openoceanAmount) {
+        setSelectedProvider("paraswap");
+        setEstimatedOutput(paraswapAmount.toFixed(6));
+        const rate = paraswapAmount / parseFloat(swapAmount);
+        setExchangeRate(rate.toFixed(6));
+      } else {
+        setSelectedProvider("openocean");
+        setEstimatedOutput(openoceanAmount.toFixed(6));
+        const rate = openoceanAmount / parseFloat(swapAmount);
         setExchangeRate(rate.toFixed(6));
       }
+      
     } catch (error) {
-      console.error("Fehler beim Abrufen des Angebots:", error);
+      console.error("Fehler beim Abrufen des besten Angebots:", error);
       setEstimatedOutput("0");
       setExchangeRate("0");
     } finally {
@@ -245,14 +254,14 @@ export default function WalletTab() {
     }
   };
 
-  // Anfrage nach Quote, wenn sich der Betrag oder Provider ändert
+  // Anfrage nach dem besten Quote, wenn sich der Betrag ändert
   useEffect(() => {
     const timer = setTimeout(() => {
-      fetchQuote();
+      fetchBestQuote();
     }, 500); // Debounce von 500ms
     
     return () => clearTimeout(timer);
-  }, [swapAmount, selectedProvider, slippage]);
+  }, [swapAmount, slippage]); // Entfernt selectedProvider aus den Dependencies
 
   // Swap-Funktion
   const executeSwap = async () => {
@@ -402,38 +411,21 @@ export default function WalletTab() {
               </button>
             </div>
 
-            {/* Token-Karten Grid - DFAITH und D.INVEST nebeneinander */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-              {/* DFAITH Token-Karte */}
-              <div className="flex flex-col items-center p-4 bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl border border-zinc-700 w-full">
-                <span className="uppercase text-xs tracking-widest text-amber-500/80 mb-2">DFAITH</span>
-                <div className="text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 drop-shadow-sm">
-                  {dfaithBalance ? Number(dfaithBalance.displayValue).toFixed(4) : "0.00"}
-                </div>
-                
-                <div className="w-full h-px bg-gradient-to-r from-transparent via-zinc-700/50 to-transparent my-3"></div>
-                
-                <div className="text-xs text-zinc-500">
-                  ≈ 0.00 EUR
-                </div>
+            {/* DFAITH Token-Karte - jetzt als einzelne Karte */}
+            <div className="flex flex-col items-center p-4 bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl border border-zinc-700 w-full mb-6">
+              <span className="uppercase text-xs tracking-widest text-amber-500/80 mb-2">DFAITH</span>
+              <div className="text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 drop-shadow-sm">
+                {dfaithBalance ? Number(dfaithBalance.displayValue).toFixed(4) : "0.00"}
               </div>
               
-              {/* D.INVEST Token-Karte */}
-              <div className="flex flex-col items-center p-4 bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl border border-zinc-700 w-full">
-                <span className="uppercase text-xs tracking-widest text-amber-500/80 mb-2">D.INVEST</span>
-                <div className="text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 drop-shadow-sm">
-                  {dinvestBalance ? Number(dinvestBalance.displayValue).toFixed(0) : "0"}
-                </div>
-                
-                <div className="w-full h-px bg-gradient-to-r from-transparent via-zinc-700/50 to-transparent my-3"></div>
-                
-                <div className="text-xs text-zinc-500">
-                  Gestaked: <span className="text-amber-400/80">0</span>
-                </div>
+              <div className="w-full h-px bg-gradient-to-r from-transparent via-zinc-700/50 to-transparent my-3"></div>
+              
+              <div className="text-xs text-zinc-500">
+                ≈ 0.00 EUR
               </div>
             </div>
 
-            {/* Action Buttons mit besseren Gradienten - redesigned */}
+            {/* Action Buttons mit besseren Gradienten */}
             <div className="grid grid-cols-3 gap-2 md:gap-4 mb-6">
               <Button
                 className="flex flex-col items-center justify-center gap-1 px-1 py-3.5 md:py-4.5 bg-gradient-to-br from-zinc-800/90 to-zinc-900 hover:from-zinc-800 hover:to-zinc-800 shadow-lg shadow-black/20 rounded-xl hover:scale-[1.02] transition-all duration-300 border border-zinc-700/80"
@@ -464,14 +456,31 @@ export default function WalletTab() {
               </Button>
             </div>
             
-            {/* Staking-Button am unteren Rand */}
-            <Button 
-              onClick={() => setShowStake(true)}
-              className="w-full py-3 bg-gradient-to-r from-amber-500/20 to-amber-600/20 hover:from-amber-500/30 hover:to-amber-600/30 text-amber-400 font-medium rounded-xl border border-amber-500/20 transition-all duration-300 flex items-center justify-center gap-2"
-            >
-              <FaLock size={14} />
-              <span>D.INVEST Staken & Verdienen</span>
-            </Button>
+            {/* D.INVEST unter den Buttons mit Stake-Button */}
+            <div className="flex flex-col p-4 bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl border border-zinc-700 w-full">
+              <div className="flex items-center justify-between mb-2">
+                <span className="uppercase text-xs tracking-widest text-amber-500/80">D.INVEST</span>
+              </div>
+              
+              <div className="flex items-center justify-between">
+                <div className="text-2xl md:text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500">
+                  {dinvestBalance ? Number(dinvestBalance.displayValue).toFixed(0) : "0"}
+                </div>
+                
+                <button 
+                  onClick={() => setShowStake(true)}
+                  className="flex items-center gap-2 px-4 py-1.5 rounded-lg bg-gradient-to-r from-amber-500/20 to-amber-600/20 text-amber-400 hover:from-amber-500/30 hover:to-amber-600/30 transition-all border border-amber-500/20"
+                >
+                  <FaLock size={12} />
+                  <span className="text-sm font-medium">Staken & Verdienen</span>
+                </button>
+              </div>
+              
+              {/* Gestaked Anzeige */}
+              <div className="text-xs text-zinc-500 mt-2">
+                Gestaked: <span className="text-amber-400/80">0</span>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
