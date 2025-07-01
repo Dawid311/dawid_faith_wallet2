@@ -100,8 +100,7 @@ export default function WalletTab() {
           <ConnectButton
             client={client}
             connectButton={{ 
-              label: "Wallet verbinden",
-              theme: "dark" 
+              label: "Wallet verbinden"
             }}
             connectModal={{ 
               size: "compact", 
