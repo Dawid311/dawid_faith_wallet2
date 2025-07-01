@@ -1,10 +1,10 @@
 import { useEffect, useState, useRef } from "react";
-import { createThirdwebClient, getContract } from "thirdweb";
-import { useActiveAccount, useActiveWalletConnectionStatus } from "thirdweb/react";
+import { createThirdwebClient, getContract, prepareContractCall, sendTransaction } from "thirdweb";
+import { useActiveAccount, useActiveWalletConnectionStatus, useSendTransaction } from "thirdweb/react";
 import { ConnectButton } from "thirdweb/react";
 import { inAppWallet, createWallet } from "thirdweb/wallets";
 import { polygon } from "thirdweb/chains";
-import { balanceOf } from "thirdweb/extensions/erc20";
+import { balanceOf, approve, allowance } from "thirdweb/extensions/erc20";
 import { Card, CardContent } from "../../../components/ui/card";
 import { Button } from "../../../components/ui/button";
 import { FaRegCopy } from "react-icons/fa";
@@ -71,6 +71,7 @@ const wallets = [
 export default function WalletTab() {
   const account = useActiveAccount();
   const status = useActiveWalletConnectionStatus();
+  const { mutate: sendTransaction, data: transactionResult, isPending: isTransactionPending } = useSendTransaction();
 
   const [dfaithBalance, setDfaithBalance] = useState<{ displayValue: string } | null>(null);
   const [dinvestBalance, setDinvestBalance] = useState<{ displayValue: string } | null>(null);
@@ -88,9 +89,12 @@ export default function WalletTab() {
   const [swapAmount, setSwapAmount] = useState("");
   const [estimatedOutput, setEstimatedOutput] = useState("0");
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedProvider, setSelectedProvider] = useState("paraswap"); // "paraswap" oder "openocean"
+  const [selectedProvider, setSelectedProvider] = useState("thirdweb"); // "thirdweb", "paraswap" oder "openocean"
   const [exchangeRate, setExchangeRate] = useState("0");
   const [slippage, setSlippage] = useState("1"); // Default 1%
+  const [currentQuote, setCurrentQuote] = useState<any>(null);
+  const [isApproving, setIsApproving] = useState(false);
+  const [needsApproval, setNeedsApproval] = useState(false);
   
   // Neue States für das Senden Modal
   const [sendAmount, setSendAmount] = useState("");
@@ -123,66 +127,6 @@ export default function WalletTab() {
   };
 
   useEffect(() => {
-    async function fetchBalances() {
-      if (!account?.address) {
-        setDfaithBalance(null);
-        setDinvestBalance(null);
-        return;
-      }
-      
-      try {
-        console.log("Wallet-Adresse:", account.address);
-        console.log("Lade Balances...");
-        
-        // D.FAITH Balance abrufen
-        const dfaithContract = getContract({
-          client,
-          chain: polygon,
-          address: DFAITH_TOKEN.address
-        });
-        
-        const dfaithBalanceResult = await balanceOf({
-          contract: dfaithContract,
-          address: account.address
-        });
-        
-        // D.INVEST Balance abrufen
-        const dinvestContract = getContract({
-          client,
-          chain: polygon,
-          address: DINVEST_TOKEN.address
-        });
-        
-        const dinvestBalanceResult = await balanceOf({
-          contract: dinvestContract,
-          address: account.address
-        });
-        
-        // Balances formatieren und setzen
-        const dfaithFormatted = Number(dfaithBalanceResult) / Math.pow(10, DFAITH_TOKEN.decimals);
-        const dinvestFormatted = Number(dinvestBalanceResult) / Math.pow(10, DINVEST_TOKEN.decimals);
-        
-        setDfaithBalance({ displayValue: dfaithFormatted.toFixed(4) });
-        // D.INVEST Balance - als Integer (0 Dezimalen) anzeigen
-        setDinvestBalance({ displayValue: Math.floor(dinvestFormatted).toString() });
-        
-        console.log("=== BALANCE DEBUG ===");
-        console.log("D.FAITH Raw Balance:", dfaithBalanceResult.toString());
-        console.log("D.FAITH Formatted:", dfaithFormatted);
-        console.log("D.INVEST Raw Balance:", dinvestBalanceResult.toString());
-        console.log("D.INVEST Formatted:", dinvestFormatted);
-        console.log("D.INVEST Final displayValue:", dinvestFormatted.toFixed(4));
-        console.log("D.INVEST > 0?", dinvestFormatted > 0);
-        console.log("D.INVEST State wird gesetzt mit:", { displayValue: dinvestFormatted.toFixed(4) });
-        console.log("=====================");
-        
-      } catch (error) {
-        console.error("Fehler beim Abrufen der Balances:", error);
-        // Bei Fehler 0 setzen
-        setDfaithBalance({ displayValue: "0.0000" });
-        setDinvestBalance({ displayValue: "0" });
-      }
-    }
     fetchBalances();
   }, [account?.address]);
 
@@ -255,72 +199,158 @@ export default function WalletTab() {
     if (!swapAmount || parseFloat(swapAmount) <= 0) {
       setEstimatedOutput("0");
       setExchangeRate("0");
+      setCurrentQuote(null);
       return;
     }
     
     setIsLoading(true);
     
     try {
-      // Parallele Anfragen an beide APIs
-      const [paraswapPromise, openoceanPromise] = [
-        axios.get(`https://apiv5.paraswap.io/prices`, {
-          params: {
-            srcToken: DFAITH_TOKEN.address,
-            destToken: POL_TOKEN.address,
-            amount: (parseFloat(swapAmount) * Math.pow(10, DFAITH_TOKEN.decimals)).toString(),
-            srcDecimals: DFAITH_TOKEN.decimals,
-            destDecimals: POL_TOKEN.decimals,
-            side: "SELL",
-            network: 137, // Polygon
-          }
-        }).catch(error => null), // Fehlerbehandlung für ParaSwap
-        
-        axios.get(`https://open-api.openocean.finance/v3/137/quote`, {
-          params: {
-            chain: "polygon",
-            inTokenAddress: DFAITH_TOKEN.address,
-            outTokenAddress: POL_TOKEN.address,
-            amount: swapAmount,
-            gasPrice: "30",
-            slippage: slippage
-          }
-        }).catch(error => null) // Fehlerbehandlung für OpenOcean
-      ];
+      const amountInWei = (parseFloat(swapAmount) * Math.pow(10, DFAITH_TOKEN.decimals)).toString();
       
-      // Warte auf beide Antworten
-      const [paraswapResponse, openoceanResponse] = await Promise.all([paraswapPromise, openoceanPromise]);
-      
-      // Berechne die Ergebnisse beider Anbieter
-      let paraswapAmount = 0;
-      let openoceanAmount = 0;
-      
-      if (paraswapResponse?.data) {
-        paraswapAmount = parseFloat(paraswapResponse.data.priceRoute.destAmount) / Math.pow(10, POL_TOKEN.decimals);
-      }
-      
-      if (openoceanResponse?.data?.data) {
-        openoceanAmount = parseFloat(openoceanResponse.data.data.outAmount);
-      }
-      
-      // Wähle den besseren Kurs
-      if (paraswapAmount > openoceanAmount) {
-        setSelectedProvider("paraswap");
-        setEstimatedOutput(paraswapAmount.toFixed(6));
-        const rate = paraswapAmount / parseFloat(swapAmount);
-        setExchangeRate(rate.toFixed(6));
+      if (selectedProvider === "thirdweb") {
+        // Für Thirdweb verwenden wir eine vereinfachte Schätzung
+        // In einer vollständigen Implementierung würde hier die Thirdweb DEX API verwendet
+        try {
+          // Simuliere einen geschätzten Preis (1 D.FAITH = 0.002 POL als Beispiel)
+          const estimatedRate = 0.002;
+          const outputAmount = parseFloat(swapAmount) * estimatedRate;
+          
+          setEstimatedOutput(outputAmount.toFixed(6));
+          setExchangeRate(estimatedRate.toFixed(6));
+          setCurrentQuote({
+            fromAmount: amountInWei,
+            toAmount: (outputAmount * Math.pow(10, POL_TOKEN.decimals)).toString(),
+            provider: "thirdweb"
+          });
+        } catch (error) {
+          console.error("Thirdweb Quote Error:", error);
+          setEstimatedOutput("0");
+          setExchangeRate("0");
+          setCurrentQuote(null);
+        }
       } else {
-        setSelectedProvider("openocean");
-        setEstimatedOutput(openoceanAmount.toFixed(6));
-        const rate = openoceanAmount / parseFloat(swapAmount);
-        setExchangeRate(rate.toFixed(6));
+        // Parallele Anfragen an ParaSwap und OpenOcean
+        const [paraswapPromise, openoceanPromise] = [
+          selectedProvider === "paraswap" ? axios.get(`https://apiv5.paraswap.io/prices`, {
+            params: {
+              srcToken: DFAITH_TOKEN.address,
+              destToken: POL_TOKEN.address,
+              amount: amountInWei,
+              srcDecimals: DFAITH_TOKEN.decimals,
+              destDecimals: POL_TOKEN.decimals,
+              side: "SELL",
+              network: 137,
+            }
+          }).catch(() => null) : Promise.resolve(null),
+          
+          selectedProvider === "openocean" ? axios.get(`https://open-api.openocean.finance/v3/137/quote`, {
+            params: {
+              chain: "polygon",
+              inTokenAddress: DFAITH_TOKEN.address,
+              outTokenAddress: POL_TOKEN.address,
+              amount: swapAmount,
+              gasPrice: "30",
+              slippage: slippage
+            }
+          }).catch(() => null) : Promise.resolve(null)
+        ];
+        
+        const [paraswapResponse, openoceanResponse] = await Promise.all([paraswapPromise, openoceanPromise]);
+        
+        if (selectedProvider === "paraswap" && paraswapResponse?.data) {
+          const outputAmount = parseFloat(paraswapResponse.data.priceRoute.destAmount) / Math.pow(10, POL_TOKEN.decimals);
+          setEstimatedOutput(outputAmount.toFixed(6));
+          const rate = outputAmount / parseFloat(swapAmount);
+          setExchangeRate(rate.toFixed(6));
+          setCurrentQuote(paraswapResponse.data);
+        } else if (selectedProvider === "openocean" && openoceanResponse?.data?.data) {
+          const outputAmount = parseFloat(openoceanResponse.data.data.outAmount);
+          setEstimatedOutput(outputAmount.toFixed(6));
+          const rate = outputAmount / parseFloat(swapAmount);
+          setExchangeRate(rate.toFixed(6));
+          setCurrentQuote(openoceanResponse.data.data);
+        }
       }
       
     } catch (error) {
-      console.error("Fehler beim Abrufen des besten Angebots:", error);
+      console.error("Fehler beim Abrufen des Angebots:", error);
       setEstimatedOutput("0");
       setExchangeRate("0");
+      setCurrentQuote(null);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Überprüfe ob Approval benötigt wird
+  const checkApproval = async () => {
+    if (!account?.address || !swapAmount || parseFloat(swapAmount) <= 0) {
+      setNeedsApproval(false);
+      return;
+    }
+    
+    try {
+      const dfaithContract = getContract({
+        client,
+        chain: polygon,
+        address: DFAITH_TOKEN.address
+      });
+      
+      // Router-Adresse für DEX (Beispiel - in Realität je nach DEX unterschiedlich)
+      const spenderAddress = "0x1111111254EEB25477B68fb85Ed929f73A960582"; // 1inch Router als Beispiel
+      
+      const currentAllowance = await allowance({
+        contract: dfaithContract,
+        owner: account.address,
+        spender: spenderAddress
+      });
+      
+      const requiredAmount = BigInt(parseFloat(swapAmount) * Math.pow(10, DFAITH_TOKEN.decimals));
+      setNeedsApproval(currentAllowance < requiredAmount);
+      
+    } catch (error) {
+      console.error("Fehler beim Überprüfen der Allowance:", error);
+      setNeedsApproval(true);
+    }
+  };
+
+  // Approval-Funktion
+  const approveToken = async () => {
+    if (!account?.address || !swapAmount) return;
+    
+    setIsApproving(true);
+    
+    try {
+      const dfaithContract = getContract({
+        client,
+        chain: polygon,
+        address: DFAITH_TOKEN.address
+      });
+      
+      const spenderAddress = "0x1111111254EEB25477B68fb85Ed929f73A960582"; // 1inch Router
+      const approveAmount = BigInt(parseFloat(swapAmount) * Math.pow(10, DFAITH_TOKEN.decimals));
+      
+      const transaction = approve({
+        contract: dfaithContract,
+        spender: spenderAddress,
+        amount: approveAmount.toString()
+      });
+      
+      sendTransaction(transaction, {
+        onSuccess: (result) => {
+          console.log("Approval erfolgreich:", result);
+          setNeedsApproval(false);
+        },
+        onError: (error) => {
+          console.error("Approval fehlgeschlagen:", error);
+        }
+      });
+      
+    } catch (error) {
+      console.error("Fehler beim Approval:", error);
+    } finally {
+      setIsApproving(false);
     }
   };
 
@@ -328,34 +358,161 @@ export default function WalletTab() {
   useEffect(() => {
     const timer = setTimeout(() => {
       fetchBestQuote();
+      checkApproval();
     }, 500); // Debounce von 500ms
     
     return () => clearTimeout(timer);
-  }, [swapAmount, slippage]); // Entfernt selectedProvider aus den Dependencies
+  }, [swapAmount, slippage, selectedProvider]);
 
   // Swap-Funktion
   const executeSwap = async () => {
-    if (!account?.address || !swapAmount || parseFloat(swapAmount) <= 0) {
+    if (!account?.address || !swapAmount || parseFloat(swapAmount) <= 0 || !currentQuote) {
+      return;
+    }
+    
+    if (needsApproval) {
+      await approveToken();
       return;
     }
     
     setIsLoading(true);
     
     try {
-      // Hier würde die Transaktion vorbereitet und gesendet werden
-      // Diese Funktion benötigt die vollständige Web3-Integration
-      
-      alert("In einer echten Implementierung würde jetzt der Swap durchgeführt werden.");
-      
-      // Nach erfolgreichem Swap zurücksetzen
-      setSwapAmount("");
-      setEstimatedOutput("0");
-      setExchangeRate("0");
+      if (selectedProvider === "thirdweb" && currentQuote) {
+        // Vereinfachte Thirdweb Swap - in Realität würde hier eine DEX-Integration stehen
+        alert("Thirdweb Swap: In einer vollständigen Implementierung würde hier der echte Swap über Thirdweb's DEX-Integration durchgeführt werden.");
+        
+        // Simuliere erfolgreichen Swap
+        setSwapAmount("");
+        setEstimatedOutput("0");
+        setExchangeRate("0");
+        setCurrentQuote(null);
+        fetchBalances();
+        
+      } else if (selectedProvider === "paraswap" && currentQuote?.priceRoute) {
+        // ParaSwap Transaktion erstellen
+        try {
+          const transactionResponse = await axios.post(`https://apiv5.paraswap.io/transactions/137`, {
+            srcToken: DFAITH_TOKEN.address,
+            destToken: POL_TOKEN.address,
+            srcAmount: currentQuote.priceRoute.srcAmount,
+            destAmount: currentQuote.priceRoute.destAmount,
+            priceRoute: currentQuote.priceRoute,
+            userAddress: account.address,
+            receiver: account.address,
+            slippage: parseInt(slippage) * 100 // ParaSwap erwartet Basis Points
+          });
+          
+          if (transactionResponse.data) {
+            // Transaktion mit Thirdweb senden
+            const txData = transactionResponse.data;
+            const transaction = {
+              to: txData.to,
+              data: txData.data,
+              value: txData.value || "0",
+              gas: txData.gas
+            };
+            
+            // Hier würde die Transaktion gesendet werden
+            alert("ParaSwap Transaktion wurde vorbereitet und würde jetzt gesendet werden.");
+            
+            setSwapAmount("");
+            setEstimatedOutput("0");
+            setExchangeRate("0");
+            setCurrentQuote(null);
+          }
+        } catch (error) {
+          console.error("ParaSwap Transaktion fehlgeschlagen:", error);
+          alert("ParaSwap Swap fehlgeschlagen. Siehe Konsole für Details.");
+        }
+        
+      } else if (selectedProvider === "openocean" && currentQuote) {
+        // OpenOcean Swap
+        try {
+          const swapResponse = await axios.get(`https://open-api.openocean.finance/v3/137/swap_quote`, {
+            params: {
+              chain: "polygon",
+              inTokenAddress: DFAITH_TOKEN.address,
+              outTokenAddress: POL_TOKEN.address,
+              amount: swapAmount,
+              gasPrice: "30",
+              slippage: slippage,
+              account: account.address
+            }
+          });
+          
+          if (swapResponse.data?.data) {
+            const txData = swapResponse.data.data;
+            
+            // Hier würde die Transaktion gesendet werden
+            alert("OpenOcean Transaktion wurde vorbereitet und würde jetzt gesendet werden.");
+            
+            setSwapAmount("");
+            setEstimatedOutput("0");
+            setExchangeRate("0");
+            setCurrentQuote(null);
+          }
+        } catch (error) {
+          console.error("OpenOcean Swap fehlgeschlagen:", error);
+          alert("OpenOcean Swap fehlgeschlagen. Siehe Konsole für Details.");
+        }
+      }
       
     } catch (error) {
       console.error("Fehler beim Ausführen des Swaps:", error);
+      alert("Swap fehlgeschlagen. Siehe Konsole für Details.");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Hilfsfunktion für Balance-Aktualisierung
+  const fetchBalances = async () => {
+    if (!account?.address) {
+      setDfaithBalance(null);
+      setDinvestBalance(null);
+      return;
+    }
+    
+    try {
+      console.log("Wallet-Adresse:", account.address);
+      console.log("Lade Balances...");
+      
+      // D.FAITH Balance abrufen
+      const dfaithContract = getContract({
+        client,
+        chain: polygon,
+        address: DFAITH_TOKEN.address
+      });
+      
+      const dfaithBalanceResult = await balanceOf({
+        contract: dfaithContract,
+        address: account.address
+      });
+      
+      // D.INVEST Balance abrufen
+      const dinvestContract = getContract({
+        client,
+        chain: polygon,
+        address: DINVEST_TOKEN.address
+      });
+      
+      const dinvestBalanceResult = await balanceOf({
+        contract: dinvestContract,
+        address: account.address
+      });
+      
+      // Balances formatieren und setzen
+      const dfaithFormatted = Number(dfaithBalanceResult) / Math.pow(10, DFAITH_TOKEN.decimals);
+      const dinvestFormatted = Number(dinvestBalanceResult) / Math.pow(10, DINVEST_TOKEN.decimals);
+      
+      setDfaithBalance({ displayValue: dfaithFormatted.toFixed(4) });
+      setDinvestBalance({ displayValue: Math.floor(dinvestFormatted).toString() });
+      
+    } catch (error) {
+      console.error("Fehler beim Abrufen der Balances:", error);
+      setDfaithBalance({ displayValue: "0.0000" });
+      setDinvestBalance({ displayValue: "0" });
     }
   };
 
@@ -673,8 +830,18 @@ export default function WalletTab() {
           <div className="flex flex-col gap-4">
             {/* Provider Auswahl */}
             <div className="flex items-center justify-between bg-zinc-800/70 rounded-lg p-3 border border-zinc-700">
-              <span className="text-sm text-zinc-300">Bridge-Provider (Client-ID: {process.env.NEXT_PUBLIC_TEMPLATE_CLIENT_ID!.slice(0, 8)}...):</span>
+              <span className="text-sm text-zinc-300">DEX Provider:</span>
               <div className="flex items-center gap-2">
+                <button 
+                  className={`px-3 py-1 rounded-lg text-xs font-medium transition ${
+                    selectedProvider === "thirdweb" 
+                      ? "bg-amber-500/20 text-amber-400 border border-amber-500/30" 
+                      : "bg-zinc-700 text-zinc-400 border border-zinc-600"
+                  }`}
+                  onClick={() => setSelectedProvider("thirdweb")}
+                >
+                  Thirdweb DEX
+                </button>
                 <button 
                   className={`px-3 py-1 rounded-lg text-xs font-medium transition ${
                     selectedProvider === "paraswap" 
@@ -683,7 +850,7 @@ export default function WalletTab() {
                   }`}
                   onClick={() => setSelectedProvider("paraswap")}
                 >
-                  ParaSwap (Universal Bridge)
+                  ParaSwap
                 </button>
                 <button 
                   className={`px-3 py-1 rounded-lg text-xs font-medium transition ${
@@ -693,7 +860,7 @@ export default function WalletTab() {
                   }`}
                   onClick={() => setSelectedProvider("openocean")}
                 >
-                  Thirdweb Bridge
+                  OpenOcean
                 </button>
               </div>
             </div>
@@ -804,22 +971,30 @@ export default function WalletTab() {
             {/* Ausführungs-Button */}
             <Button
               className={`w-full py-3 font-bold rounded-xl ${
-                parseFloat(swapAmount) > 0 && !isLoading
-                  ? "bg-gradient-to-r from-amber-400 to-yellow-500 text-black"
+                parseFloat(swapAmount) > 0 && !isLoading && !isTransactionPending
+                  ? needsApproval
+                    ? "bg-gradient-to-r from-blue-400 to-blue-500 text-white"
+                    : "bg-gradient-to-r from-amber-400 to-yellow-500 text-black"
                   : "bg-zinc-700 text-zinc-400 cursor-not-allowed"
               }`}
               onClick={executeSwap}
-              disabled={parseFloat(swapAmount) <= 0 || isLoading}
+              disabled={parseFloat(swapAmount) <= 0 || isLoading || isTransactionPending}
             >
-              {isLoading ? (
+              {isLoading || isTransactionPending ? (
                 <div className="flex justify-center items-center gap-2">
-                  <div className="w-5 h-5 border-t-2 border-r-2 border-black rounded-full animate-spin"></div>
-                  <span>Wird geladen...</span>
+                  <div className="w-5 h-5 border-t-2 border-r-2 border-current rounded-full animate-spin"></div>
+                  <span>
+                    {isApproving ? "Approval wird verarbeitet..." : 
+                     isTransactionPending ? "Transaktion wird verarbeitet..." : 
+                     "Wird geladen..."}
+                  </span>
                 </div>
               ) : parseFloat(swapAmount) <= 0 ? (
                 "Betrag eingeben"
+              ) : needsApproval ? (
+                `${selectedProvider.toUpperCase()} Token freigeben`
               ) : (
-                "Jetzt tauschen"
+                `Jetzt über ${selectedProvider.toUpperCase()} tauschen`
               )}
             </Button>
             
@@ -827,9 +1002,28 @@ export default function WalletTab() {
             <div className="text-xs text-zinc-500 flex items-center gap-1.5 justify-center mt-2">
               <FaExchangeAlt size={10} className="text-amber-400" />
               <span>
-                Powered by {selectedProvider === "paraswap" ? "ParaSwap Universal Bridge" : "Thirdweb Bridge"} | Client-ID: {process.env.NEXT_PUBLIC_TEMPLATE_CLIENT_ID!}
+                Powered by {
+                  selectedProvider === "thirdweb" ? "Thirdweb DEX Integration" :
+                  selectedProvider === "paraswap" ? "ParaSwap Universal Router" :
+                  "OpenOcean Aggregator"
+                } | Client-ID: {process.env.NEXT_PUBLIC_TEMPLATE_CLIENT_ID!.slice(0, 8)}...
               </span>
             </div>
+            
+            {/* Zusätzliche Informationen */}
+            {needsApproval && (
+              <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 text-xs">
+                <div className="flex items-center gap-2 text-blue-400 mb-1">
+                  <div className="w-4 h-4 rounded-full bg-blue-500/20 flex items-center justify-center">
+                    <span className="text-blue-400 text-[10px]">!</span>
+                  </div>
+                  <span className="font-medium">Token-Freigabe erforderlich</span>
+                </div>
+                <span className="text-zinc-400">
+                  Vor dem ersten Swap müssen Sie {selectedProvider.toUpperCase()} erlauben, Ihre D.FAITH Token zu verwenden.
+                </span>
+              </div>
+            )}
           </div>
           
           <Button className="mt-5 w-full bg-zinc-800 border border-zinc-700 text-zinc-400 hover:bg-zinc-700" onClick={() => setShowSell(false)}>
