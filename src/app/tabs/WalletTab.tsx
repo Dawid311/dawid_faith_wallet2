@@ -165,6 +165,7 @@ export default function WalletTab() {
         console.log("D.INVEST Formatted:", dinvestFormatted);
         console.log("D.INVEST Final displayValue:", dinvestFormatted.toString());
         console.log("D.INVEST > 0?", dinvestFormatted > 0);
+        console.log("D.INVEST State wird gesetzt mit:", { displayValue: dinvestFormatted.toString() });
         console.log("=====================");
         
       } catch (error) {
@@ -473,7 +474,7 @@ export default function WalletTab() {
             </div>
 
             {/* DFAITH Token-Karte - jetzt mit D.FAITH */}
-            <div className="flex flex-col items-center p-4 bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl border border-zinc-700 w-full mb-6 relative">
+            <div className="flex flex-col items-center p-4 bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl border border-zinc-700 w-full mb-6">
               <span className="uppercase text-xs tracking-widest text-amber-500/80 mb-2">D.FAITH</span>
               <div className="text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 drop-shadow-sm">
                 {dfaithBalance ? Number(dfaithBalance.displayValue).toFixed(4) : "0.00"}
@@ -484,21 +485,10 @@ export default function WalletTab() {
               <div className="text-xs text-zinc-500">
                 ≈ 0.00 EUR
               </div>
-              
-              {/* D.INVEST Balance klein anzeigen links unten */}
-              <div className="absolute bottom-3 left-3 flex items-center gap-1.5 bg-zinc-800/80 backdrop-blur-sm px-2 py-1 rounded-lg border border-zinc-700/50">
-                <div className="w-3 h-3 rounded-full bg-gradient-to-r from-amber-400/60 to-yellow-500/60 flex items-center justify-center">
-                  <FaLock className="text-black text-[8px]" />
-                </div>
-                <span className="text-[10px] text-zinc-400">D.INVEST:</span>
-                <span className="text-[10px] text-amber-400/80 font-medium">
-                  {dinvestBalance ? (Number(dinvestBalance.displayValue) || 0).toFixed(2) : "0.00"}
-                </span>
-              </div>
             </div>
 
             {/* Action Buttons mit besseren Gradienten */}
-            <div className="grid grid-cols-4 gap-2 md:gap-4 mb-6">
+            <div className="grid grid-cols-3 gap-2 md:gap-4 mb-6">
               <Button
                 className="flex flex-col items-center justify-center gap-1 px-1 py-3.5 md:py-4.5 bg-gradient-to-br from-zinc-800/90 to-zinc-900 hover:from-zinc-800 hover:to-zinc-800 shadow-lg shadow-black/20 rounded-xl hover:scale-[1.02] transition-all duration-300 border border-zinc-700/80"
                 onClick={() => setShowBuy(true)}
@@ -526,19 +516,17 @@ export default function WalletTab() {
                 </div>
                 <span className="text-xs bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 bg-clip-text text-transparent font-medium">Senden</span>
               </Button>
-              <Button
-                className="flex flex-col items-center justify-center gap-1 px-1 py-3.5 md:py-4.5 bg-gradient-to-br from-zinc-800/90 to-zinc-900 hover:from-zinc-800 hover:to-zinc-800 shadow-lg shadow-black/20 rounded-xl hover:scale-[1.02] transition-all duration-300 border border-zinc-700/80"
-                onClick={() => setShowStake(true)}
-              >
-                <div className="w-8 h-8 flex items-center justify-center bg-gradient-to-br from-amber-400 to-yellow-500 rounded-full mb-1 shadow-inner">
-                  <FaLock className="text-black text-sm" />
-                </div>
-                <span className="text-xs bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 bg-clip-text text-transparent font-medium">Staking</span>
-              </Button>
             </div>
             
-            {/* D.INVEST immer anzeigen wenn Balance vorhanden (auch sehr kleine Beträge) */}
-            {dinvestBalance && Number(dinvestBalance.displayValue) >= 0 && (
+            {/* D.INVEST immer anzeigen wenn Balance definiert ist */}
+            {(() => {
+              console.log("D.INVEST Render Check:", {
+                dinvestBalance,
+                displayValue: dinvestBalance?.displayValue,
+                asNumber: dinvestBalance ? Number(dinvestBalance.displayValue) : 'undefined'
+              });
+              return dinvestBalance;
+            })() && (
               <div className="flex flex-col p-4 bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl border border-zinc-700 w-full">
                 <div className="flex items-center justify-between mb-2">
                   <span className="uppercase text-xs tracking-widest text-amber-500/80">D.INVEST</span>
@@ -546,7 +534,7 @@ export default function WalletTab() {
                 
                 <div className="flex items-center justify-between">
                   <div className="text-2xl md:text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500">
-                    {(Number(dinvestBalance.displayValue) || 0).toFixed(2)}
+                    {(Number(dinvestBalance?.displayValue || 0) || 0).toFixed(2)}
                   </div>
                   
                   <button 
