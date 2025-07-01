@@ -156,12 +156,16 @@ export default function WalletTab() {
         const dinvestFormatted = Number(dinvestBalanceResult) / Math.pow(10, DINVEST_TOKEN.decimals);
         
         setDfaithBalance({ displayValue: dfaithFormatted.toFixed(4) });
-        setDinvestBalance({ displayValue: dinvestFormatted.toFixed(0) });
+        setDinvestBalance({ displayValue: dinvestFormatted.toString() }); // Als String ohne toFixed für bessere Anzeige
         
-        console.log("D.FAITH Balance:", dfaithFormatted);
-        console.log("D.INVEST Balance:", dinvestFormatted);
-        console.log("D.INVEST Raw:", dinvestBalanceResult.toString());
+        console.log("=== BALANCE DEBUG ===");
+        console.log("D.FAITH Raw Balance:", dfaithBalanceResult.toString());
+        console.log("D.FAITH Formatted:", dfaithFormatted);
+        console.log("D.INVEST Raw Balance:", dinvestBalanceResult.toString());
+        console.log("D.INVEST Formatted:", dinvestFormatted);
+        console.log("D.INVEST Final displayValue:", dinvestFormatted.toString());
         console.log("D.INVEST > 0?", dinvestFormatted > 0);
+        console.log("=====================");
         
       } catch (error) {
         console.error("Fehler beim Abrufen der Balances:", error);
@@ -488,7 +492,7 @@ export default function WalletTab() {
                 </div>
                 <span className="text-[10px] text-zinc-400">D.INVEST:</span>
                 <span className="text-[10px] text-amber-400/80 font-medium">
-                  {dinvestBalance ? Number(dinvestBalance.displayValue).toFixed(0) : "0"}
+                  {dinvestBalance ? (Number(dinvestBalance.displayValue) || 0).toFixed(2) : "0.00"}
                 </span>
               </div>
             </div>
@@ -533,8 +537,8 @@ export default function WalletTab() {
               </Button>
             </div>
             
-            {/* D.INVEST nur anzeigen wenn Balance > 0 */}
-            {dinvestBalance && Number(dinvestBalance.displayValue) > 0 && (
+            {/* D.INVEST immer anzeigen wenn Balance vorhanden (auch sehr kleine Beträge) */}
+            {dinvestBalance && Number(dinvestBalance.displayValue) >= 0 && (
               <div className="flex flex-col p-4 bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl border border-zinc-700 w-full">
                 <div className="flex items-center justify-between mb-2">
                   <span className="uppercase text-xs tracking-widest text-amber-500/80">D.INVEST</span>
@@ -542,7 +546,7 @@ export default function WalletTab() {
                 
                 <div className="flex items-center justify-between">
                   <div className="text-2xl md:text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500">
-                    {Number(dinvestBalance.displayValue).toFixed(0)}
+                    {(Number(dinvestBalance.displayValue) || 0).toFixed(2)}
                   </div>
                   
                   <button 
@@ -796,7 +800,7 @@ export default function WalletTab() {
               <div className="bg-zinc-800 rounded-lg p-3 border border-zinc-700 text-center">
                 <span className="text-xs text-zinc-500 mb-1">Verfügbar</span>
                 <div className="text-lg font-bold text-amber-400">
-                  {dinvestBalance ? Number(dinvestBalance.displayValue).toFixed(0) : "0"}
+                  {dinvestBalance ? (Number(dinvestBalance.displayValue) || 0).toFixed(2) : "0.00"}
                 </div>
               </div>
               <div className="bg-zinc-800 rounded-lg p-3 border border-zinc-700 text-center">
