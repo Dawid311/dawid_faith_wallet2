@@ -237,23 +237,28 @@ export default function WalletTab() {
             </Button>
           </div>
           
-          {/* D.INVEST Balance - jetzt unter den Buttons */}
+          {/* D.INVEST Balance - neu gestaltet ohne Vertragsadresse */}
           <div className="flex flex-col items-center p-4 bg-zinc-800/50 rounded-xl border border-zinc-700 w-full">
-            <div className="flex items-center justify-between w-full mb-2">
-              <span className="text-sm text-zinc-400">D.INVEST Token</span>
-              <button 
-                onClick={() => setShowStake(true)}
-                className="text-xs px-3 py-1 rounded-lg bg-amber-600/20 text-amber-400 hover:bg-amber-600/30 transition"
-              >
-                Staken
-              </button>
-            </div>
-            <div className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500">
+            <span className="text-sm text-zinc-400 mb-1">D.INVEST Token</span>
+            
+            <div className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 mb-2">
               {dinvestBalance ? Number(dinvestBalance.displayValue).toFixed(0) : "0"}
             </div>
-            <div className="text-xs text-zinc-500 mt-1 w-full overflow-hidden text-ellipsis text-center">
-              Contract: 0xa3f0Bf2a9d7f1a0958989Ea4c4DBE8B595117643
+            
+            {/* Gestakte Tokens anzeigen, falls vorhanden */}
+            <div className="text-xs text-zinc-500 mb-3">
+              <span>Gestaked: </span>
+              <span className="text-amber-400/80">0</span> {/* Hier die gestakten Tokens einfügen */}
             </div>
+            
+            {/* Neuer Stake-Button unter der Balance */}
+            <button 
+              onClick={() => setShowStake(true)}
+              className="text-sm px-4 py-1.5 rounded-lg bg-gradient-to-r from-amber-500/20 to-amber-600/20 text-amber-400 hover:from-amber-500/30 hover:to-amber-600/30 transition-all duration-300 flex items-center gap-2"
+            >
+              <FaLock size={12} />
+              <span>Staken & Verdienen</span>
+            </button>
           </div>
         </CardContent>
       </Card>
