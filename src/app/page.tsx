@@ -90,7 +90,10 @@ export default function Home() {
             <div className="flex flex-col items-center gap-6">
               <ConnectButton
                 client={client}
-                chain="polygon"
+                chain={{
+                  id: 137, // Polygon Mainnet chain ID
+                  rpc: "https://polygon-rpc.com"
+                }}
                 appMetadata={{
                   name: "Faith Wallet",
                   url: "https://example.com",
