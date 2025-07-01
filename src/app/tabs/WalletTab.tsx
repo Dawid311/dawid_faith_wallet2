@@ -6,7 +6,7 @@ import { inAppWallet, createWallet } from "thirdweb/wallets";
 import { Card, CardContent } from "../../../components/ui/card";
 import { Button } from "../../../components/ui/button";
 import { FaRegCopy } from "react-icons/fa";
-import { FaCoins, FaArrowDown, FaArrowUp, FaPaperPlane } from "react-icons/fa";
+import { FaCoins, FaArrowDown, FaArrowUp, FaPaperPlane, FaLock } from "react-icons/fa";
 
 // Modal mit dunklem Farbschema
 function Modal({ open, onClose, title, children }: { open: boolean, onClose: () => void, title: string, children: React.ReactNode }) {
@@ -63,20 +63,24 @@ export default function WalletTab() {
   const status = useActiveWalletConnectionStatus();
 
   const [dfaithBalance, setDfaithBalance] = useState<{ displayValue: string } | null>(null);
-
+  const [dinvestBalance, setDinvestBalance] = useState<{ displayValue: string } | null>(null);
+  
   // Modale State
   const [showBuy, setShowBuy] = useState(false);
   const [showSell, setShowSell] = useState(false);
   const [showSend, setShowSend] = useState(false);
+  const [showStake, setShowStake] = useState(false);
 
   useEffect(() => {
     async function fetchBalances() {
       if (!account?.address) {
         setDfaithBalance(null);
+        setDinvestBalance(null);
         return;
       }
       // Hier echte Balance-Logik einbauen!
       setDfaithBalance({ displayValue: "0.00" });
+      setDinvestBalance({ displayValue: "0.00" });
     }
     fetchBalances();
   }, [account?.address]);
@@ -159,7 +163,7 @@ export default function WalletTab() {
   }
 
   return (
-    <div className="flex justify-center min-h-[70vh] items-center py-8 bg-black"> {/* Hier geändert von bg-zinc-100 zu bg-black */}
+    <div className="flex justify-center min-h-[70vh] items-center py-8 bg-black">
       <Card className="w-full max-w-xl bg-gradient-to-br from-zinc-900 to-black rounded-3xl shadow-2xl border border-zinc-700 relative overflow-hidden">
         {/* Glanzeffekt/Highlight oben */}
         <div className="absolute top-0 left-0 w-full h-1/3 bg-gradient-to-r from-pink-500/10 via-purple-500/10 to-blue-500/10 rounded-t-3xl"></div>
@@ -188,7 +192,7 @@ export default function WalletTab() {
           </div>
 
           {/* Wallet Address mit besserem Styling */}
-          <div className="flex justify-between items-center bg-zinc-800/80 backdrop-blur-sm rounded-2xl p-4 mb-10 border border-zinc-700">
+          <div className="flex justify-between items-center bg-zinc-800/80 backdrop-blur-sm rounded-2xl p-4 mb-8 border border-zinc-700">
             <span className="font-mono text-zinc-300 text-base">{formatAddress(account.address)}</span>
             <button
               onClick={copyWalletAddress}
@@ -199,13 +203,36 @@ export default function WalletTab() {
             </button>
           </div>
 
-          {/* Balance mit Gold/Gradient Style */}
-          <div className="flex flex-col items-center mb-12">
-            <span className="uppercase text-xs tracking-widest text-zinc-500 mb-2">Kontostand</span>
-            <div className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 drop-shadow">
-              {dfaithBalance ? Number(dfaithBalance.displayValue).toFixed(4) : "0.00"}
+          {/* Balances mit Gold/Gradient Style */}
+          <div className="flex flex-col items-center mb-6">
+            <span className="uppercase text-xs tracking-widest text-zinc-500 mb-2">Deine Token</span>
+            
+            {/* DFAITH Balance */}
+            <div className="mb-4">
+              <div className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 drop-shadow">
+                {dfaithBalance ? Number(dfaithBalance.displayValue).toFixed(4) : "0.00"}
+              </div>
+              <span className="text-sm font-semibold text-amber-400/80 mt-1">DFAITH</span>
             </div>
-            <span className="text-sm font-semibold text-amber-400/80 mt-1">DFAITH</span>
+            
+            {/* D.INVEST Balance */}
+            <div className="flex flex-col items-center p-4 bg-zinc-800/50 rounded-xl border border-zinc-700 w-full mb-6">
+              <div className="flex items-center justify-between w-full mb-1">
+                <span className="text-sm text-zinc-400">D.INVEST</span>
+                <button 
+                  onClick={() => setShowStake(true)}
+                  className="text-xs px-2 py-1 rounded-lg bg-amber-600/20 text-amber-400 hover:bg-amber-600/30 transition"
+                >
+                  Staken
+                </button>
+              </div>
+              <div className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500">
+                {dinvestBalance ? Number(dinvestBalance.displayValue).toFixed(0) : "0"}
+              </div>
+              <div className="text-xs text-zinc-500 mt-1 w-full overflow-hidden text-ellipsis">
+                Smart Contract: 0xa3f0...7643
+              </div>
+            </div>
           </div>
 
           {/* Action Buttons mit besseren Gradienten - jetzt immer nebeneinander */}
@@ -214,21 +241,21 @@ export default function WalletTab() {
               className="flex flex-col items-center justify-center gap-1 px-1 py-4 md:py-5 bg-gradient-to-br from-zinc-800 to-zinc-900 font-bold shadow-xl rounded-xl hover:scale-[1.03] hover:shadow-amber-500/20 transition-all duration-300 border border-zinc-700"
               onClick={() => setShowBuy(true)}
             >
-              <FaArrowDown className="text-lg md:text-xl bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 bg-clip-text text-transparent" />
+              <FaArrowDown className="text-lg md:text-xl text-amber-400" />
               <span className="text-xs md:text-sm bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 bg-clip-text text-transparent">Kaufen</span>
             </Button>
             <Button
               className="flex flex-col items-center justify-center gap-1 px-1 py-4 md:py-5 bg-gradient-to-br from-zinc-800 to-zinc-900 font-bold shadow-xl rounded-xl hover:scale-[1.03] hover:shadow-amber-500/20 transition-all duration-300 border border-zinc-700"
               onClick={() => setShowSell(true)}
             >
-              <FaArrowUp className="text-lg md:text-xl bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 bg-clip-text text-transparent" />
+              <FaArrowUp className="text-lg md:text-xl text-amber-400" />
               <span className="text-xs md:text-sm bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 bg-clip-text text-transparent">Verkaufen</span>
             </Button>
             <Button
               className="flex flex-col items-center justify-center gap-1 px-1 py-4 md:py-5 bg-gradient-to-br from-zinc-800 to-zinc-900 font-bold shadow-xl rounded-xl hover:scale-[1.03] hover:shadow-amber-500/20 transition-all duration-300 border border-zinc-700"
               onClick={() => setShowSend(true)}
             >
-              <FaPaperPlane className="text-lg md:text-xl bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 bg-clip-text text-transparent" />
+              <FaPaperPlane className="text-lg md:text-xl text-amber-400" />
               <span className="text-xs md:text-sm bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 bg-clip-text text-transparent">Senden</span>
             </Button>
           </div>
@@ -253,6 +280,27 @@ export default function WalletTab() {
       <Modal open={showSend} onClose={() => setShowSend(false)} title="Token senden">
         <div className="text-center text-zinc-300">Sende-Funktion kommt hier hin.</div>
         <Button className="mt-6 w-full bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold" onClick={() => setShowSend(false)}>
+          Schließen
+        </Button>
+      </Modal>
+      
+      <Modal open={showStake} onClose={() => setShowStake(false)} title="D.INVEST staken">
+        <div className="text-zinc-300">
+          <p className="text-center mb-4">Stake deine D.INVEST Tokens und verdiene Belohnungen</p>
+          <div className="bg-zinc-800 rounded-lg p-4 mb-4">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-sm text-zinc-400">Smart Contract:</span>
+            </div>
+            <div className="font-mono text-xs text-amber-400 break-all">
+              0x333C4053048D542f039bd3de08f35AB998a6e68E
+            </div>
+          </div>
+          <div className="flex items-center justify-center gap-2 mb-4">
+            <FaLock className="text-amber-400" />
+            <span className="text-zinc-300">Sichere Staking-Funktion</span>
+          </div>
+        </div>
+        <Button className="mt-4 w-full bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold" onClick={() => setShowStake(false)}>
           Schließen
         </Button>
       </Modal>
