@@ -1,8 +1,10 @@
 import { useEffect, useState, useRef } from "react";
-import { createThirdwebClient } from "thirdweb";
+import { createThirdwebClient, getContract } from "thirdweb";
 import { useActiveAccount, useActiveWalletConnectionStatus } from "thirdweb/react";
 import { ConnectButton } from "thirdweb/react";
 import { inAppWallet, createWallet } from "thirdweb/wallets";
+import { polygon } from "thirdweb/chains";
+import { balanceOf } from "thirdweb/extensions/erc20";
 import { Card, CardContent } from "../../../components/ui/card";
 import { Button } from "../../../components/ui/button";
 import { FaRegCopy } from "react-icons/fa";
@@ -89,11 +91,17 @@ export default function WalletTab() {
   const [exchangeRate, setExchangeRate] = useState("0");
   const [slippage, setSlippage] = useState("1"); // Default 1%
   
-  // Konstanten für Token korrigieren
+  // Konstanten für Token mit echten Contract-Adressen
   const DFAITH_TOKEN = {
-    address: "0xB83D1B711BdB57B47e10BC9D5B874B4Fd99C23d6", 
+    address: "0xB83D1B711BdB57B47e10BC9D5B874B4Fd99C23d6", // D.FAITH Token-Contract
     decimals: 18,
-    symbol: "D.FAITH" // Geändert zu D.FAITH
+    symbol: "D.FAITH"
+  };
+
+  const DINVEST_TOKEN = {
+    address: "0xa3f0Bf2a9d7f1a0958989Ea4c4DBE8B595117643", // D.INVEST Token-Contract
+    decimals: 18,
+    symbol: "D.INVEST"
   };
 
   const POL_TOKEN = {
@@ -109,10 +117,51 @@ export default function WalletTab() {
         setDinvestBalance(null);
         return;
       }
-      // Hier echte Balance-Logik einbauen!
-      // In einer echten Implementierung würdest du hier Web3-Aufrufe machen
-      setDfaithBalance({ displayValue: "1052.6842" }); // Beispielwert
-      setDinvestBalance({ displayValue: "500" });      // Beispielwert
+      
+      try {
+        console.log("Wallet-Adresse:", account.address);
+        console.log("Lade Balances...");
+        
+        // D.FAITH Balance abrufen
+        const dfaithContract = getContract({
+          client,
+          chain: polygon,
+          address: DFAITH_TOKEN.address
+        });
+        
+        const dfaithBalanceResult = await balanceOf({
+          contract: dfaithContract,
+          address: account.address
+        });
+        
+        // D.INVEST Balance abrufen
+        const dinvestContract = getContract({
+          client,
+          chain: polygon,
+          address: DINVEST_TOKEN.address
+        });
+        
+        const dinvestBalanceResult = await balanceOf({
+          contract: dinvestContract,
+          address: account.address
+        });
+        
+        // Balances formatieren und setzen
+        const dfaithFormatted = Number(dfaithBalanceResult) / Math.pow(10, DFAITH_TOKEN.decimals);
+        const dinvestFormatted = Number(dinvestBalanceResult) / Math.pow(10, DINVEST_TOKEN.decimals);
+        
+        setDfaithBalance({ displayValue: dfaithFormatted.toFixed(4) });
+        setDinvestBalance({ displayValue: dinvestFormatted.toFixed(0) });
+        
+        console.log("D.FAITH Balance:", dfaithFormatted);
+        console.log("D.INVEST Balance:", dinvestFormatted);
+        
+      } catch (error) {
+        console.error("Fehler beim Abrufen der Balances:", error);
+        // Bei Fehler 0 setzen
+        setDfaithBalance({ displayValue: "0.0000" });
+        setDinvestBalance({ displayValue: "0" });
+      }
     }
     fetchBalances();
   }, [account?.address]);
@@ -134,14 +183,14 @@ export default function WalletTab() {
             dialog: "#18181b",
             fontFamily: "Inter"
           },
-          defaultInputTokenAddress: "0xB83D1B711BdB57B47e10BC9D5B874B4Fd99C23d6", // Geänderte DFAITH-Token-Adresse
+          defaultInputTokenAddress: "0xB83D1B711BdB57B47e10BC9D5B874B4Fd99C23d6", // D.FAITH Token-Contract-Adresse
           defaultInputAmount: 1,
           defaultOutputTokenAddress: "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270", // WMATIC auf Polygon
           jsonRpcEndpoint: "https://polygon-rpc.com", // Expliziten RPC Endpoint angeben
           tokenList: [
             {
               "name": "D.FAITH Token",
-              "address": "0xB83D1B711BdB57B47e10BC9D5B874B4Fd99C23d6",
+              "address": "0xB83D1B711BdB57B47e10BC9D5B874B4Fd99C23d6", // D.FAITH Token-Contract
               "symbol": "D.FAITH",
               "decimals": 18,
               "chainId": 137,
@@ -457,31 +506,33 @@ export default function WalletTab() {
               </Button>
             </div>
             
-            {/* D.INVEST unter den Buttons mit Stake-Button */}
-            <div className="flex flex-col p-4 bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl border border-zinc-700 w-full">
-              <div className="flex items-center justify-between mb-2">
-                <span className="uppercase text-xs tracking-widest text-amber-500/80">D.INVEST</span>
-              </div>
-              
-              <div className="flex items-center justify-between">
-                <div className="text-2xl md:text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500">
-                  {dinvestBalance ? Number(dinvestBalance.displayValue).toFixed(0) : "0"}
+            {/* D.INVEST nur anzeigen wenn Balance > 0 */}
+            {dinvestBalance && Number(dinvestBalance.displayValue) > 0 && (
+              <div className="flex flex-col p-4 bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl border border-zinc-700 w-full">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="uppercase text-xs tracking-widest text-amber-500/80">D.INVEST</span>
                 </div>
                 
-                <button 
-                  onClick={() => setShowStake(true)}
-                  className="flex items-center gap-2 px-4 py-1.5 rounded-lg bg-gradient-to-r from-amber-500/20 to-amber-600/20 text-amber-400 hover:from-amber-500/30 hover:to-amber-600/30 transition-all border border-amber-500/20"
-                >
-                  <FaLock size={12} />
-                  <span className="text-sm font-medium">Staken & Verdienen</span>
-                </button>
+                <div className="flex items-center justify-between">
+                  <div className="text-2xl md:text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500">
+                    {Number(dinvestBalance.displayValue).toFixed(0)}
+                  </div>
+                  
+                  <button 
+                    onClick={() => setShowStake(true)}
+                    className="flex items-center gap-2 px-4 py-1.5 rounded-lg bg-gradient-to-r from-amber-500/20 to-amber-600/20 text-amber-400 hover:from-amber-500/30 hover:to-amber-600/30 transition-all border border-amber-500/20"
+                  >
+                    <FaLock size={12} />
+                    <span className="text-sm font-medium">Staken & Verdienen</span>
+                  </button>
+                </div>
+                
+                {/* Gestaked Anzeige */}
+                <div className="text-xs text-zinc-500 mt-2">
+                  Gestaked: <span className="text-amber-400/80">0</span>
+                </div>
               </div>
-              
-              {/* Gestaked Anzeige */}
-              <div className="text-xs text-zinc-500 mt-2">
-                Gestaked: <span className="text-amber-400/80">0</span>
-              </div>
-            </div>
+            )}
           </CardContent>
         </Card>
 
