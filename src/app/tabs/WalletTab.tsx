@@ -114,7 +114,25 @@ export default function WalletTab() {
           defaultInputTokenAddress: "0xEE27258975a2DA946CD5025134D70E5E24F6789F", // DFAITH-Token-Adresse
           defaultInputAmount: 1,
           defaultOutputTokenAddress: "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270", // WMATIC auf Polygon
-          // provider: account?.connector?.getProvider(), // Removed because 'connector' does not exist on 'Account'
+          jsonRpcEndpoint: "https://polygon-rpc.com", // Expliziten RPC Endpoint angeben
+          tokenList: [
+            {
+              "name": "DFAITH Token",
+              "address": "0xEE27258975a2DA946CD5025134D70E5E24F6789F",
+              "symbol": "DFAITH",
+              "decimals": 18,
+              "chainId": 137,
+              "logoURI": "https://placehold.co/200x200/gold/black?text=DF"
+            },
+            {
+              "name": "Wrapped Matic",
+              "address": "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270",
+              "symbol": "WMATIC",
+              "decimals": 18,
+              "chainId": 137,
+              "logoURI": "https://s2.coinmarketcap.com/static/img/coins/64x64/3890.png"
+            }
+          ]
         });
         
         // Widget zum Container hinzufügen
