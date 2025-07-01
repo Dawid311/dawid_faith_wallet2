@@ -76,20 +76,15 @@ export default function Navigation({ activeTab, setActiveTab }: NavigationProps)
         <li className="relative flex items-center">
           <button
             title={activeSocial.charAt(0).toUpperCase() + activeSocial.slice(1)}
-            onClick={() => setActiveTab(activeSocial)}
+            onClick={() => setOpen((v) => !v)} // Nur Dropdown öffnen/schließen!
             className="flex items-center"
+            aria-haspopup="true"
+            aria-expanded={open}
           >
             {socialIcons[activeSocial]}
-          </button>
-          <button
-            onClick={() => setOpen((v) => !v)}
-            className="flex items-center ml-1"
-            title="Weitere Social Media"
-            tabIndex={-1}
-          >
             <FiChevronDown
               size={22}
-              className={`transition-colors ${
+              className={`ml-1 transition-colors ${
                 open ? "text-pink-400" : "text-zinc-400"
               } hover:text-pink-400`}
             />
