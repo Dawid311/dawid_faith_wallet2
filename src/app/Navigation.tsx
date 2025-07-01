@@ -19,22 +19,21 @@ type NavigationProps = {
 
 export default function Navigation({ activeTab, setActiveTab }: NavigationProps) {
   const [open, setOpen] = useState(false);
-  const [activeSocial, setActiveSocial] = useState<"instagram" | "tiktok" | "facebook" | null>(null);
 
-  // Social Media Icon je nach Auswahl
+  // Social Media Icon je nach aktivem Tab
   const getSocialIcon = () => {
-    if (activeSocial === "instagram")
+    if (activeTab === "instagram")
       return <FaInstagram size={22} className="text-pink-500" />;
-    if (activeSocial === "tiktok")
+    if (activeTab === "tiktok")
       return <FaTiktok size={22} className="text-black dark:text-white" />;
-    if (activeSocial === "facebook")
+    if (activeTab === "facebook")
       return <FaFacebook size={22} className="text-blue-600" />;
     // Default: Chevron
     return (
       <FiChevronDown
         size={22}
         className={`transition-colors ${
-          activeTab === "social" || open ? "text-pink-400" : "text-zinc-400"
+          open ? "text-pink-400" : "text-zinc-400"
         } hover:text-pink-400`}
       />
     );
@@ -73,13 +72,10 @@ export default function Navigation({ activeTab, setActiveTab }: NavigationProps)
             />
           </button>
         </li>
-        {/* Social Media Dropdown */}
+        {/* Social Media Icon (immer sichtbar, Dropdown zum Wechseln) */}
         <li className="relative">
           <button
-            onClick={() => {
-              setOpen((v) => !v);
-              setActiveTab("social");
-            }}
+            onClick={() => setOpen((v) => !v)}
             className="flex items-center"
             title="Social Media"
           >
@@ -89,9 +85,8 @@ export default function Navigation({ activeTab, setActiveTab }: NavigationProps)
             <div className="absolute left-1/2 -translate-x-1/2 mt-2 bg-zinc-800 rounded shadow-lg flex flex-col z-50 min-w-[120px]">
               <button
                 onClick={() => {
-                  setActiveSocial("instagram");
+                  setActiveTab("instagram");
                   setOpen(false);
-                  setActiveTab("social");
                 }}
                 className="flex items-center gap-2 px-4 py-2 hover:bg-zinc-700 text-zinc-100 w-full"
               >
@@ -99,9 +94,8 @@ export default function Navigation({ activeTab, setActiveTab }: NavigationProps)
               </button>
               <button
                 onClick={() => {
-                  setActiveSocial("tiktok");
+                  setActiveTab("tiktok");
                   setOpen(false);
-                  setActiveTab("social");
                 }}
                 className="flex items-center gap-2 px-4 py-2 hover:bg-zinc-700 text-zinc-100 w-full"
               >
@@ -109,9 +103,8 @@ export default function Navigation({ activeTab, setActiveTab }: NavigationProps)
               </button>
               <button
                 onClick={() => {
-                  setActiveSocial("facebook");
+                  setActiveTab("facebook");
                   setOpen(false);
-                  setActiveTab("social");
                 }}
                 className="flex items-center gap-2 px-4 py-2 hover:bg-zinc-700 text-zinc-100 w-full"
               >

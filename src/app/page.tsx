@@ -2,8 +2,14 @@
 
 import { useState } from "react";
 import Navigation from "./Navigation";
-import { ConnectButton } from "thirdweb/react";
-import { client } from "./client";
+import WalletTab from "./tabs/WalletTab";
+import TokenomicsTab from "./tabs/TokenomicsTab";
+import MerchTab from "./tabs/MerchTab";
+import StreamTab from "./tabs/StreamTab";
+import LiveTab from "./tabs/LiveTab";
+import InstagramTab from "./tabs/InstagramTab";
+import TiktokTab from "./tabs/TiktokTab";
+import FacebookTab from "./tabs/FacebookTab";
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState("wallet");
@@ -12,22 +18,17 @@ export default function Home() {
     <main className="min-h-screen flex flex-col bg-zinc-950">
       <Navigation activeTab={activeTab} setActiveTab={setActiveTab} />
       <section className="flex-1 flex flex-col items-center justify-center pt-24 pb-8">
-        {activeTab === "wallet" && (
-          <ConnectButton
-            client={client}
-            appMetadata={{
-              name: "Faith Wallet",
-              url: "https://example.com",
-            }}
-            theme="dark"
-          />
-        )}
-        {activeTab === "tokenomics" && <div className="text-white">Tokenomics Inhalt</div>}
-        {activeTab === "merch" && <div className="text-white">Merch Inhalt</div>}
-        {activeTab === "stream" && <div className="text-white">Stream Inhalt</div>}
-        {activeTab === "live" && <div className="text-white">Live Inhalt</div>}
-        {activeTab === "social" && <div className="text-white">Social Media geöffnet</div>}
+        {activeTab === "wallet" && <WalletTab />}
+        {activeTab === "tokenomics" && <TokenomicsTab />}
+        {activeTab === "merch" && <MerchTab />}
+        {activeTab === "stream" && <StreamTab />}
+        {activeTab === "live" && <LiveTab />}
+        {activeTab === "instagram" && <InstagramTab />}
+        {activeTab === "tiktok" && <TiktokTab />}
+        {activeTab === "facebook" && <FacebookTab />}
       </section>
     </main>
   );
 }
+
+
