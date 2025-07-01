@@ -6,8 +6,9 @@ import { inAppWallet, createWallet } from "thirdweb/wallets";
 import { Card, CardContent } from "../../../components/ui/card";
 import { Button } from "../../../components/ui/button";
 import { FaRegCopy } from "react-icons/fa";
-import { FaCoins, FaArrowDown, FaArrowUp, FaPaperPlane, FaLock } from "react-icons/fa";
+import { FaCoins, FaArrowDown, FaArrowUp, FaPaperPlane, FaLock, FaExchangeAlt } from "react-icons/fa";
 import Script from "next/script";
+import axios from "axios";
 
 // Modal mit dunklem Farbschema
 function Modal({ open, onClose, title, children }: { open: boolean, onClose: () => void, title: string, children: React.ReactNode }) {
@@ -79,6 +80,27 @@ export default function WalletTab() {
   const [showStake, setShowStake] = useState(false);
   const uniswapWidgetRef = useRef<HTMLDivElement>(null);
   const [uniswapLoaded, setUniswapLoaded] = useState(false);
+
+  // Neue States für den Swap
+  const [swapAmount, setSwapAmount] = useState("");
+  const [estimatedOutput, setEstimatedOutput] = useState("0");
+  const [isLoading, setIsLoading] = useState(false);
+  const [selectedProvider, setSelectedProvider] = useState("paraswap"); // "paraswap" oder "openocean"
+  const [exchangeRate, setExchangeRate] = useState("0");
+  const [slippage, setSlippage] = useState("1"); // Default 1%
+  
+  // Konstanten für Token
+  const DFAITH_TOKEN = {
+    address: "0xEE27258975a2DA946CD5025134D70E5E24F6789F",
+    decimals: 18,
+    symbol: "DFAITH"
+  };
+  
+  const MATIC_TOKEN = {
+    address: "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270", // WMATIC
+    decimals: 18,
+    symbol: "MATIC"
+  };
 
   useEffect(() => {
     async function fetchBalances() {
@@ -157,6 +179,106 @@ export default function WalletTab() {
   };
 
   const formatAddress = (address: string) => `${address.slice(0, 6)}...${address.slice(-4)}`;
+
+  // Funktion zum Abrufen eines Preisangebots
+  const fetchQuote = async () => {
+    if (!swapAmount || parseFloat(swapAmount) <= 0) {
+      setEstimatedOutput("0");
+      setExchangeRate("0");
+      return;
+    }
+    
+    setIsLoading(true);
+    
+    try {
+      let quote;
+      
+      if (selectedProvider === "paraswap") {
+        // ParaSwap API Call
+        const response = await axios.get(`https://apiv5.paraswap.io/prices`, {
+          params: {
+            srcToken: DFAITH_TOKEN.address,
+            destToken: MATIC_TOKEN.address,
+            amount: (parseFloat(swapAmount) * Math.pow(10, DFAITH_TOKEN.decimals)).toString(),
+            srcDecimals: DFAITH_TOKEN.decimals,
+            destDecimals: MATIC_TOKEN.decimals,
+            side: "SELL",
+            network: 137, // Polygon
+          }
+        });
+        
+        quote = response.data;
+        
+        // Extrahiere den Wert und berechne den Wechselkurs
+        const outputAmount = parseFloat(quote.priceRoute.destAmount) / Math.pow(10, MATIC_TOKEN.decimals);
+        setEstimatedOutput(outputAmount.toFixed(6));
+        
+        const rate = outputAmount / parseFloat(swapAmount);
+        setExchangeRate(rate.toFixed(6));
+      } else {
+        // OpenOcean API Call
+        const response = await axios.get(`https://open-api.openocean.finance/v3/137/quote`, {
+          params: {
+            chain: "polygon",
+            inTokenAddress: DFAITH_TOKEN.address,
+            outTokenAddress: MATIC_TOKEN.address,
+            amount: swapAmount,
+            gasPrice: "30",
+            slippage: slippage
+          }
+        });
+        
+        quote = response.data.data;
+        
+        // Extrahiere den Wert
+        setEstimatedOutput(quote.outAmount);
+        
+        const rate = parseFloat(quote.outAmount) / parseFloat(swapAmount);
+        setExchangeRate(rate.toFixed(6));
+      }
+    } catch (error) {
+      console.error("Fehler beim Abrufen des Angebots:", error);
+      setEstimatedOutput("0");
+      setExchangeRate("0");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Anfrage nach Quote, wenn sich der Betrag oder Provider ändert
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchQuote();
+    }, 500); // Debounce von 500ms
+    
+    return () => clearTimeout(timer);
+  }, [swapAmount, selectedProvider, slippage]);
+
+  // Swap-Funktion
+  const executeSwap = async () => {
+    if (!account?.address || !swapAmount || parseFloat(swapAmount) <= 0) {
+      return;
+    }
+    
+    setIsLoading(true);
+    
+    try {
+      // Hier würde die Transaktion vorbereitet und gesendet werden
+      // Diese Funktion benötigt die vollständige Web3-Integration
+      
+      alert("In einer echten Implementierung würde jetzt der Swap durchgeführt werden.");
+      
+      // Nach erfolgreichem Swap zurücksetzen
+      setSwapAmount("");
+      setEstimatedOutput("0");
+      setExchangeRate("0");
+      
+    } catch (error) {
+      console.error("Fehler beim Ausführen des Swaps:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   if (status !== "connected" || !account?.address) {
     return (
@@ -410,34 +532,161 @@ export default function WalletTab() {
           </Button>
         </Modal>
 
-        {/* Übrige Modals bleiben unverändert */}
+        {/* Modifiziertes Verkaufs-Modal */}
         <Modal open={showSell} onClose={() => setShowSell(false)} title="DFAITH verkaufen">
-          <div className="text-zinc-300">
-            <div className="mb-3 text-center text-sm text-zinc-400">
-              Tausche DFAITH gegen POL mit Uniswap
-            </div>
-            
-            {/* Uniswap Widget Container */}
-            <div 
-              ref={uniswapWidgetRef} 
-              className="w-full min-h-[360px] rounded-lg overflow-hidden bg-zinc-800 flex items-center justify-center"
-            >
-              {!uniswapLoaded && (
-                <div className="text-center py-6">
-                  <div className="animate-spin w-8 h-8 border-t-2 border-amber-400 border-r-2 rounded-full mx-auto mb-3"></div>
-                  <p className="text-zinc-400 text-sm">Widget wird geladen...</p>
-                </div>
-              )}
-            </div>
-            
-            <div className="mt-4 text-xs text-zinc-500">
-              <div className="flex items-center gap-1.5 mb-1">
-                <FaCoins className="text-amber-400" size={12} />
-                <span>Swap wird über Uniswap ausgeführt</span>
+          <div className="flex flex-col gap-4">
+            {/* Provider Auswahl */}
+            <div className="flex items-center justify-between bg-zinc-800/70 rounded-lg p-3 border border-zinc-700">
+              <span className="text-sm text-zinc-300">Swap-Provider:</span>
+              <div className="flex items-center gap-2">
+                <button 
+                  className={`px-3 py-1 rounded-lg text-xs font-medium transition ${
+                    selectedProvider === "paraswap" 
+                      ? "bg-amber-500/20 text-amber-400 border border-amber-500/30" 
+                      : "bg-zinc-700 text-zinc-400 border border-zinc-600"
+                  }`}
+                  onClick={() => setSelectedProvider("paraswap")}
+                >
+                  ParaSwap
+                </button>
+                <button 
+                  className={`px-3 py-1 rounded-lg text-xs font-medium transition ${
+                    selectedProvider === "openocean" 
+                      ? "bg-amber-500/20 text-amber-400 border border-amber-500/30" 
+                      : "bg-zinc-700 text-zinc-400 border border-zinc-600"
+                  }`}
+                  onClick={() => setSelectedProvider("openocean")}
+                >
+                  OpenOcean
+                </button>
               </div>
-              <p>Die genauen Beträge und Gebühren werden im Widget angezeigt.</p>
+            </div>
+            
+            {/* Eingabefeld für DFAITH */}
+            <div className="bg-zinc-800 rounded-lg border border-zinc-700 p-4">
+              <div className="flex justify-between mb-2">
+                <span className="text-sm text-zinc-400">Von</span>
+                <span className="text-xs text-zinc-500">
+                  Verfügbar: <span className="text-amber-400">
+                    {dfaithBalance ? Number(dfaithBalance.displayValue).toFixed(4) : "0.00"}
+                  </span>
+                </span>
+              </div>
+              
+              <div className="flex items-center gap-3 bg-zinc-900 rounded-lg p-3 border border-zinc-700">
+                <div className="flex items-center gap-2 bg-zinc-800 px-2.5 py-1.5 rounded-lg">
+                  <div className="w-6 h-6 rounded-full bg-gradient-to-r from-amber-400 to-yellow-500 flex items-center justify-center">
+                    <span className="text-xs font-bold text-black">DF</span>
+                  </div>
+                  <span className="text-sm text-amber-400">DFAITH</span>
+                </div>
+                <input 
+                  type="number"
+                  className="flex-1 bg-transparent border-none text-right text-base text-amber-400 font-medium focus:outline-none"
+                  placeholder="0.0"
+                  value={swapAmount}
+                  onChange={(e) => setSwapAmount(e.target.value)}
+                />
+              </div>
+              
+              <div className="flex justify-between mt-2">
+                <span></span>
+                <button 
+                  className="text-xs px-2 py-0.5 bg-amber-500/20 text-amber-400 rounded hover:bg-amber-500/30 transition"
+                  onClick={() => setSwapAmount(dfaithBalance?.displayValue || "0")}
+                >
+                  MAX
+                </button>
+              </div>
+            </div>
+            
+            {/* Austausch-Icon */}
+            <div className="flex justify-center -my-1.5">
+              <div className="w-8 h-8 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center shadow-lg">
+                <FaArrowDown className="text-amber-400 text-sm" />
+              </div>
+            </div>
+            
+            {/* Ausgabefeld für MATIC */}
+            <div className="bg-zinc-800 rounded-lg border border-zinc-700 p-4">
+              <div className="flex justify-between mb-2">
+                <span className="text-sm text-zinc-400">Zu</span>
+                <span className="text-xs text-zinc-500">
+                  Geschätzter Erhalt
+                </span>
+              </div>
+              
+              <div className="flex items-center gap-3 bg-zinc-900 rounded-lg p-3 border border-zinc-700">
+                <div className="flex items-center gap-2 bg-zinc-800 px-2.5 py-1.5 rounded-lg">
+                  <div className="w-6 h-6 rounded-full bg-gradient-to-r from-purple-400 to-purple-600 flex items-center justify-center">
+                    <span className="text-xs font-bold text-white">M</span>
+                  </div>
+                  <span className="text-sm text-purple-400">MATIC</span>
+                </div>
+                <div className="flex-1 text-right">
+                  {isLoading ? (
+                    <div className="flex justify-end items-center">
+                      <div className="w-5 h-5 border-t-2 border-r-2 border-amber-400 rounded-full animate-spin"></div>
+                    </div>
+                  ) : (
+                    <span className="text-base text-purple-400 font-medium">
+                      {estimatedOutput}
+                    </span>
+                  )}
+                </div>
+              </div>
+              
+              <div className="flex justify-between mt-2">
+                <span className="text-xs text-zinc-500">
+                  Kurs: 1 DFAITH = {exchangeRate} MATIC
+                </span>
+                <span className="text-xs text-zinc-500">
+                  Slippage: 
+                  <select 
+                    className="ml-1 bg-zinc-800 border border-zinc-700 rounded text-amber-400 px-1"
+                    value={slippage}
+                    onChange={(e) => setSlippage(e.target.value)}
+                  >
+                    <option value="0.5">0.5%</option>
+                    <option value="1">1%</option>
+                    <option value="2">2%</option>
+                    <option value="3">3%</option>
+                  </select>
+                </span>
+              </div>
+            </div>
+            
+            {/* Ausführungs-Button */}
+            <Button
+              className={`w-full py-3 font-bold rounded-xl ${
+                parseFloat(swapAmount) > 0 && !isLoading
+                  ? "bg-gradient-to-r from-amber-400 to-yellow-500 text-black"
+                  : "bg-zinc-700 text-zinc-400 cursor-not-allowed"
+              }`}
+              onClick={executeSwap}
+              disabled={parseFloat(swapAmount) <= 0 || isLoading}
+            >
+              {isLoading ? (
+                <div className="flex justify-center items-center gap-2">
+                  <div className="w-5 h-5 border-t-2 border-r-2 border-black rounded-full animate-spin"></div>
+                  <span>Wird geladen...</span>
+                </div>
+              ) : parseFloat(swapAmount) <= 0 ? (
+                "Betrag eingeben"
+              ) : (
+                "Jetzt tauschen"
+              )}
+            </Button>
+            
+            {/* Provider Info */}
+            <div className="text-xs text-zinc-500 flex items-center gap-1.5 justify-center mt-2">
+              <FaExchangeAlt size={10} className="text-amber-400" />
+              <span>
+                Powered by {selectedProvider === "paraswap" ? "ParaSwap" : "OpenOcean"} | Beste Kurse automatisch
+              </span>
             </div>
           </div>
+          
           <Button className="mt-5 w-full bg-zinc-800 border border-zinc-700 text-zinc-400 hover:bg-zinc-700" onClick={() => setShowSell(false)}>
             Schließen
           </Button>
