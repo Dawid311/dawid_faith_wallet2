@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState, useRef } from "react";
 import { createThirdwebClient } from "thirdweb";
 import { useActiveAccount, useActiveWalletConnectionStatus } from "thirdweb/react";
 import { ConnectButton } from "thirdweb/react";
@@ -7,6 +7,7 @@ import { Card, CardContent } from "../../../components/ui/card";
 import { Button } from "../../../components/ui/button";
 import { FaRegCopy } from "react-icons/fa";
 import { FaCoins, FaArrowDown, FaArrowUp, FaPaperPlane, FaLock } from "react-icons/fa";
+import Script from "next/script";
 
 // Modal mit dunklem Farbschema
 function Modal({ open, onClose, title, children }: { open: boolean, onClose: () => void, title: string, children: React.ReactNode }) {
@@ -20,6 +21,12 @@ function Modal({ open, onClose, title, children }: { open: boolean, onClose: () 
       </div>
     </div>
   );
+}
+
+declare global {
+  interface Window {
+    SwapWidget: any;
+  }
 }
 
 const client = createThirdwebClient({
@@ -70,6 +77,8 @@ export default function WalletTab() {
   const [showSell, setShowSell] = useState(false);
   const [showSend, setShowSend] = useState(false);
   const [showStake, setShowStake] = useState(false);
+  const uniswapWidgetRef = useRef<HTMLDivElement>(null);
+  const [uniswapLoaded, setUniswapLoaded] = useState(false);
 
   useEffect(() => {
     async function fetchBalances() {
@@ -84,6 +93,43 @@ export default function WalletTab() {
     }
     fetchBalances();
   }, [account?.address]);
+
+  // Uniswap Widget initialisieren, wenn Modal geöffnet wird
+  useEffect(() => {
+    if (showSell && uniswapWidgetRef.current && uniswapLoaded && window.SwapWidget) {
+      try {
+        const widget = new window.SwapWidget({
+          width: "100%",
+          theme: {
+            primary: "#1c1c1c",
+            secondary: "#2c2c2c",
+            interactive: "#fbbf24",
+            container: "#18181b",
+            module: "#27272a",
+            accent: "#f59e0b",
+            outline: "#3f3f46",
+            dialog: "#18181b",
+            fontFamily: "Inter"
+          },
+          defaultInputTokenAddress: "0xEE27258975a2DA946CD5025134D70E5E24F6789F", // DFAITH-Token-Adresse
+          defaultInputAmount: 1,
+          defaultOutputTokenAddress: "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270", // WMATIC auf Polygon
+          // provider: account?.connector?.getProvider(), // Removed because 'connector' does not exist on 'Account'
+        });
+        
+        // Widget zum Container hinzufügen
+        const container = uniswapWidgetRef.current;
+        container.innerHTML = "";
+        widget.render(container);
+        
+        return () => {
+          if (container) container.innerHTML = "";
+        };
+      } catch (error) {
+        console.error("Fehler beim Initialisieren des Uniswap Widgets:", error);
+      }
+    }
+  }, [showSell, uniswapLoaded, account]);
 
   const copyWalletAddress = () => {
     if (account?.address) {
@@ -163,211 +209,272 @@ export default function WalletTab() {
   }
 
   return (
-    <div className="flex justify-center min-h-[70vh] items-center py-8 bg-black">
-      <Card className="w-full max-w-xl bg-gradient-to-br from-zinc-900 to-black rounded-3xl shadow-2xl border border-zinc-700 relative overflow-hidden">
-        {/* Glanzeffekt/Highlight oben */}
-        <div className="absolute top-0 left-0 w-full h-1/3 bg-gradient-to-r from-pink-500/10 via-purple-500/10 to-blue-500/10 rounded-t-3xl"></div>
-        
-        <CardContent className="p-10 relative z-10">
-          {/* Header mit Gold-Akzent */}
-          <div className="flex justify-between items-center mb-10">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-gradient-to-r from-yellow-400 to-amber-600 rounded-full">
-                <FaCoins className="text-black text-xl" />
-              </div>
-              <span className="text-lg font-bold bg-gradient-to-r from-amber-200 to-yellow-400 bg-clip-text text-transparent">
-                Dawid Faith Wallet
-              </span>
-            </div>
-            <ConnectButton
-              client={client}
-              connectButton={{ label: "" }}
-              connectModal={{ size: "compact" }}
-              wallets={wallets}
-              chain={{
-                id: 137,
-                rpc: "https://polygon-rpc.com",
-              }}
-            />
-          </div>
-
-          {/* Wallet Address mit besserem Styling */}
-          <div className="flex justify-between items-center bg-zinc-800/80 backdrop-blur-sm rounded-2xl p-4 mb-8 border border-zinc-700">
-            <span className="font-mono text-zinc-300 text-base">{formatAddress(account.address)}</span>
-            <button
-              onClick={copyWalletAddress}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-700 hover:bg-zinc-600 text-zinc-200 text-sm font-medium transition-all duration-200"
-              title="Adresse kopieren"
-            >
-              <FaRegCopy /> Kopieren
-            </button>
-          </div>
-
-          {/* DFAITH Balance */}
-          <div className="flex flex-col items-center mb-8">
-            <span className="uppercase text-xs tracking-widest text-zinc-500 mb-2">Kontostand</span>
-            <div className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 drop-shadow">
-              {dfaithBalance ? Number(dfaithBalance.displayValue).toFixed(4) : "0.00"}
-            </div>
-            <span className="text-sm font-semibold text-amber-400/80 mt-1">DFAITH</span>
-          </div>
-
-          {/* Action Buttons mit besseren Gradienten - jetzt immer nebeneinander */}
-          <div className="grid grid-cols-3 gap-2 md:gap-4 mb-8">
-            <Button
-              className="flex flex-col items-center justify-center gap-1 px-1 py-4 md:py-5 bg-gradient-to-br from-zinc-800 to-zinc-900 font-bold shadow-xl rounded-xl hover:scale-[1.03] hover:shadow-amber-500/20 transition-all duration-300 border border-zinc-700"
-              onClick={() => setShowBuy(true)}
-            >
-              <FaArrowDown className="text-lg md:text-xl text-amber-400" />
-              <span className="text-xs md:text-sm bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 bg-clip-text text-transparent">Kaufen</span>
-            </Button>
-            <Button
-              className="flex flex-col items-center justify-center gap-1 px-1 py-4 md:py-5 bg-gradient-to-br from-zinc-800 to-zinc-900 font-bold shadow-xl rounded-xl hover:scale-[1.03] hover:shadow-amber-500/20 transition-all duration-300 border border-zinc-700"
-              onClick={() => setShowSell(true)}
-            >
-              <FaArrowUp className="text-lg md:text-xl text-amber-400" />
-              <span className="text-xs md:text-sm bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 bg-clip-text text-transparent">Verkaufen</span>
-            </Button>
-            <Button
-              className="flex flex-col items-center justify-center gap-1 px-1 py-4 md:py-5 bg-gradient-to-br from-zinc-800 to-zinc-900 font-bold shadow-xl rounded-xl hover:scale-[1.03] hover:shadow-amber-500/20 transition-all duration-300 border border-zinc-700"
-              onClick={() => setShowSend(true)}
-            >
-              <FaPaperPlane className="text-lg md:text-xl text-amber-400" />
-              <span className="text-xs md:text-sm bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 bg-clip-text text-transparent">Senden</span>
-            </Button>
-          </div>
-          
-          {/* D.INVEST Balance - neu gestaltet ohne Vertragsadresse */}
-          <div className="flex flex-col items-center p-4 bg-zinc-800/50 rounded-xl border border-zinc-700 w-full">
-            <span className="text-sm text-zinc-400 mb-1">D.INVEST Token</span>
-            
-            <div className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 mb-2">
-              {dinvestBalance ? Number(dinvestBalance.displayValue).toFixed(0) : "0"}
-            </div>
-            
-            {/* Gestakte Tokens anzeigen, falls vorhanden */}
-            <div className="text-xs text-zinc-500 mb-3">
-              <span>Gestaked: </span>
-              <span className="text-amber-400/80">0</span> {/* Hier die gestakten Tokens einfügen */}
-            </div>
-            
-            {/* Neuer Stake-Button unter der Balance */}
-            <button 
-              onClick={() => setShowStake(true)}
-              className="text-sm px-4 py-1.5 rounded-lg bg-gradient-to-r from-amber-500/20 to-amber-600/20 text-amber-400 hover:from-amber-500/30 hover:to-amber-600/30 transition-all duration-300 flex items-center gap-2"
-            >
-              <FaLock size={12} />
-              <span>Staken & Verdienen</span>
-            </button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Modale mit angepasstem Inhalt */}
-      <Modal open={showBuy} onClose={() => setShowBuy(false)} title="DFAITH kaufen">
-        <div className="text-center text-zinc-300">Kauf-Funktion kommt hier hin.</div>
-        <Button className="mt-6 w-full bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold" onClick={() => setShowBuy(false)}>
-          Schließen
-        </Button>
-      </Modal>
-
-      <Modal open={showSell} onClose={() => setShowSell(false)} title="DFAITH verkaufen">
-        <div className="text-center text-zinc-300">Verkauf-Funktion kommt hier hin.</div>
-        <Button className="mt-6 w-full bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold" onClick={() => setShowSell(false)}>
-          Schließen
-        </Button>
-      </Modal>
-
-      <Modal open={showSend} onClose={() => setShowSend(false)} title="Token senden">
-        <div className="text-center text-zinc-300">Sende-Funktion kommt hier hin.</div>
-        <Button className="mt-6 w-full bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold" onClick={() => setShowSend(false)}>
-          Schließen
-        </Button>
-      </Modal>
+    <>
+      <Script 
+        src="https://unpkg.com/@uniswap/widgets@latest/dist/uniswap-widgets.js" 
+        onLoad={() => setUniswapLoaded(true)}
+      />
       
-      <Modal open={showStake} onClose={() => setShowStake(false)} title="D.INVEST staken">
-        <div className="text-zinc-300">
-          {/* Oberer Bereich mit Balances */}
-          <div className="grid grid-cols-2 gap-4 mb-6">
-            <div className="bg-zinc-800 rounded-lg p-3 text-center border border-zinc-700">
-              <p className="text-xs text-zinc-500 mb-1">Verfügbar</p>
-              <p className="text-lg font-bold text-amber-400">{dinvestBalance ? Number(dinvestBalance.displayValue).toFixed(0) : "0"}</p>
-            </div>
-            <div className="bg-zinc-800 rounded-lg p-3 text-center border border-zinc-700">
-              <p className="text-xs text-zinc-500 mb-1">Gestaked</p>
-              <p className="text-lg font-bold text-amber-400">0</p>
-            </div>
-          </div>
+      <div className="flex justify-center min-h-[70vh] items-center py-8 bg-black">
+        <Card className="w-full max-w-xl bg-gradient-to-br from-zinc-900 to-black rounded-3xl shadow-2xl border border-zinc-700 relative overflow-hidden">
+          {/* Glanzeffekt/Highlight oben */}
+          <div className="absolute top-0 left-0 w-full h-1/3 bg-gradient-to-r from-pink-500/10 via-purple-500/10 to-blue-500/10 rounded-t-3xl"></div>
           
-          {/* Eingabefeld für Staking */}
-          <div className="bg-zinc-800 rounded-lg p-4 mb-6 border border-zinc-700">
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-sm text-zinc-400">Betrag:</span>
-              <button 
-                className="text-xs px-2 py-0.5 bg-zinc-700 hover:bg-zinc-600 rounded text-amber-400"
-                onClick={() => {/* Maximalbetrag setzen */}}
+          <CardContent className="p-10 relative z-10">
+            {/* Header mit Gold-Akzent */}
+            <div className="flex justify-between items-center mb-10">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-gradient-to-r from-yellow-400 to-amber-600 rounded-full">
+                  <FaCoins className="text-black text-xl" />
+                </div>
+                <span className="text-lg font-bold bg-gradient-to-r from-amber-200 to-yellow-400 bg-clip-text text-transparent">
+                  Dawid Faith Wallet
+                </span>
+              </div>
+              <ConnectButton
+                client={client}
+                connectButton={{ label: "" }}
+                connectModal={{ size: "compact" }}
+                wallets={wallets}
+                chain={{
+                  id: 137,
+                  rpc: "https://polygon-rpc.com",
+                }}
+              />
+            </div>
+
+            {/* Wallet Address mit besserem Styling */}
+            <div className="flex justify-between items-center bg-zinc-800/80 backdrop-blur-sm rounded-2xl p-4 mb-8 border border-zinc-700">
+              <span className="font-mono text-zinc-300 text-base">{formatAddress(account.address)}</span>
+              <button
+                onClick={copyWalletAddress}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-700 hover:bg-zinc-600 text-zinc-200 text-sm font-medium transition-all duration-200"
+                title="Adresse kopieren"
               >
-                MAX
+                <FaRegCopy /> Kopieren
               </button>
             </div>
-            <div className="relative">
-              <input 
-                type="number"
-                placeholder="0"
-                className="w-full bg-zinc-900 border border-zinc-700 rounded p-2 text-amber-400 focus:border-amber-500 focus:outline-none"
-              />
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-zinc-500">
-                D.INVEST
+
+            {/* DFAITH Balance */}
+            <div className="flex flex-col items-center mb-8">
+              <span className="uppercase text-xs tracking-widest text-zinc-500 mb-2">Kontostand</span>
+              <div className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 drop-shadow">
+                {dfaithBalance ? Number(dfaithBalance.displayValue).toFixed(4) : "0.00"}
+              </div>
+              <span className="text-sm font-semibold text-amber-400/80 mt-1">DFAITH</span>
+            </div>
+
+            {/* Action Buttons mit besseren Gradienten - jetzt immer nebeneinander */}
+            <div className="grid grid-cols-3 gap-2 md:gap-4 mb-8">
+              <Button
+                className="flex flex-col items-center justify-center gap-1 px-1 py-4 md:py-5 bg-gradient-to-br from-zinc-800 to-zinc-900 font-bold shadow-xl rounded-xl hover:scale-[1.03] hover:shadow-amber-500/20 transition-all duration-300 border border-zinc-700"
+                onClick={() => setShowBuy(true)}
+              >
+                <FaArrowDown className="text-lg md:text-xl text-amber-400" />
+                <span className="text-xs md:text-sm bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 bg-clip-text text-transparent">Kaufen</span>
+              </Button>
+              <Button
+                className="flex flex-col items-center justify-center gap-1 px-1 py-4 md:py-5 bg-gradient-to-br from-zinc-800 to-zinc-900 font-bold shadow-xl rounded-xl hover:scale-[1.03] hover:shadow-amber-500/20 transition-all duration-300 border border-zinc-700"
+                onClick={() => setShowSell(true)}
+              >
+                <FaArrowUp className="text-lg md:text-xl text-amber-400" />
+                <span className="text-xs md:text-sm bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 bg-clip-text text-transparent">Verkaufen</span>
+              </Button>
+              <Button
+                className="flex flex-col items-center justify-center gap-1 px-1 py-4 md:py-5 bg-gradient-to-br from-zinc-800 to-zinc-900 font-bold shadow-xl rounded-xl hover:scale-[1.03] hover:shadow-amber-500/20 transition-all duration-300 border border-zinc-700"
+                onClick={() => setShowSend(true)}
+              >
+                <FaPaperPlane className="text-lg md:text-xl text-amber-400" />
+                <span className="text-xs md:text-sm bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 bg-clip-text text-transparent">Senden</span>
+              </Button>
+            </div>
+            
+            {/* D.INVEST Balance - ohne "Token" */}
+            <div className="flex flex-col items-center p-4 bg-zinc-800/50 rounded-xl border border-zinc-700 w-full">
+              <span className="text-sm text-zinc-400 mb-1">D.INVEST</span>
+              
+              <div className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 mb-2">
+                {dinvestBalance ? Number(dinvestBalance.displayValue).toFixed(0) : "0"}
+              </div>
+              
+              {/* Gestakte Tokens anzeigen, falls vorhanden */}
+              <div className="text-xs text-zinc-500 mb-3">
+                <span>Gestaked: </span>
+                <span className="text-amber-400/80">0</span> {/* Hier die gestakten Tokens einfügen */}
+              </div>
+              
+              {/* Neuer Stake-Button unter der Balance */}
+              <button 
+                onClick={() => setShowStake(true)}
+                className="text-sm px-4 py-1.5 rounded-lg bg-gradient-to-r from-amber-500/20 to-amber-600/20 text-amber-400 hover:from-amber-500/30 hover:to-amber-600/30 transition-all duration-300 flex items-center gap-2"
+              >
+                <FaLock size={12} />
+                <span>Staken & Verdienen</span>
+              </button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Kauf-Modal mit 3 Buttons */}
+        <Modal open={showBuy} onClose={() => setShowBuy(false)} title="Token kaufen">
+          <div className="flex flex-col gap-5">
+            {/* DFAITH mit POL kaufen */}
+            <div className="bg-zinc-800 rounded-lg p-4 border border-zinc-700">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 bg-gradient-to-r from-yellow-400 to-amber-600 rounded-full">
+                    <FaCoins className="text-black text-sm" />
+                  </div>
+                  <span className="font-medium text-amber-400">DFAITH</span>
+                </div>
+                <span className="text-xs text-zinc-400">mit POL kaufen</span>
+              </div>
+              <Button className="w-full bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-2">
+                DFAITH kaufen
+              </Button>
+            </div>
+            
+            {/* D.INVEST mit € kaufen */}
+            <div className="bg-zinc-800 rounded-lg p-4 border border-zinc-700">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 bg-gradient-to-r from-yellow-400 to-amber-600 rounded-full">
+                    <FaLock className="text-black text-sm" />
+                  </div>
+                  <span className="font-medium text-amber-400">D.INVEST</span>
+                </div>
+                <span className="text-xs text-zinc-400">mit € kaufen</span>
+              </div>
+              <Button className="w-full bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-2">
+                D.INVEST kaufen
+              </Button>
+            </div>
+            
+            {/* POL mit € kaufen */}
+            <div className="bg-zinc-800 rounded-lg p-4 border border-zinc-700">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 bg-gradient-to-r from-purple-400 to-purple-600 rounded-full">
+                    <FaCoins className="text-black text-sm" />
+                  </div>
+                  <span className="font-medium text-purple-400">POLYGON</span>
+                </div>
+                <span className="text-xs text-zinc-400">mit € kaufen</span>
+              </div>
+              <Button className="w-full bg-gradient-to-r from-purple-500 to-purple-600 text-white font-bold py-2">
+                POL kaufen
+              </Button>
+            </div>
+          </div>
+          
+          <Button className="mt-5 w-full bg-zinc-800 border border-zinc-700 text-zinc-400 hover:bg-zinc-700" onClick={() => setShowBuy(false)}>
+            Schließen
+          </Button>
+        </Modal>
+
+        {/* Übrige Modals bleiben unverändert */}
+        <Modal open={showSell} onClose={() => setShowSell(false)} title="DFAITH verkaufen">
+          <div className="text-center text-zinc-300">
+            Verkauf-Funktion kommt hier hin.
+          </div>
+          <Button className="mt-6 w-full bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold" onClick={() => setShowSell(false)}>
+            Schließen
+          </Button>
+        </Modal>
+
+        <Modal open={showSend} onClose={() => setShowSend(false)} title="Token senden">
+          <div className="text-center text-zinc-300">
+            Sende-Funktion kommt hier hin.
+          </div>
+          <Button className="mt-6 w-full bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold" onClick={() => setShowSend(false)}>
+            Schließen
+          </Button>
+        </Modal>
+        
+        <Modal open={showStake} onClose={() => setShowStake(false)} title="D.INVEST staken">
+          <div className="text-zinc-300">
+            {/* Oberer Bereich mit Balances */}
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              <div className="bg-zinc-800 rounded-lg p-3 text-center border border-zinc-700">
+                <p className="text-xs text-zinc-500 mb-1">Verfügbar</p>
+                <p className="text-lg font-bold text-amber-400">{dinvestBalance ? Number(dinvestBalance.displayValue).toFixed(0) : "0"}</p>
+              </div>
+              <div className="bg-zinc-800 rounded-lg p-3 text-center border border-zinc-700">
+                <p className="text-xs text-zinc-500 mb-1">Gestaked</p>
+                <p className="text-lg font-bold text-amber-400">0</p>
+              </div>
+            </div>
+            
+            {/* Eingabefeld für Staking */}
+            <div className="bg-zinc-800 rounded-lg p-4 mb-6 border border-zinc-700">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-sm text-zinc-400">Betrag:</span>
+                <button 
+                  className="text-xs px-2 py-0.5 bg-zinc-700 hover:bg-zinc-600 rounded text-amber-400"
+                  onClick={() => {/* Maximalbetrag setzen */}}
+                >
+                  MAX
+                </button>
+              </div>
+              <div className="relative">
+                <input 
+                  type="number"
+                  placeholder="0"
+                  className="w-full bg-zinc-900 border border-zinc-700 rounded p-2 text-amber-400 focus:border-amber-500 focus:outline-none"
+                />
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-zinc-500">
+                  D.INVEST
+                </div>
+              </div>
+            </div>
+            
+            {/* Aktions-Buttons */}
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              <Button 
+                onClick={() => {/* Stake-Logik */}}
+                className="bg-gradient-to-r from-amber-500 to-amber-600 text-black font-bold py-2"
+              >
+                Staken
+              </Button>
+              <Button 
+                onClick={() => {/* Unstake-Logik */}}
+                className="bg-zinc-800 border border-zinc-700 text-amber-400 font-bold py-2 hover:bg-zinc-700"
+              >
+                Unstaken
+              </Button>
+            </div>
+            
+            {/* Rewards-Bereich */}
+            <div className="bg-zinc-800 rounded-lg p-4 mb-6 border border-zinc-700">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-sm text-zinc-400">Verdiente Belohnungen:</span>
+                <span className="text-amber-400 font-bold">0 DFAITH</span>
+              </div>
+              <Button 
+                onClick={() => {/* Claim-Logik */}} 
+                className="w-full bg-gradient-to-r from-amber-500 to-amber-600 text-black font-bold py-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={true}
+              >
+                Belohnungen einfordern
+              </Button>
+            </div>
+            
+            {/* Info-Bereich */}
+            <div className="bg-zinc-800/50 rounded-lg p-4 mb-4 text-xs">
+              <div className="flex items-center mb-2 gap-2">
+                <FaLock className="text-amber-400" />
+                <span className="text-zinc-300">Smart Contract:</span>
+              </div>
+              <div className="font-mono text-amber-400/80 break-all text-xs">
+                0x333C4053048D542f039bd3de08f35AB998a6e68E
               </div>
             </div>
           </div>
-          
-          {/* Aktions-Buttons */}
-          <div className="grid grid-cols-2 gap-4 mb-6">
-            <Button 
-              onClick={() => {/* Stake-Logik */}}
-              className="bg-gradient-to-r from-amber-500 to-amber-600 text-black font-bold py-2"
-            >
-              Staken
-            </Button>
-            <Button 
-              onClick={() => {/* Unstake-Logik */}}
-              className="bg-zinc-800 border border-zinc-700 text-amber-400 font-bold py-2 hover:bg-zinc-700"
-            >
-              Unstaken
-            </Button>
-          </div>
-          
-          {/* Rewards-Bereich */}
-          <div className="bg-zinc-800 rounded-lg p-4 mb-6 border border-zinc-700">
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-sm text-zinc-400">Verdiente Belohnungen:</span>
-              <span className="text-amber-400 font-bold">0 DFAITH</span>
-            </div>
-            <Button 
-              onClick={() => {/* Claim-Logik */}} 
-              className="w-full bg-gradient-to-r from-amber-500 to-amber-600 text-black font-bold py-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={true}
-            >
-              Belohnungen einfordern
-            </Button>
-          </div>
-          
-          {/* Info-Bereich */}
-          <div className="bg-zinc-800/50 rounded-lg p-4 mb-4 text-xs">
-            <div className="flex items-center mb-2 gap-2">
-              <FaLock className="text-amber-400" />
-              <span className="text-zinc-300">Smart Contract:</span>
-            </div>
-            <div className="font-mono text-amber-400/80 break-all text-xs">
-              0x333C4053048D542f039bd3de08f35AB998a6e68E
-            </div>
-          </div>
-        </div>
-        <Button className="mt-2 w-full bg-zinc-800 border border-zinc-700 text-zinc-400 hover:bg-zinc-700" onClick={() => setShowStake(false)}>
-          Schließen
-        </Button>
-      </Modal>
-    </div>
+          <Button className="mt-2 w-full bg-zinc-800 border border-zinc-700 text-zinc-400 hover:bg-zinc-700" onClick={() => setShowStake(false)}>
+            Schließen
+          </Button>
+        </Modal>
+      </div>
+    </>
   );
 }
