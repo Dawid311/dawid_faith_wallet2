@@ -92,21 +92,27 @@ export default function WalletTab() {
   const [exchangeRate, setExchangeRate] = useState("0");
   const [slippage, setSlippage] = useState("1"); // Default 1%
   
+  // Neue States für das Senden Modal
+  const [sendAmount, setSendAmount] = useState("");
+  const [sendToAddress, setSendToAddress] = useState("");
+  const [selectedSendToken, setSelectedSendToken] = useState("DFAITH"); // "DFAITH", "DINVEST", "POL"
+  const [isSending, setIsSending] = useState(false);
+  
   // Konstanten für Token mit echten Contract-Adressen
   const DFAITH_TOKEN = {
-    address: "0xB83D1B711BdB57B47e10BC9D5B874B4Fd99C23d6", // D.FAITH Token-Contract
+    address: "0x67f1439bd51Cfb0A46f739Ec8D5663F41d027bff", // D.FAITH Token-Contract
     decimals: 18,
     symbol: "D.FAITH"
   };
 
   const DINVEST_TOKEN = {
-    address: "0xa3f0Bf2a9d7f1a0958989Ea4c4DBE8B595117643", // D.INVEST Token-Contract
-    decimals: 0,
+    address: "0x72a428F03d7a301cEAce084366928b99c4d757bD", // D.INVEST Token-Contract
+    decimals: 18,
     symbol: "D.INVEST"
   };
 
   const STAKING_CONTRACT = {
-    address: "0x333C4053048D542f039bd3de08f35AB998a6e68E", // D.INVEST Staking Contract
+    address: "0xe730555afA4DeA022976DdDc0cC7DBba1C98568A", // D.INVEST Staking Contract
     name: "D.INVEST Staking"
   };
 
@@ -157,24 +163,24 @@ export default function WalletTab() {
         const dinvestFormatted = Number(dinvestBalanceResult) / Math.pow(10, DINVEST_TOKEN.decimals);
         
         setDfaithBalance({ displayValue: dfaithFormatted.toFixed(4) });
-        // D.INVEST Balance - keine Dezimalstellen da 0 decimals
-        setDinvestBalance({ displayValue: dinvestFormatted.toString() });
+        // D.INVEST Balance - jetzt auch mit 18 Decimals
+        setDinvestBalance({ displayValue: dinvestFormatted.toFixed(4) });
         
         console.log("=== BALANCE DEBUG ===");
         console.log("D.FAITH Raw Balance:", dfaithBalanceResult.toString());
         console.log("D.FAITH Formatted:", dfaithFormatted);
         console.log("D.INVEST Raw Balance:", dinvestBalanceResult.toString());
         console.log("D.INVEST Formatted:", dinvestFormatted);
-        console.log("D.INVEST Final displayValue:", dinvestFormatted.toString());
+        console.log("D.INVEST Final displayValue:", dinvestFormatted.toFixed(4));
         console.log("D.INVEST > 0?", dinvestFormatted > 0);
-        console.log("D.INVEST State wird gesetzt mit:", { displayValue: dinvestFormatted.toString() });
+        console.log("D.INVEST State wird gesetzt mit:", { displayValue: dinvestFormatted.toFixed(4) });
         console.log("=====================");
         
       } catch (error) {
         console.error("Fehler beim Abrufen der Balances:", error);
         // Bei Fehler 0 setzen
         setDfaithBalance({ displayValue: "0.0000" });
-        setDinvestBalance({ displayValue: "0" });
+        setDinvestBalance({ displayValue: "0.0000" });
       }
     }
     fetchBalances();
@@ -197,14 +203,14 @@ export default function WalletTab() {
             dialog: "#18181b",
             fontFamily: "Inter"
           },
-          defaultInputTokenAddress: "0xB83D1B711BdB57B47e10BC9D5B874B4Fd99C23d6", // D.FAITH Token-Contract-Adresse
+          defaultInputTokenAddress: "0x67f1439bd51Cfb0A46f739Ec8D5663F41d027bff", // D.FAITH Token-Contract-Adresse
           defaultInputAmount: 1,
           defaultOutputTokenAddress: "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270", // WMATIC auf Polygon
           jsonRpcEndpoint: "https://polygon-rpc.com", // Expliziten RPC Endpoint angeben
           tokenList: [
             {
               "name": "D.FAITH Token",
-              "address": "0xB83D1B711BdB57B47e10BC9D5B874B4Fd99C23d6", // D.FAITH Token-Contract
+              "address": "0x67f1439bd51Cfb0A46f739Ec8D5663F41d027bff", // D.FAITH Token-Contract
               "symbol": "D.FAITH",
               "decimals": 18,
               "chainId": 137,
@@ -350,6 +356,45 @@ export default function WalletTab() {
       console.error("Fehler beim Ausführen des Swaps:", error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Sende-Funktion
+  const executeSend = async () => {
+    if (!account?.address || !sendAmount || parseFloat(sendAmount) <= 0 || !sendToAddress) {
+      return;
+    }
+    
+    setIsSending(true);
+    
+    try {
+      // Hier würde die Transaktion vorbereitet und gesendet werden
+      // Diese Funktion benötigt die vollständige Web3-Integration
+      
+      alert(`In einer echten Implementierung würde jetzt ${sendAmount} ${selectedSendToken} an ${sendToAddress} gesendet werden.`);
+      
+      // Nach erfolgreichem Senden zurücksetzen
+      setSendAmount("");
+      setSendToAddress("");
+      
+    } catch (error) {
+      console.error("Fehler beim Senden:", error);
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  // Hilfsfunktion um verfügbares Guthaben für gewählten Token zu bekommen
+  const getAvailableBalance = () => {
+    switch (selectedSendToken) {
+      case "DFAITH":
+        return dfaithBalance ? Number(dfaithBalance.displayValue) : 0;
+      case "DINVEST":
+        return dinvestBalance ? Number(dinvestBalance.displayValue) : 0;
+      case "POL":
+        return 0; // POL Balance würde hier abgerufen werden
+      default:
+        return 0;
     }
   };
 
@@ -545,7 +590,7 @@ export default function WalletTab() {
                 
                 <div className="flex items-center justify-between">
                   <div className="text-2xl md:text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500">
-                    {Number(dinvestBalance?.displayValue || 0)}
+                    {Number(dinvestBalance?.displayValue || 0).toFixed(4)}
                   </div>
                   
                   <button 
@@ -784,10 +829,156 @@ export default function WalletTab() {
         </Modal>
 
         <Modal open={showSend} onClose={() => setShowSend(false)} title="Token senden">
-          <div className="text-center text-zinc-300">
-            Sende-Funktion kommt hier hin.
+          <div className="flex flex-col gap-4">
+            {/* Token Auswahl */}
+            <div className="flex flex-col gap-3">
+              <span className="text-sm text-zinc-300">Token auswählen:</span>
+              <div className="grid grid-cols-3 gap-2">
+                <button 
+                  className={`flex flex-col items-center gap-2 p-3 rounded-lg border transition ${
+                    selectedSendToken === "DFAITH" 
+                      ? "bg-amber-500/20 text-amber-400 border-amber-500/30" 
+                      : "bg-zinc-800 text-zinc-400 border-zinc-700 hover:bg-zinc-700"
+                  }`}
+                  onClick={() => setSelectedSendToken("DFAITH")}
+                >
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-r from-amber-400 to-yellow-500 flex items-center justify-center">
+                    <span className="text-xs font-bold text-black">DF</span>
+                  </div>
+                  <span className="text-xs font-medium">D.FAITH</span>
+                  <span className="text-[10px] text-zinc-500">
+                    {dfaithBalance ? Number(dfaithBalance.displayValue).toFixed(4) : "0.0000"}
+                  </span>
+                </button>
+                
+                <button 
+                  className={`flex flex-col items-center gap-2 p-3 rounded-lg border transition ${
+                    selectedSendToken === "DINVEST" 
+                      ? "bg-amber-500/20 text-amber-400 border-amber-500/30" 
+                      : "bg-zinc-800 text-zinc-400 border-zinc-700 hover:bg-zinc-700"
+                  }`}
+                  onClick={() => setSelectedSendToken("DINVEST")}
+                >
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-r from-amber-400 to-yellow-500 flex items-center justify-center">
+                    <FaLock className="text-black text-xs" />
+                  </div>
+                  <span className="text-xs font-medium">D.INVEST</span>
+                  <span className="text-[10px] text-zinc-500">
+                    {dinvestBalance ? Number(dinvestBalance.displayValue).toFixed(4) : "0.0000"}
+                  </span>
+                </button>
+                
+                <button 
+                  className={`flex flex-col items-center gap-2 p-3 rounded-lg border transition ${
+                    selectedSendToken === "POL" 
+                      ? "bg-purple-500/20 text-purple-400 border-purple-500/30" 
+                      : "bg-zinc-800 text-zinc-400 border-zinc-700 hover:bg-zinc-700"
+                  }`}
+                  onClick={() => setSelectedSendToken("POL")}
+                >
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-r from-purple-400 to-purple-600 flex items-center justify-center">
+                    <span className="text-xs font-bold text-white">P</span>
+                  </div>
+                  <span className="text-xs font-medium">POL</span>
+                  <span className="text-[10px] text-zinc-500">0.0000</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Empfänger Adresse */}
+            <div className="flex flex-col gap-2">
+              <span className="text-sm text-zinc-300">Empfänger Adresse:</span>
+              <input 
+                type="text"
+                placeholder="0x..."
+                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg py-3 px-4 text-zinc-300 focus:border-amber-500 focus:outline-none"
+                value={sendToAddress}
+                onChange={(e) => setSendToAddress(e.target.value)}
+              />
+            </div>
+
+            {/* Betrag */}
+            <div className="flex flex-col gap-2">
+              <div className="flex justify-between">
+                <span className="text-sm text-zinc-300">Betrag:</span>
+                <span className="text-xs text-zinc-500">
+                  Verfügbar: <span className={`${
+                    selectedSendToken === "POL" ? "text-purple-400" : "text-amber-400"
+                  }`}>
+                    {getAvailableBalance().toFixed(4)} {selectedSendToken}
+                  </span>
+                </span>
+              </div>
+              
+              <div className="relative">
+                <input 
+                  type="number"
+                  placeholder="0.0"
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg py-3 px-4 pr-16 text-zinc-300 focus:border-amber-500 focus:outline-none"
+                  value={sendAmount}
+                  onChange={(e) => setSendAmount(e.target.value)}
+                />
+                <button 
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 text-xs px-2 py-1 bg-amber-500/20 text-amber-400 rounded hover:bg-amber-500/30 transition"
+                  onClick={() => setSendAmount(getAvailableBalance().toString())}
+                >
+                  MAX
+                </button>
+              </div>
+            </div>
+
+            {/* Geschätzte Kosten */}
+            <div className="bg-zinc-800/50 rounded-lg p-3 border border-zinc-700">
+              <div className="flex justify-between text-xs">
+                <span className="text-zinc-500">Netzwerkgebühren:</span>
+                <span className="text-zinc-400">~0.001 POL</span>
+              </div>
+              <div className="flex justify-between text-xs mt-1">
+                <span className="text-zinc-500">Gesamtkosten:</span>
+                <span className="text-zinc-300">
+                  {sendAmount || "0"} {selectedSendToken} + 0.001 POL
+                </span>
+              </div>
+            </div>
+
+            {/* Senden Button */}
+            <Button
+              className={`w-full py-3 font-bold rounded-xl ${
+                parseFloat(sendAmount) > 0 && sendToAddress && !isSending
+                  ? selectedSendToken === "POL" 
+                    ? "bg-gradient-to-r from-purple-500 to-purple-600 text-white"
+                    : "bg-gradient-to-r from-amber-400 to-yellow-500 text-black"
+                  : "bg-zinc-700 text-zinc-400 cursor-not-allowed"
+              }`}
+              onClick={executeSend}
+              disabled={parseFloat(sendAmount) <= 0 || !sendToAddress || isSending}
+            >
+              {isSending ? (
+                <div className="flex justify-center items-center gap-2">
+                  <div className={`w-5 h-5 border-t-2 border-r-2 ${
+                    selectedSendToken === "POL" ? "border-white" : "border-black"
+                  } rounded-full animate-spin`}></div>
+                  <span>Wird gesendet...</span>
+                </div>
+              ) : parseFloat(sendAmount) <= 0 || !sendToAddress ? (
+                "Betrag und Adresse eingeben"
+              ) : (
+                `${selectedSendToken} senden`
+              )}
+            </Button>
+            
+            {/* Warnung */}
+            <div className="text-xs text-zinc-500 flex items-center gap-2 mt-2">
+              <div className="w-4 h-4 rounded-full bg-yellow-500/20 flex items-center justify-center">
+                <span className="text-yellow-400 text-[10px]">!</span>
+              </div>
+              <span>
+                Überprüfen Sie die Empfängeradresse sorgfältig. Transaktionen können nicht rückgängig gemacht werden.
+              </span>
+            </div>
           </div>
-          <Button className="mt-6 w-full bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold" onClick={() => setShowSend(false)}>
+          
+          <Button className="mt-5 w-full bg-zinc-800 border border-zinc-700 text-zinc-400 hover:bg-zinc-700" onClick={() => setShowSend(false)}>
             Schließen
           </Button>
         </Modal>
