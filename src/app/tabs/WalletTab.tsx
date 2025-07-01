@@ -721,7 +721,12 @@ export default function WalletTab() {
                   className="flex-1 bg-transparent border-none text-right text-base text-amber-400 font-medium focus:outline-none"
                   placeholder="0.0"
                   value={swapAmount}
-                  onChange={(e) => setSwapAmount(e.target.value)}
+                  onChange={(e) => {
+                    console.log("Input changed to:", e.target.value);
+                    setSwapAmount(e.target.value);
+                  }}
+                  step="any"
+                  min="0"
                 />
               </div>
               
@@ -729,7 +734,11 @@ export default function WalletTab() {
                 <span></span>
                 <button 
                   className="text-xs px-2 py-0.5 bg-amber-500/20 text-amber-400 rounded hover:bg-amber-500/30 transition"
-                  onClick={() => setSwapAmount(dfaithBalance?.displayValue || "0")}
+                  onClick={() => {
+                    console.log("MAX Button clicked, dfaithBalance:", dfaithBalance);
+                    console.log("Setting swapAmount to:", dfaithBalance?.displayValue || "0");
+                    setSwapAmount(dfaithBalance?.displayValue || "0");
+                  }}
                 >
                   MAX
                 </button>
