@@ -8,14 +8,14 @@ import { Button } from "../../../components/ui/button";
 import { FaRegCopy } from "react-icons/fa";
 import { FaCoins, FaArrowDown, FaArrowUp, FaPaperPlane } from "react-icons/fa";
 
-// Modal wie gehabt
+// Modal mit dunklem Farbschema
 function Modal({ open, onClose, title, children }: { open: boolean, onClose: () => void, title: string, children: React.ReactNode }) {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-2xl p-8 min-w-[340px] shadow-2xl relative border border-zinc-200">
-        <button className="absolute top-3 right-4 text-2xl text-zinc-400 hover:text-zinc-600" onClick={onClose}>&times;</button>
-        <h3 className="font-bold mb-6 text-center text-xl text-zinc-800">{title}</h3>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+      <div className="bg-zinc-900 rounded-2xl p-8 min-w-[340px] shadow-2xl relative border border-zinc-700">
+        <button className="absolute top-3 right-4 text-2xl text-zinc-500 hover:text-zinc-300" onClick={onClose}>&times;</button>
+        <h3 className="font-bold mb-6 text-center text-xl text-amber-400">{title}</h3>
         {children}
       </div>
     </div>
@@ -92,37 +92,74 @@ export default function WalletTab() {
 
   if (status !== "connected" || !account?.address) {
     return (
-      <div className="flex flex-col items-center min-h-[60vh] justify-center">
-        <Card className="bg-gradient-to-br from-zinc-900 via-zinc-800 to-zinc-700 rounded-2xl shadow-2xl p-8 w-full max-w-sm border border-zinc-700">
-          <h2 className="text-2xl font-extrabold text-white mb-8 text-center tracking-tight">
-            Dawid Faith Wallet
-          </h2>
-          <ConnectButton
-            client={client}
-            connectButton={{ 
-              label: "Wallet verbinden"
-            }}
-            connectModal={{ 
-              size: "compact", 
-              title: "Verbinde deine Wallet",
-              welcomeScreen: {
-                title: "Dawid Faith Wallet",
-                subtitle: "Verbinde dich, um auf deine Token zuzugreifen"
-              }
-            }}
-            wallets={wallets}
-            chain={{
-              id: 137,
-              rpc: "https://polygon-rpc.com",
-            }}
-          />
+      <div className="flex flex-col items-center min-h-[70vh] justify-center bg-black py-8">
+        <Card className="w-full max-w-sm bg-gradient-to-br from-zinc-900 to-black rounded-3xl shadow-2xl border border-zinc-700 relative overflow-hidden">
+          {/* Glanzeffekt/Highlight oben */}
+          <div className="absolute top-0 left-0 w-full h-1/3 bg-gradient-to-r from-pink-500/10 via-purple-500/10 to-blue-500/10 rounded-t-3xl"></div>
+          
+          <CardContent className="p-8 relative z-10">
+            {/* Logo/Header */}
+            <div className="flex items-center justify-center gap-3 mb-8">
+              <div className="p-2 bg-gradient-to-r from-yellow-400 to-amber-600 rounded-full">
+                <FaCoins className="text-black text-xl" />
+              </div>
+              <h2 className="text-2xl font-bold bg-gradient-to-r from-amber-200 to-yellow-400 bg-clip-text text-transparent">
+                Dawid Faith Wallet
+              </h2>
+            </div>
+            
+            <p className="text-zinc-400 text-center mb-8">
+              Verbinde dich, um auf deine Token zuzugreifen
+            </p>
+            
+            {/* Angepasster Connect Button mit begrenzten Optionen */}
+            <ConnectButton
+              client={client}
+              connectButton={{ 
+                label: "Wallet verbinden",
+                className: "w-full py-3 bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold rounded-xl hover:opacity-90 transition-opacity"
+              }}
+              connectModal={{
+                size: "compact",
+                title: "Wallet verbinden", 
+                welcomeScreen: {
+                  title: "Dawid Faith Wallet",
+                  subtitle: "Wähle deine bevorzugte Anmeldemethode",
+                  img: {
+                    src: "https://placehold.co/400x200/gold/black?text=DFAITH",
+                    width: 400,
+                    height: 200
+                  }
+                },
+                // Limitierte Optionen für bessere Benutzererfahrung
+              }}
+              // Nur wichtigste Wallets anzeigen
+              wallets={[
+                inAppWallet({
+                  auth: {
+                    options: [
+                      "email", 
+                      "google",
+                      "facebook",
+                    ],
+                  },
+                }),
+                createWallet("io.metamask"),
+                createWallet("com.coinbase.wallet"),
+              ]}
+              chain={{
+                id: 137,
+                rpc: "https://polygon-rpc.com",
+              }}
+            />
+          </CardContent>
         </Card>
       </div>
     );
   }
 
   return (
-    <div className="flex justify-center min-h-[70vh] items-center py-8 bg-zinc-100">
+    <div className="flex justify-center min-h-[70vh] items-center py-8 bg-black"> {/* Hier geändert von bg-zinc-100 zu bg-black */}
       <Card className="w-full max-w-xl bg-gradient-to-br from-zinc-900 to-black rounded-3xl shadow-2xl border border-zinc-700 relative overflow-hidden">
         {/* Glanzeffekt/Highlight oben */}
         <div className="absolute top-0 left-0 w-full h-1/3 bg-gradient-to-r from-pink-500/10 via-purple-500/10 to-blue-500/10 rounded-t-3xl"></div>
@@ -198,23 +235,23 @@ export default function WalletTab() {
         </CardContent>
       </Card>
 
-      {/* Modale */}
+      {/* Modale mit angepasstem Inhalt */}
       <Modal open={showBuy} onClose={() => setShowBuy(false)} title="DFAITH kaufen">
-        <div className="text-center text-zinc-700">Kauf-Funktion kommt hier hin.</div>
+        <div className="text-center text-zinc-300">Kauf-Funktion kommt hier hin.</div>
         <Button className="mt-6 w-full bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold" onClick={() => setShowBuy(false)}>
           Schließen
         </Button>
       </Modal>
 
       <Modal open={showSell} onClose={() => setShowSell(false)} title="DFAITH verkaufen">
-        <div className="text-center text-zinc-700">Verkauf-Funktion kommt hier hin.</div>
+        <div className="text-center text-zinc-300">Verkauf-Funktion kommt hier hin.</div>
         <Button className="mt-6 w-full bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold" onClick={() => setShowSell(false)}>
           Schließen
         </Button>
       </Modal>
 
       <Modal open={showSend} onClose={() => setShowSend(false)} title="Token senden">
-        <div className="text-center text-zinc-700">Sende-Funktion kommt hier hin.</div>
+        <div className="text-center text-zinc-300">Sende-Funktion kommt hier hin.</div>
         <Button className="mt-6 w-full bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold" onClick={() => setShowSend(false)}>
           Schließen
         </Button>
