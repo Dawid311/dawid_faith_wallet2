@@ -5,15 +5,17 @@ import { ConnectButton } from "thirdweb/react";
 import { inAppWallet, createWallet } from "thirdweb/wallets";
 import { Card, CardContent } from "../../../components/ui/card";
 import { Button } from "../../../components/ui/button";
+import { FaRegCopy } from "react-icons/fa";
+import { FaCoins, FaArrowDown, FaArrowUp, FaPaperPlane } from "react-icons/fa";
 
 // Modal wie gehabt
 function Modal({ open, onClose, title, children }: { open: boolean, onClose: () => void, title: string, children: React.ReactNode }) {
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-xl p-6 min-w-[300px] shadow-xl relative">
-        <button className="absolute top-2 right-3 text-xl" onClick={onClose}>&times;</button>
-        <h3 className="font-bold mb-4 text-center">{title}</h3>
+      <div className="bg-white rounded-2xl p-8 min-w-[340px] shadow-2xl relative border border-zinc-200">
+        <button className="absolute top-3 right-4 text-2xl text-zinc-400 hover:text-zinc-600" onClick={onClose}>&times;</button>
+        <h3 className="font-bold mb-6 text-center text-xl text-zinc-800">{title}</h3>
         {children}
       </div>
     </div>
@@ -56,24 +58,20 @@ export default function WalletTab() {
   const account = useActiveAccount();
   const status = useActiveWalletConnectionStatus();
 
-  const [maticBalance, setMaticBalance] = useState<{ displayValue: string } | null>(null);
   const [dfaithBalance, setDfaithBalance] = useState<{ displayValue: string } | null>(null);
 
   // Modale State
   const [showBuy, setShowBuy] = useState(false);
   const [showSell, setShowSell] = useState(false);
   const [showSend, setShowSend] = useState(false);
-  const [showHistory, setShowHistory] = useState(false);
 
   useEffect(() => {
     async function fetchBalances() {
       if (!account?.address) {
-        setMaticBalance(null);
         setDfaithBalance(null);
         return;
       }
       // Hier echte Balance-Logik einbauen!
-      setMaticBalance({ displayValue: "0.00" });
       setDfaithBalance({ displayValue: "0.00" });
     }
     fetchBalances();
@@ -82,7 +80,7 @@ export default function WalletTab() {
   const copyWalletAddress = () => {
     if (account?.address) {
       navigator.clipboard.writeText(account.address);
-      alert("✅ Adresse wurde kopiert!");
+      // Optional: Snackbar statt alert für bessere UX
     }
   };
 
@@ -90,14 +88,14 @@ export default function WalletTab() {
 
   if (status !== "connected" || !account?.address) {
     return (
-      <div className="flex flex-col items-center">
-        <div className="bg-zinc-900 rounded-xl shadow-lg p-8 flex flex-col items-center w-full max-w-xs border border-zinc-800">
-          <h2 className="text-xl font-bold text-white mb-6 text-center">
+      <div className="flex flex-col items-center min-h-[60vh] justify-center">
+        <Card className="bg-gradient-to-br from-zinc-900 via-zinc-800 to-zinc-700 rounded-2xl shadow-2xl p-8 w-full max-w-sm border border-zinc-700">
+          <h2 className="text-2xl font-extrabold text-white mb-8 text-center tracking-tight">
             Dawid Faith Wallet
           </h2>
           <ConnectButton
             client={client}
-            connectButton={{ label: "Login" }}
+            connectButton={{ label: "Wallet verbinden" }}
             connectModal={{ size: "compact" }}
             wallets={wallets}
             chain={{
@@ -105,76 +103,77 @@ export default function WalletTab() {
               rpc: "https://polygon-rpc.com",
             }}
           />
-        </div>
+        </Card>
       </div>
     );
   }
 
   return (
-    <div className="flex justify-center">
-      <Card className="w-full max-w-2xl bg-white text-black shadow-2xl relative">
-        <CardContent className="p-8">
-          {/* Header mit MATIC, History und Wallet-Connect */}
-          <div className="flex justify-between items-center mb-6">
-            {/* MATIC Badge */}
-            <div className="bg-gray-100 rounded-2xl px-3 py-2 text-sm font-bold text-purple-600 flex items-center gap-2">
-              MATIC: {maticBalance ? Number(maticBalance.displayValue).toFixed(4) : "0.00"}
+    <div className="flex justify-center min-h-[70vh] items-center bg-gradient-to-br from-zinc-100 via-white to-zinc-200 py-8">
+      <Card className="w-full max-w-xl bg-white/90 rounded-3xl shadow-2xl border border-zinc-200 relative">
+        <CardContent className="p-10">
+          {/* Header */}
+          <div className="flex justify-between items-center mb-8">
+            <div className="flex items-center gap-3">
+              <FaCoins className="text-yellow-400 text-2xl" />
+              <span className="text-lg font-bold text-zinc-700">Dawid Faith Wallet</span>
             </div>
-            <div className="flex items-center gap-2">
-              {/* History Button */}
-              <Button
-                className="bg-zinc-100 border border-zinc-300 hover:bg-zinc-200 text-black px-3 py-2 rounded-lg text-sm font-medium"
-                onClick={() => setShowHistory(true)}
-                title="Transaktionshistorie"
-              >
-                <svg className="w-5 h-5 mr-1 inline-block" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                Historie
-              </Button>
-              {/* Thirdweb ConnectButton */}
-              <ConnectButton
-                client={client}
-                connectButton={{ label: "" }}
-                connectModal={{ size: "compact" }}
-                wallets={wallets}
-                chain={{
-                  id: 137,
-                  rpc: "https://polygon-rpc.com",
-                }}
-              />
-            </div>
+            <ConnectButton
+              client={client}
+              connectButton={{ label: "" }}
+              connectModal={{ size: "compact" }}
+              wallets={wallets}
+              chain={{
+                id: 137,
+                rpc: "https://polygon-rpc.com",
+              }}
+            />
           </div>
 
-          <h2 className="text-2xl font-bold text-center mb-6 bg-gradient-to-r from-orange-400 via-pink-500 to-purple-600 bg-clip-text text-transparent">
-            Dawid Faith Wallet
-          </h2>
-
           {/* Wallet Address */}
-          <div className="flex justify-between items-center bg-gray-100 rounded-xl p-4 mb-6">
-            <span className="font-mono">{formatAddress(account.address)}</span>
-            <Button onClick={copyWalletAddress}>
-              Adresse kopieren
-            </Button>
+          <div className="flex justify-between items-center bg-zinc-100 rounded-xl p-4 mb-8 border border-zinc-200">
+            <span className="font-mono text-zinc-700 text-base">{formatAddress(account.address)}</span>
+            <button
+              onClick={() => {
+                copyWalletAddress();
+              }}
+              className="flex items-center gap-2 px-3 py-1 rounded-lg bg-zinc-200 hover:bg-zinc-300 text-zinc-700 text-sm font-medium transition"
+              title="Adresse kopieren"
+            >
+              <FaRegCopy /> Kopieren
+            </button>
           </div>
 
           {/* Balance */}
-          <div className="text-center mb-8">
-            <div className="text-lg font-semibold">
-              DFAITH: {dfaithBalance ? Number(dfaithBalance.displayValue).toFixed(4) : "0.00"}
+          <div className="flex flex-col items-center mb-10">
+            <span className="uppercase text-xs tracking-widest text-zinc-400 mb-1">Kontostand</span>
+            <div className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-orange-400 via-pink-500 to-purple-600 drop-shadow">
+              {dfaithBalance ? Number(dfaithBalance.displayValue).toFixed(4) : "0.00"} <span className="text-lg font-bold">DFAITH</span>
             </div>
           </div>
 
           {/* Action Buttons */}
-          <div className="flex flex-row gap-4 justify-center">
-            <Button className="flex-1 bg-gradient-to-r from-orange-400 via-pink-500 to-purple-600 text-white font-bold shadow-lg" onClick={() => setShowBuy(true)}>
-              Kaufen
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <Button
+              className="flex flex-col items-center justify-center gap-2 py-5 bg-gradient-to-r from-orange-400 via-pink-500 to-purple-600 text-white font-bold shadow-lg rounded-xl hover:scale-[1.03] transition"
+              onClick={() => setShowBuy(true)}
+            >
+              <FaArrowDown className="text-xl" />
+              <span>Kaufen</span>
             </Button>
-            <Button className="flex-1 bg-gradient-to-r from-purple-600 via-pink-500 to-orange-400 text-white font-bold shadow-lg" onClick={() => setShowSell(true)}>
-              Verkaufen
+            <Button
+              className="flex flex-col items-center justify-center gap-2 py-5 bg-gradient-to-r from-purple-600 via-pink-500 to-orange-400 text-white font-bold shadow-lg rounded-xl hover:scale-[1.03] transition"
+              onClick={() => setShowSell(true)}
+            >
+              <FaArrowUp className="text-xl" />
+              <span>Verkaufen</span>
             </Button>
-            <Button className="flex-1 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-white font-bold shadow-lg" onClick={() => setShowSend(true)}>
-              Senden
+            <Button
+              className="flex flex-col items-center justify-center gap-2 py-5 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-white font-bold shadow-lg rounded-xl hover:scale-[1.03] transition"
+              onClick={() => setShowSend(true)}
+            >
+              <FaPaperPlane className="text-xl" />
+              <span>Senden</span>
             </Button>
           </div>
         </CardContent>
@@ -182,20 +181,16 @@ export default function WalletTab() {
 
       {/* Modale */}
       <Modal open={showBuy} onClose={() => setShowBuy(false)} title="DFAITH kaufen">
-        <div className="text-center">Kauf-Funktion kommt hier hin.</div>
-        <Button className="mt-4 w-full" onClick={() => setShowBuy(false)}>Schließen</Button>
+        <div className="text-center text-zinc-700">Kauf-Funktion kommt hier hin.</div>
+        <Button className="mt-6 w-full" onClick={() => setShowBuy(false)}>Schließen</Button>
       </Modal>
       <Modal open={showSell} onClose={() => setShowSell(false)} title="DFAITH verkaufen">
-        <div className="text-center">Verkauf-Funktion kommt hier hin.</div>
-        <Button className="mt-4 w-full" onClick={() => setShowSell(false)}>Schließen</Button>
+        <div className="text-center text-zinc-700">Verkauf-Funktion kommt hier hin.</div>
+        <Button className="mt-6 w-full" onClick={() => setShowSell(false)}>Schließen</Button>
       </Modal>
       <Modal open={showSend} onClose={() => setShowSend(false)} title="Token senden">
-        <div className="text-center">Sende-Funktion kommt hier hin.</div>
-        <Button className="mt-4 w-full" onClick={() => setShowSend(false)}>Schließen</Button>
-      </Modal>
-      <Modal open={showHistory} onClose={() => setShowHistory(false)} title="Transaktionshistorie">
-        <div className="text-center">Hier könnte deine Transaktionshistorie stehen.</div>
-        <Button className="mt-4 w-full" onClick={() => setShowHistory(false)}>Schließen</Button>
+        <div className="text-center text-zinc-700">Sende-Funktion kommt hier hin.</div>
+        <Button className="mt-6 w-full" onClick={() => setShowSend(false)}>Schließen</Button>
       </Modal>
     </div>
   );
