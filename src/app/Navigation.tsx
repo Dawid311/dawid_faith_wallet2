@@ -27,17 +27,7 @@ const socialIcons = {
 
 export default function Navigation({ activeTab, setActiveTab }: NavigationProps) {
   const [open, setOpen] = useState(false);
-  // Standard: Instagram, wenn noch nichts gewählt wurde
   const [activeSocial, setActiveSocial] = useState<"instagram" | "tiktok" | "facebook">("instagram");
-
-  // Wenn ein Social-Tab aktiv ist, setze auch activeSocial
-  if (
-    (activeTab === "instagram" && activeSocial !== "instagram") ||
-    (activeTab === "tiktok" && activeSocial !== "tiktok") ||
-    (activeTab === "facebook" && activeSocial !== "facebook")
-  ) {
-    setActiveSocial(activeTab as "instagram" | "tiktok" | "facebook");
-  }
 
   return (
     <nav className="fixed top-0 left-0 w-full bg-zinc-900 border-b border-zinc-800 z-50">
