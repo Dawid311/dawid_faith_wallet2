@@ -160,6 +160,8 @@ export default function WalletTab() {
         
         console.log("D.FAITH Balance:", dfaithFormatted);
         console.log("D.INVEST Balance:", dinvestFormatted);
+        console.log("D.INVEST Raw:", dinvestBalanceResult.toString());
+        console.log("D.INVEST > 0?", dinvestFormatted > 0);
         
       } catch (error) {
         console.error("Fehler beim Abrufen der Balances:", error);
@@ -467,7 +469,7 @@ export default function WalletTab() {
             </div>
 
             {/* DFAITH Token-Karte - jetzt mit D.FAITH */}
-            <div className="flex flex-col items-center p-4 bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl border border-zinc-700 w-full mb-6">
+            <div className="flex flex-col items-center p-4 bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl border border-zinc-700 w-full mb-6 relative">
               <span className="uppercase text-xs tracking-widest text-amber-500/80 mb-2">D.FAITH</span>
               <div className="text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 drop-shadow-sm">
                 {dfaithBalance ? Number(dfaithBalance.displayValue).toFixed(4) : "0.00"}
@@ -477,6 +479,17 @@ export default function WalletTab() {
               
               <div className="text-xs text-zinc-500">
                 ≈ 0.00 EUR
+              </div>
+              
+              {/* D.INVEST Balance klein anzeigen links unten */}
+              <div className="absolute bottom-3 left-3 flex items-center gap-1.5 bg-zinc-800/80 backdrop-blur-sm px-2 py-1 rounded-lg border border-zinc-700/50">
+                <div className="w-3 h-3 rounded-full bg-gradient-to-r from-amber-400/60 to-yellow-500/60 flex items-center justify-center">
+                  <FaLock className="text-black text-[8px]" />
+                </div>
+                <span className="text-[10px] text-zinc-400">D.INVEST:</span>
+                <span className="text-[10px] text-amber-400/80 font-medium">
+                  {dinvestBalance ? Number(dinvestBalance.displayValue).toFixed(0) : "0"}
+                </span>
               </div>
             </div>
 
