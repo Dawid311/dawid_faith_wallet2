@@ -80,6 +80,7 @@ export default function WalletTab() {
   const [showSell, setShowSell] = useState(false);
   const [showSend, setShowSend] = useState(false);
   const [showStake, setShowStake] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const uniswapWidgetRef = useRef<HTMLDivElement>(null);
   const [uniswapLoaded, setUniswapLoaded] = useState(false);
 
@@ -100,7 +101,7 @@ export default function WalletTab() {
 
   const DINVEST_TOKEN = {
     address: "0xa3f0Bf2a9d7f1a0958989Ea4c4DBE8B595117643", // D.INVEST Token-Contract
-    decimals: 18,
+    decimals: 0,
     symbol: "D.INVEST"
   };
 
@@ -156,7 +157,8 @@ export default function WalletTab() {
         const dinvestFormatted = Number(dinvestBalanceResult) / Math.pow(10, DINVEST_TOKEN.decimals);
         
         setDfaithBalance({ displayValue: dfaithFormatted.toFixed(4) });
-        setDinvestBalance({ displayValue: dinvestFormatted.toString() }); // Als String ohne toFixed für bessere Anzeige
+        // D.INVEST Balance - keine Dezimalstellen da 0 decimals
+        setDinvestBalance({ displayValue: dinvestFormatted.toString() });
         
         console.log("=== BALANCE DEBUG ===");
         console.log("D.FAITH Raw Balance:", dfaithBalanceResult.toString());
@@ -488,7 +490,7 @@ export default function WalletTab() {
             </div>
 
             {/* Action Buttons mit besseren Gradienten */}
-            <div className="grid grid-cols-3 gap-2 md:gap-4 mb-6">
+            <div className="grid grid-cols-4 gap-2 md:gap-4 mb-6">
               <Button
                 className="flex flex-col items-center justify-center gap-1 px-1 py-3.5 md:py-4.5 bg-gradient-to-br from-zinc-800/90 to-zinc-900 hover:from-zinc-800 hover:to-zinc-800 shadow-lg shadow-black/20 rounded-xl hover:scale-[1.02] transition-all duration-300 border border-zinc-700/80"
                 onClick={() => setShowBuy(true)}
@@ -516,6 +518,15 @@ export default function WalletTab() {
                 </div>
                 <span className="text-xs bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 bg-clip-text text-transparent font-medium">Senden</span>
               </Button>
+              <Button
+                className="flex flex-col items-center justify-center gap-1 px-1 py-3.5 md:py-4.5 bg-gradient-to-br from-zinc-800/90 to-zinc-900 hover:from-zinc-800 hover:to-zinc-800 shadow-lg shadow-black/20 rounded-xl hover:scale-[1.02] transition-all duration-300 border border-zinc-700/80"
+                onClick={() => setShowHistory(true)}
+              >
+                <div className="w-8 h-8 flex items-center justify-center bg-gradient-to-br from-amber-400 to-yellow-500 rounded-full mb-1 shadow-inner">
+                  <FaCoins className="text-black text-sm" />
+                </div>
+                <span className="text-xs bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 bg-clip-text text-transparent font-medium">History</span>
+              </Button>
             </div>
             
             {/* D.INVEST immer anzeigen wenn Balance definiert ist */}
@@ -534,7 +545,7 @@ export default function WalletTab() {
                 
                 <div className="flex items-center justify-between">
                   <div className="text-2xl md:text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500">
-                    {(Number(dinvestBalance?.displayValue || 0) || 0).toFixed(2)}
+                    {Number(dinvestBalance?.displayValue || 0)}
                   </div>
                   
                   <button 
@@ -788,7 +799,7 @@ export default function WalletTab() {
               <div className="bg-zinc-800 rounded-lg p-3 border border-zinc-700 text-center">
                 <span className="text-xs text-zinc-500 mb-1">Verfügbar</span>
                 <div className="text-lg font-bold text-amber-400">
-                  {dinvestBalance ? (Number(dinvestBalance.displayValue) || 0).toFixed(2) : "0.00"}
+                  {dinvestBalance ? Number(dinvestBalance.displayValue) : 0}
                 </div>
               </div>
               <div className="bg-zinc-800 rounded-lg p-3 border border-zinc-700 text-center">
@@ -886,6 +897,125 @@ export default function WalletTab() {
           
           {/* Schließen-Button hinzugefügt */}
           <Button className="mt-4 w-full bg-zinc-800 border border-zinc-700 text-zinc-400 hover:bg-zinc-700" onClick={() => setShowStake(false)}>
+            Schließen
+          </Button>
+        </Modal>
+
+        {/* History Modal */}
+        <Modal open={showHistory} onClose={() => setShowHistory(false)} title="Transaktionshistorie">
+          <div className="flex flex-col gap-4 max-h-96 overflow-y-auto">
+            {/* Filter Buttons */}
+            <div className="flex gap-2 mb-4">
+              <button className="px-3 py-1 rounded-lg bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs font-medium">
+                Alle
+              </button>
+              <button className="px-3 py-1 rounded-lg bg-zinc-700 text-zinc-400 border border-zinc-600 text-xs font-medium hover:bg-zinc-600">
+                D.FAITH
+              </button>
+              <button className="px-3 py-1 rounded-lg bg-zinc-700 text-zinc-400 border border-zinc-600 text-xs font-medium hover:bg-zinc-600">
+                D.INVEST
+              </button>
+            </div>
+
+            {/* Beispiel Transaktionen */}
+            <div className="space-y-3">
+              {/* D.FAITH Purchase */}
+              <div className="bg-zinc-800 rounded-lg p-3 border border-zinc-700">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-green-400 to-green-600 flex items-center justify-center">
+                      <FaArrowDown className="text-white text-xs" />
+                    </div>
+                    <div>
+                      <div className="text-sm font-medium text-amber-400">D.FAITH Kauf</div>
+                      <div className="text-xs text-zinc-500">vor 2 Stunden</div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-sm font-bold text-green-400">+100.0000</div>
+                    <div className="text-xs text-zinc-500">D.FAITH</div>
+                  </div>
+                </div>
+                <div className="text-xs text-zinc-500">
+                  Hash: 0x1234...5678
+                </div>
+              </div>
+
+              {/* D.INVEST Transfer */}
+              <div className="bg-zinc-800 rounded-lg p-3 border border-zinc-700">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-400 to-blue-600 flex items-center justify-center">
+                      <FaPaperPlane className="text-white text-xs" />
+                    </div>
+                    <div>
+                      <div className="text-sm font-medium text-amber-400">D.INVEST Transfer</div>
+                      <div className="text-xs text-zinc-500">vor 1 Tag</div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-sm font-bold text-blue-400">10</div>
+                    <div className="text-xs text-zinc-500">D.INVEST</div>
+                  </div>
+                </div>
+                <div className="text-xs text-zinc-500">
+                  An: 0xabcd...efgh
+                </div>
+              </div>
+
+              {/* Stake Transaction */}
+              <div className="bg-zinc-800 rounded-lg p-3 border border-zinc-700">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-purple-400 to-purple-600 flex items-center justify-center">
+                      <FaLock className="text-white text-xs" />
+                    </div>
+                    <div>
+                      <div className="text-sm font-medium text-amber-400">D.INVEST Staking</div>
+                      <div className="text-xs text-zinc-500">vor 3 Tagen</div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-sm font-bold text-purple-400">50</div>
+                    <div className="text-xs text-zinc-500">D.INVEST</div>
+                  </div>
+                </div>
+                <div className="text-xs text-zinc-500">
+                  Staking Contract: {STAKING_CONTRACT.address.slice(0, 10)}...
+                </div>
+              </div>
+
+              {/* Swap Transaction */}
+              <div className="bg-zinc-800 rounded-lg p-3 border border-zinc-700">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-orange-400 to-orange-600 flex items-center justify-center">
+                      <FaExchangeAlt className="text-white text-xs" />
+                    </div>
+                    <div>
+                      <div className="text-sm font-medium text-amber-400">Token Swap</div>
+                      <div className="text-xs text-zinc-500">vor 1 Woche</div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-sm font-bold text-orange-400">25 D.FAITH → 0.5 POL</div>
+                    <div className="text-xs text-zinc-500">via ParaSwap</div>
+                  </div>
+                </div>
+                <div className="text-xs text-zinc-500">
+                  Hash: 0x9876...5432
+                </div>
+              </div>
+            </div>
+
+            {/* Load More Button */}
+            <Button className="w-full bg-zinc-700 hover:bg-zinc-600 text-zinc-300 font-medium py-2 mt-4">
+              Weitere laden
+            </Button>
+          </div>
+          
+          {/* Schließen-Button */}
+          <Button className="mt-4 w-full bg-zinc-800 border border-zinc-700 text-zinc-400 hover:bg-zinc-700" onClick={() => setShowHistory(false)}>
             Schließen
           </Button>
         </Modal>
