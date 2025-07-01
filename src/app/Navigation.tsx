@@ -27,6 +27,7 @@ const socialIcons = {
 
 export default function Navigation({ activeTab, setActiveTab }: NavigationProps) {
   const [open, setOpen] = useState(false);
+  const [activeSocial, setActiveSocial] = useState<"instagram" | "tiktok" | "facebook">("instagram");
 
   return (
     <nav className="fixed top-0 left-0 w-full bg-zinc-900 border-b border-zinc-800 z-50">
@@ -70,7 +71,7 @@ export default function Navigation({ activeTab, setActiveTab }: NavigationProps)
             aria-haspopup="true"
             aria-expanded={open}
           >
-            {socialIcons["instagram"]}
+            {socialIcons[activeSocial]}
             <FiChevronDown
               size={22}
               className={`ml-1 transition-colors ${
@@ -82,6 +83,7 @@ export default function Navigation({ activeTab, setActiveTab }: NavigationProps)
             <div className="absolute left-1/2 -translate-x-1/2 mt-2 bg-zinc-800 rounded shadow-lg flex flex-col z-50 min-w-[120px]">
               <button
                 onClick={() => {
+                  setActiveSocial("instagram");
                   setActiveTab("instagram");
                   setOpen(false);
                 }}
@@ -91,6 +93,7 @@ export default function Navigation({ activeTab, setActiveTab }: NavigationProps)
               </button>
               <button
                 onClick={() => {
+                  setActiveSocial("tiktok");
                   setActiveTab("tiktok");
                   setOpen(false);
                 }}
@@ -100,6 +103,7 @@ export default function Navigation({ activeTab, setActiveTab }: NavigationProps)
               </button>
               <button
                 onClick={() => {
+                  setActiveSocial("facebook");
                   setActiveTab("facebook");
                   setOpen(false);
                 }}
