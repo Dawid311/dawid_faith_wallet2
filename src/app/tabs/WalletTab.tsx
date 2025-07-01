@@ -112,46 +112,46 @@ export default function WalletTab() {
               Verbinde dich, um auf deine Token zuzugreifen
             </p>
             
-            {/* Angepasster Connect Button mit begrenzten Optionen */}
-            <ConnectButton
-              client={client}
-              connectButton={{ 
-                label: "Wallet verbinden",
-                className: "w-full py-3 bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold rounded-xl hover:opacity-90 transition-opacity"
-              }}
-              connectModal={{
-                size: "compact",
-                title: "Wallet verbinden", 
-                welcomeScreen: {
-                  title: "Dawid Faith Wallet",
-                  subtitle: "Wähle deine bevorzugte Anmeldemethode",
-                  img: {
-                    src: "https://placehold.co/400x200/gold/black?text=DFAITH",
-                    width: 400,
-                    height: 200
-                  }
-                },
-                // Limitierte Optionen für bessere Benutzererfahrung
-              }}
-              // Nur wichtigste Wallets anzeigen
-              wallets={[
-                inAppWallet({
-                  auth: {
-                    options: [
-                      "email", 
-                      "google",
-                      "facebook",
-                    ],
+            {/* Angepasster Connect Button mit begrenzten Optionen - jetzt zentriert */}
+            <div className="flex justify-center w-full">
+              <ConnectButton
+                client={client}
+                connectButton={{ 
+                  label: "Wallet verbinden",
+                  className: "w-full py-3 bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold rounded-xl hover:opacity-90 transition-opacity"
+                }}
+                connectModal={{
+                  size: "compact",
+                  title: "Wallet verbinden", 
+                  welcomeScreen: {
+                    title: "Dawid Faith Wallet",
+                    subtitle: "Wähle deine bevorzugte Anmeldemethode",
+                    img: {
+                      src: "https://placehold.co/400x200/gold/black?text=DFAITH",
+                      width: 400,
+                      height: 200
+                    }
                   },
-                }),
-                createWallet("io.metamask"),
-                createWallet("com.coinbase.wallet"),
-              ]}
-              chain={{
-                id: 137,
-                rpc: "https://polygon-rpc.com",
-              }}
-            />
+                }}
+                wallets={[
+                  inAppWallet({
+                    auth: {
+                      options: [
+                        "email", 
+                        "google",
+                        "facebook",
+                      ],
+                    },
+                  }),
+                  createWallet("io.metamask"),
+                  createWallet("com.coinbase.wallet"),
+                ]}
+                chain={{
+                  id: 137,
+                  rpc: "https://polygon-rpc.com",
+                }}
+              />
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -208,28 +208,28 @@ export default function WalletTab() {
             <span className="text-sm font-semibold text-amber-400/80 mt-1">DFAITH</span>
           </div>
 
-          {/* Action Buttons mit besseren Gradienten */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {/* Action Buttons mit besseren Gradienten - jetzt immer nebeneinander */}
+          <div className="grid grid-cols-3 gap-2 md:gap-4">
             <Button
-              className="flex flex-col items-center justify-center gap-2 py-5 bg-gradient-to-br from-zinc-800 to-zinc-900 text-amber-400 font-bold shadow-xl rounded-xl hover:scale-[1.03] hover:shadow-amber-500/20 transition-all duration-300 border border-zinc-700"
+              className="flex flex-col items-center justify-center gap-1 px-1 py-4 md:py-5 bg-gradient-to-br from-zinc-800 to-zinc-900 font-bold shadow-xl rounded-xl hover:scale-[1.03] hover:shadow-amber-500/20 transition-all duration-300 border border-zinc-700"
               onClick={() => setShowBuy(true)}
             >
-              <FaArrowDown className="text-xl" />
-              <span>Kaufen</span>
+              <FaArrowDown className="text-lg md:text-xl bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 bg-clip-text text-transparent" />
+              <span className="text-xs md:text-sm bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 bg-clip-text text-transparent">Kaufen</span>
             </Button>
             <Button
-              className="flex flex-col items-center justify-center gap-2 py-5 bg-gradient-to-br from-zinc-800 to-zinc-900 text-amber-400 font-bold shadow-xl rounded-xl hover:scale-[1.03] hover:shadow-amber-500/20 transition-all duration-300 border border-zinc-700"
+              className="flex flex-col items-center justify-center gap-1 px-1 py-4 md:py-5 bg-gradient-to-br from-zinc-800 to-zinc-900 font-bold shadow-xl rounded-xl hover:scale-[1.03] hover:shadow-amber-500/20 transition-all duration-300 border border-zinc-700"
               onClick={() => setShowSell(true)}
             >
-              <FaArrowUp className="text-xl" />
-              <span>Verkaufen</span>
+              <FaArrowUp className="text-lg md:text-xl bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 bg-clip-text text-transparent" />
+              <span className="text-xs md:text-sm bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 bg-clip-text text-transparent">Verkaufen</span>
             </Button>
             <Button
-              className="flex flex-col items-center justify-center gap-2 py-5 bg-gradient-to-br from-zinc-800 to-zinc-900 text-amber-400 font-bold shadow-xl rounded-xl hover:scale-[1.03] hover:shadow-amber-500/20 transition-all duration-300 border border-zinc-700"
+              className="flex flex-col items-center justify-center gap-1 px-1 py-4 md:py-5 bg-gradient-to-br from-zinc-800 to-zinc-900 font-bold shadow-xl rounded-xl hover:scale-[1.03] hover:shadow-amber-500/20 transition-all duration-300 border border-zinc-700"
               onClick={() => setShowSend(true)}
             >
-              <FaPaperPlane className="text-xl" />
-              <span>Senden</span>
+              <FaPaperPlane className="text-lg md:text-xl bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 bg-clip-text text-transparent" />
+              <span className="text-xs md:text-sm bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 bg-clip-text text-transparent">Senden</span>
             </Button>
           </div>
         </CardContent>
