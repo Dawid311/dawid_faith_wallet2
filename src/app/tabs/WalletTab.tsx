@@ -235,23 +235,27 @@ export default function WalletTab() {
       
       <div className="flex justify-center min-h-[70vh] items-center py-8 bg-black">
         <Card className="w-full max-w-xl bg-gradient-to-br from-zinc-900 to-black rounded-3xl shadow-2xl border border-zinc-700 relative overflow-hidden">
-          {/* Glanzeffekt/Highlight oben */}
-          <div className="absolute top-0 left-0 w-full h-1/3 bg-gradient-to-r from-pink-500/10 via-purple-500/10 to-blue-500/10 rounded-t-3xl"></div>
+          {/* Verbesserte Glanzeffekte */}
+          <div className="absolute top-0 left-0 w-full h-1/3 bg-gradient-to-r from-amber-500/5 via-yellow-500/10 to-amber-500/5 rounded-t-3xl"></div>
+          <div className="absolute top-0 right-0 w-1/3 h-20 bg-amber-400/10 blur-3xl rounded-full"></div>
           
-          <CardContent className="p-10 relative z-10">
-            {/* Header mit Gold-Akzent */}
-            <div className="flex justify-between items-center mb-10">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-gradient-to-r from-yellow-400 to-amber-600 rounded-full">
-                  <FaCoins className="text-black text-xl" />
+          <CardContent className="p-6 md:p-10 relative z-10">
+            {/* Header mit verbessertem Gold-Akzent */}
+            <div className="flex justify-between items-center mb-8">
+              <div className="flex items-center gap-2.5">
+                <div className="p-1.5 md:p-2 bg-gradient-to-r from-amber-500 to-yellow-500 rounded-full shadow-lg shadow-amber-500/20">
+                  <FaCoins className="text-black text-lg md:text-xl" />
                 </div>
-                <span className="text-lg font-bold bg-gradient-to-r from-amber-200 to-yellow-400 bg-clip-text text-transparent">
+                <span className="text-base md:text-lg font-bold bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 bg-clip-text text-transparent">
                   Dawid Faith Wallet
                 </span>
               </div>
               <ConnectButton
                 client={client}
-                connectButton={{ label: "" }}
+                connectButton={{ 
+                  label: "", 
+                  className: "bg-zinc-800 hover:bg-zinc-700 transition-colors border border-zinc-700"
+                }}
                 connectModal={{ size: "compact" }}
                 wallets={wallets}
                 chain={{
@@ -262,8 +266,11 @@ export default function WalletTab() {
             </div>
 
             {/* Wallet Address mit besserem Styling */}
-            <div className="flex justify-between items-center bg-zinc-800/80 backdrop-blur-sm rounded-2xl p-4 mb-8 border border-zinc-700">
-              <span className="font-mono text-zinc-300 text-base">{formatAddress(account.address)}</span>
+            <div className="flex justify-between items-center bg-zinc-800/70 backdrop-blur-sm rounded-xl p-3 mb-6 border border-zinc-700/80">
+              <div className="flex flex-col">
+                <span className="text-xs text-zinc-500 mb-0.5">Wallet Adresse</span>
+                <span className="font-mono text-zinc-300 text-sm">{formatAddress(account.address)}</span>
+              </div>
               <button
                 onClick={copyWalletAddress}
                 className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-700 hover:bg-zinc-600 text-zinc-200 text-sm font-medium transition-all duration-200"
@@ -273,63 +280,76 @@ export default function WalletTab() {
               </button>
             </div>
 
-            {/* DFAITH Balance */}
-            <div className="flex flex-col items-center mb-8">
-              <span className="uppercase text-xs tracking-widest text-zinc-500 mb-2">Kontostand</span>
-              <div className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 drop-shadow">
-                {dfaithBalance ? Number(dfaithBalance.displayValue).toFixed(4) : "0.00"}
+            {/* Token-Karten Grid - DFAITH und D.INVEST nebeneinander */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+              {/* DFAITH Token-Karte */}
+              <div className="flex flex-col items-center p-4 bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl border border-zinc-700 w-full">
+                <span className="uppercase text-xs tracking-widest text-amber-500/80 mb-2">DFAITH</span>
+                <div className="text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 drop-shadow-sm">
+                  {dfaithBalance ? Number(dfaithBalance.displayValue).toFixed(4) : "0.00"}
+                </div>
+                
+                <div className="w-full h-px bg-gradient-to-r from-transparent via-zinc-700/50 to-transparent my-3"></div>
+                
+                <div className="text-xs text-zinc-500">
+                  ≈ 0.00 EUR
+                </div>
               </div>
-              <span className="text-sm font-semibold text-amber-400/80 mt-1">DFAITH</span>
+              
+              {/* D.INVEST Token-Karte */}
+              <div className="flex flex-col items-center p-4 bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl border border-zinc-700 w-full">
+                <span className="uppercase text-xs tracking-widest text-amber-500/80 mb-2">D.INVEST</span>
+                <div className="text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 drop-shadow-sm">
+                  {dinvestBalance ? Number(dinvestBalance.displayValue).toFixed(0) : "0"}
+                </div>
+                
+                <div className="w-full h-px bg-gradient-to-r from-transparent via-zinc-700/50 to-transparent my-3"></div>
+                
+                <div className="text-xs text-zinc-500">
+                  Gestaked: <span className="text-amber-400/80">0</span>
+                </div>
+              </div>
             </div>
 
-            {/* Action Buttons mit besseren Gradienten - jetzt immer nebeneinander */}
-            <div className="grid grid-cols-3 gap-2 md:gap-4 mb-8">
+            {/* Action Buttons mit besseren Gradienten - redesigned */}
+            <div className="grid grid-cols-3 gap-2 md:gap-4 mb-6">
               <Button
-                className="flex flex-col items-center justify-center gap-1 px-1 py-4 md:py-5 bg-gradient-to-br from-zinc-800 to-zinc-900 font-bold shadow-xl rounded-xl hover:scale-[1.03] hover:shadow-amber-500/20 transition-all duration-300 border border-zinc-700"
+                className="flex flex-col items-center justify-center gap-1 px-1 py-3.5 md:py-4.5 bg-gradient-to-br from-zinc-800/90 to-zinc-900 hover:from-zinc-800 hover:to-zinc-800 shadow-lg shadow-black/20 rounded-xl hover:scale-[1.02] transition-all duration-300 border border-zinc-700/80"
                 onClick={() => setShowBuy(true)}
               >
-                <FaArrowDown className="text-lg md:text-xl text-amber-400" />
-                <span className="text-xs md:text-sm bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 bg-clip-text text-transparent">Kaufen</span>
+                <div className="w-8 h-8 flex items-center justify-center bg-gradient-to-br from-amber-400 to-yellow-500 rounded-full mb-1 shadow-inner">
+                  <FaArrowDown className="text-black text-sm" />
+                </div>
+                <span className="text-xs bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 bg-clip-text text-transparent font-medium">Kaufen</span>
               </Button>
               <Button
-                className="flex flex-col items-center justify-center gap-1 px-1 py-4 md:py-5 bg-gradient-to-br from-zinc-800 to-zinc-900 font-bold shadow-xl rounded-xl hover:scale-[1.03] hover:shadow-amber-500/20 transition-all duration-300 border border-zinc-700"
+                className="flex flex-col items-center justify-center gap-1 px-1 py-3.5 md:py-4.5 bg-gradient-to-br from-zinc-800/90 to-zinc-900 hover:from-zinc-800 hover:to-zinc-800 shadow-lg shadow-black/20 rounded-xl hover:scale-[1.02] transition-all duration-300 border border-zinc-700/80"
                 onClick={() => setShowSell(true)}
               >
-                <FaArrowUp className="text-lg md:text-xl text-amber-400" />
-                <span className="text-xs md:text-sm bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 bg-clip-text text-transparent">Verkaufen</span>
+                <div className="w-8 h-8 flex items-center justify-center bg-gradient-to-br from-amber-400 to-yellow-500 rounded-full mb-1 shadow-inner">
+                  <FaArrowUp className="text-black text-sm" />
+                </div>
+                <span className="text-xs bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 bg-clip-text text-transparent font-medium">Verkaufen</span>
               </Button>
               <Button
-                className="flex flex-col items-center justify-center gap-1 px-1 py-4 md:py-5 bg-gradient-to-br from-zinc-800 to-zinc-900 font-bold shadow-xl rounded-xl hover:scale-[1.03] hover:shadow-amber-500/20 transition-all duration-300 border border-zinc-700"
+                className="flex flex-col items-center justify-center gap-1 px-1 py-3.5 md:py-4.5 bg-gradient-to-br from-zinc-800/90 to-zinc-900 hover:from-zinc-800 hover:to-zinc-800 shadow-lg shadow-black/20 rounded-xl hover:scale-[1.02] transition-all duration-300 border border-zinc-700/80"
                 onClick={() => setShowSend(true)}
               >
-                <FaPaperPlane className="text-lg md:text-xl text-amber-400" />
-                <span className="text-xs md:text-sm bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 bg-clip-text text-transparent">Senden</span>
+                <div className="w-8 h-8 flex items-center justify-center bg-gradient-to-br from-amber-400 to-yellow-500 rounded-full mb-1 shadow-inner">
+                  <FaPaperPlane className="text-black text-sm" />
+                </div>
+                <span className="text-xs bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 bg-clip-text text-transparent font-medium">Senden</span>
               </Button>
             </div>
             
-            {/* D.INVEST Balance - ohne "Token" */}
-            <div className="flex flex-col items-center p-4 bg-zinc-800/50 rounded-xl border border-zinc-700 w-full">
-              <span className="text-sm text-zinc-400 mb-1">D.INVEST</span>
-              
-              <div className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 mb-2">
-                {dinvestBalance ? Number(dinvestBalance.displayValue).toFixed(0) : "0"}
-              </div>
-              
-              {/* Gestakte Tokens anzeigen, falls vorhanden */}
-              <div className="text-xs text-zinc-500 mb-3">
-                <span>Gestaked: </span>
-                <span className="text-amber-400/80">0</span> {/* Hier die gestakten Tokens einfügen */}
-              </div>
-              
-              {/* Neuer Stake-Button unter der Balance */}
-              <button 
-                onClick={() => setShowStake(true)}
-                className="text-sm px-4 py-1.5 rounded-lg bg-gradient-to-r from-amber-500/20 to-amber-600/20 text-amber-400 hover:from-amber-500/30 hover:to-amber-600/30 transition-all duration-300 flex items-center gap-2"
-              >
-                <FaLock size={12} />
-                <span>Staken & Verdienen</span>
-              </button>
-            </div>
+            {/* Staking-Button am unteren Rand */}
+            <Button 
+              onClick={() => setShowStake(true)}
+              className="w-full py-3 bg-gradient-to-r from-amber-500/20 to-amber-600/20 hover:from-amber-500/30 hover:to-amber-600/30 text-amber-400 font-medium rounded-xl border border-amber-500/20 transition-all duration-300 flex items-center justify-center gap-2"
+            >
+              <FaLock size={14} />
+              <span>D.INVEST Staken & Verdienen</span>
+            </Button>
           </CardContent>
         </Card>
 
