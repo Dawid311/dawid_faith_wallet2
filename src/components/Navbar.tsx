@@ -25,11 +25,7 @@ export default function Navbar() {
       </span>
       <ul className="flex items-center gap-8">
         <li>
-          <a
-            href="#tokenomics"
-            title="Tokenomics"
-            className="text-zinc-100 hover:underline"
-          >
+          <a href="#tokenomics" title="Tokenomics">
             {/* Tokenomics: Diagramm-Icon */}
             <svg
               width="24"
@@ -44,9 +40,9 @@ export default function Navbar() {
             </svg>
           </a>
         </li>
-        <li className="flex items-center gap-2">
+        <li>
           {/* Wallet: Wallet-Icon */}
-          <span title="Wallet">
+          <a href="#wallet" title="Wallet">
             <svg
               width="24"
               height="24"
@@ -65,18 +61,7 @@ export default function Navbar() {
               />
               <circle cx="17" cy="12" r="1" fill="#fff" />
             </svg>
-          </span>
-          <ConnectButton
-            client={client}
-            chain={{
-              id: 137,
-              rpc: "https://polygon-rpc.com",
-            }}
-            appMetadata={{
-              name: "Example App",
-              url: "https://example.com",
-            }}
-          />
+          </a>
         </li>
         <li className="relative">
           <button
@@ -197,11 +182,7 @@ export default function Navbar() {
           )}
         </li>
         <li>
-          <a
-            href="#merch"
-            title="Merch"
-            className="text-zinc-100 hover:underline"
-          >
+          <a href="#merch" title="Merch">
             {/* Merch: T-Shirt-Icon */}
             <svg
               width="24"
@@ -219,11 +200,7 @@ export default function Navbar() {
           </a>
         </li>
         <li>
-          <a
-            href="#live"
-            title="Live"
-            className="text-zinc-100 hover:underline"
-          >
+          <a href="#live" title="Live">
             {/* Live: Play-Icon */}
             <svg
               width="24"
@@ -239,11 +216,7 @@ export default function Navbar() {
           </a>
         </li>
         <li>
-          <a
-            href="#streamer"
-            title="Streamer"
-            className="text-zinc-100 hover:underline"
-          >
+          <a href="#streamer" title="Streamer">
             {/* Streamer: Mikrofon-Icon */}
             <svg
               width="24"
