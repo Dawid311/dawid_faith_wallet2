@@ -11,48 +11,59 @@ import {
 } from "react-icons/fa";
 import { FiChevronDown } from "react-icons/fi";
 import { useState } from "react";
-import { usePathname } from "next/navigation";
 
-export default function Navigation() {
+type NavigationProps = {
+  activeTab: string;
+  setActiveTab: (tab: string) => void;
+};
+
+export default function Navigation({ activeTab, setActiveTab }: NavigationProps) {
   const [open, setOpen] = useState(false);
-  const pathname = usePathname();
-
-  // Aktiver Tab je nach Route
-  const isActive = (route: string) => pathname === route;
 
   return (
     <nav className="fixed top-0 left-0 w-full bg-zinc-900 border-b border-zinc-800 z-50">
       <ul className="flex justify-center items-center gap-8 py-3">
         <li>
-          <Link href="/tokenomics" title="Tokenomics">
+          <button
+            title="Tokenomics"
+            onClick={() => setActiveTab("tokenomics")}
+            className="flex items-center"
+          >
             <FaChartBar
               size={22}
               className={`transition-colors ${
-                isActive("/tokenomics") ? "text-yellow-400" : "text-zinc-400"
+                activeTab === "tokenomics" ? "text-yellow-400" : "text-zinc-400"
               } hover:text-yellow-400`}
             />
-          </Link>
+          </button>
         </li>
         <li>
-          <Link href="/wallet" title="Wallet">
+          <button
+            title="Wallet"
+            onClick={() => setActiveTab("wallet")}
+            className="flex items-center"
+          >
             <FaWallet
               size={22}
               className={`transition-colors ${
-                isActive("/wallet") ? "text-blue-400" : "text-zinc-400"
+                activeTab === "wallet" ? "text-blue-400" : "text-zinc-400"
               } hover:text-blue-400`}
             />
-          </Link>
+          </button>
         </li>
         <li className="relative">
           <button
-            onClick={() => setOpen((v) => !v)}
+            onClick={() => {
+              setOpen((v) => !v);
+              setActiveTab("social");
+            }}
             className="flex items-center"
             title="Social Media"
           >
             <FiChevronDown
               size={22}
               className={`transition-colors ${
-                open ? "text-pink-400" : "text-zinc-400"
+                activeTab === "social" || open ? "text-pink-400" : "text-zinc-400"
               } hover:text-pink-400`}
             />
           </button>
@@ -86,34 +97,46 @@ export default function Navigation() {
           )}
         </li>
         <li>
-          <Link href="/merch" title="Merch">
+          <button
+            title="Merch"
+            onClick={() => setActiveTab("merch")}
+            className="flex items-center"
+          >
             <FaTshirt
               size={22}
               className={`transition-colors ${
-                isActive("/merch") ? "text-green-400" : "text-zinc-400"
+                activeTab === "merch" ? "text-green-400" : "text-zinc-400"
               } hover:text-green-400`}
             />
-          </Link>
+          </button>
         </li>
         <li>
-          <Link href="/stream" title="Stream">
+          <button
+            title="Stream"
+            onClick={() => setActiveTab("stream")}
+            className="flex items-center"
+          >
             <FaVideo
               size={22}
               className={`transition-colors ${
-                isActive("/stream") ? "text-red-400" : "text-zinc-400"
+                activeTab === "stream" ? "text-red-400" : "text-zinc-400"
               } hover:text-red-400`}
             />
-          </Link>
+          </button>
         </li>
         <li>
-          <Link href="/live" title="Live">
+          <button
+            title="Live"
+            onClick={() => setActiveTab("live")}
+            className="flex items-center"
+          >
             <FaBroadcastTower
               size={22}
               className={`transition-colors ${
-                isActive("/live") ? "text-purple-400" : "text-zinc-400"
+                activeTab === "live" ? "text-purple-400" : "text-zinc-400"
               } hover:text-purple-400`}
             />
-          </Link>
+          </button>
         </li>
       </ul>
     </nav>
