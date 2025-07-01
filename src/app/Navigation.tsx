@@ -20,25 +20,6 @@ type NavigationProps = {
 export default function Navigation({ activeTab, setActiveTab }: NavigationProps) {
   const [open, setOpen] = useState(false);
 
-  // Social Media Icon je nach aktivem Tab
-  const getSocialIcon = () => {
-    if (activeTab === "instagram")
-      return <FaInstagram size={22} className="text-pink-500" />;
-    if (activeTab === "tiktok")
-      return <FaTiktok size={22} className="text-black dark:text-white" />;
-    if (activeTab === "facebook")
-      return <FaFacebook size={22} className="text-blue-600" />;
-    // Default: Chevron
-    return (
-      <FiChevronDown
-        size={22}
-        className={`transition-colors ${
-          open ? "text-pink-400" : "text-zinc-400"
-        } hover:text-pink-400`}
-      />
-    );
-  };
-
   return (
     <nav className="fixed top-0 left-0 w-full bg-zinc-900 border-b border-zinc-800 z-50">
       <ul className="flex justify-center items-center gap-8 py-3">
@@ -72,26 +53,39 @@ export default function Navigation({ activeTab, setActiveTab }: NavigationProps)
             />
           </button>
         </li>
-        {/* Social Media Icon (immer sichtbar, Dropdown zum Wechseln) */}
+        {/* Instagram immer sichtbar */}
+        <li>
+          <button
+            title="Instagram"
+            onClick={() => setActiveTab("instagram")}
+            className="flex items-center"
+          >
+            <FaInstagram
+              size={22}
+              className={`transition-colors ${
+                activeTab === "instagram" ? "text-pink-500" : "text-zinc-400"
+              } hover:text-pink-500`}
+            />
+          </button>
+        </li>
+        {/* Chevron für Dropdown */}
         <li className="relative">
           <button
             onClick={() => setOpen((v) => !v)}
             className="flex items-center"
-            title="Social Media"
+            title="Weitere Social Media"
           >
-            {getSocialIcon()}
+            <FiChevronDown
+              size={22}
+              className={`transition-colors ${
+                open || activeTab === "tiktok" || activeTab === "facebook"
+                  ? "text-pink-400"
+                  : "text-zinc-400"
+              } hover:text-pink-400`}
+            />
           </button>
           {open && (
             <div className="absolute left-1/2 -translate-x-1/2 mt-2 bg-zinc-800 rounded shadow-lg flex flex-col z-50 min-w-[120px]">
-              <button
-                onClick={() => {
-                  setActiveTab("instagram");
-                  setOpen(false);
-                }}
-                className="flex items-center gap-2 px-4 py-2 hover:bg-zinc-700 text-zinc-100 w-full"
-              >
-                <FaInstagram className="text-pink-500" /> Instagram
-              </button>
               <button
                 onClick={() => {
                   setActiveTab("tiktok");
@@ -99,7 +93,14 @@ export default function Navigation({ activeTab, setActiveTab }: NavigationProps)
                 }}
                 className="flex items-center gap-2 px-4 py-2 hover:bg-zinc-700 text-zinc-100 w-full"
               >
-                <FaTiktok className="text-black dark:text-white" /> TikTok
+                <FaTiktok
+                  className={`${
+                    activeTab === "tiktok"
+                      ? "text-black dark:text-white"
+                      : "text-zinc-400"
+                  }`}
+                />{" "}
+                TikTok
               </button>
               <button
                 onClick={() => {
@@ -108,7 +109,14 @@ export default function Navigation({ activeTab, setActiveTab }: NavigationProps)
                 }}
                 className="flex items-center gap-2 px-4 py-2 hover:bg-zinc-700 text-zinc-100 w-full"
               >
-                <FaFacebook className="text-blue-600" /> Facebook
+                <FaFacebook
+                  className={`${
+                    activeTab === "facebook"
+                      ? "text-blue-600"
+                      : "text-zinc-400"
+                  }`}
+                />{" "}
+                Facebook
               </button>
             </div>
           )}
