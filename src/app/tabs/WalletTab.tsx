@@ -697,165 +697,150 @@ export default function WalletTab() {
           </Button>
         </Modal>
 
-        {/* Verbessertes Thirdweb Verkaufs-Modal */}
-        <Modal open={showSell} onClose={() => setShowSell(false)} title="D.FAITH zu POL tauschen">
-          <div className="flex flex-col gap-6">
-            {/* Thirdweb Branding */}
-            <div className="flex items-center justify-center gap-2 bg-gradient-to-r from-purple-500/10 to-blue-500/10 rounded-lg p-3 border border-purple-500/20">
-              <div className="w-6 h-6 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 flex items-center justify-center">
-                <span className="text-white text-xs font-bold">T</span>
+        {/* Komprimiertes Thirdweb Verkaufs-Modal */}
+        <Modal open={showSell} onClose={() => {
+          setShowSell(false);
+          setSwapStep("input");
+          setSwapAmount("");
+          setEstimatedOutput("0");
+        }} title="D.FAITH zu POL tauschen">
+          <div className="flex flex-col gap-4">
+            {/* Kompakte Thirdweb Branding */}
+            <div className="flex items-center justify-between bg-gradient-to-r from-purple-500/10 to-blue-500/10 rounded-lg p-2 border border-purple-500/20">
+              <div className="flex items-center gap-2">
+                <div className="w-5 h-5 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 flex items-center justify-center">
+                  <span className="text-white text-xs font-bold">T</span>
+                </div>
+                <span className="text-sm font-medium text-purple-400">Thirdweb DEX</span>
               </div>
-              <span className="text-sm font-medium text-purple-400">Powered by Thirdweb DEX</span>
-              <div className="ml-auto text-xs text-zinc-500">
-                Beste Preise garantiert
-              </div>
+              <div className="text-xs text-zinc-500">Beste Preise</div>
             </div>
 
             {swapStep === "input" && (
               <>
-                {/* Eingabe Sektion */}
-                <div className="space-y-4">
-                  {/* Von Token */}
-                  <div className="bg-zinc-800 rounded-xl border border-zinc-700 p-4">
-                    <div className="flex justify-between items-center mb-3">
-                      <span className="text-sm text-zinc-400 font-medium">Du verkaufst</span>
+                {/* Kompakte Token-Eingabe */}
+                <div className="space-y-3">
+                  {/* Von Token - komprimiert */}
+                  <div className="bg-zinc-800 rounded-lg border border-zinc-700 p-3">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-xs text-zinc-400">Du verkaufst</span>
                       <span className="text-xs text-zinc-500">
-                        Verfügbar: <span className="text-amber-400 font-medium">
-                          {dfaithBalance ? Number(dfaithBalance.displayValue).toFixed(4) : "0.00"} D.FAITH
+                        Max: <span className="text-amber-400 font-medium">
+                          {dfaithBalance ? Number(dfaithBalance.displayValue).toFixed(2) : "0.00"}
                         </span>
                       </span>
                     </div>
                     
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center gap-3 bg-zinc-900 px-4 py-3 rounded-xl border border-zinc-700 min-w-0">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-r from-amber-400 to-yellow-500 flex items-center justify-center flex-shrink-0">
-                          <span className="text-sm font-bold text-black">DF</span>
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 bg-zinc-900 px-3 py-2 rounded-lg border border-zinc-700">
+                        <div className="w-6 h-6 rounded-full bg-gradient-to-r from-amber-400 to-yellow-500 flex items-center justify-center">
+                          <span className="text-xs font-bold text-black">DF</span>
                         </div>
-                        <div className="min-w-0">
-                          <div className="text-sm font-medium text-amber-400">D.FAITH</div>
-                          <div className="text-xs text-zinc-500">Dawid Faith Token</div>
-                        </div>
+                        <span className="text-sm text-amber-400">D.FAITH</span>
                       </div>
                       
-                      <div className="flex-1">
+                      <div className="flex-1 flex items-center gap-2">
                         <input 
                           type="number"
-                          className="w-full bg-transparent text-right text-2xl font-bold text-amber-400 placeholder-zinc-600 focus:outline-none"
+                          className="flex-1 bg-transparent text-right text-lg font-bold text-amber-400 placeholder-zinc-600 focus:outline-none"
                           placeholder="0.0"
                           value={swapAmount}
                           onChange={(e) => setSwapAmount(e.target.value)}
                           step="any"
                           min="0"
                         />
-                        <div className="text-right text-xs text-zinc-500 mt-1">
-                          ≈ €0.00
-                        </div>
+                        <button 
+                          className="px-2 py-1 bg-amber-500/20 text-amber-400 rounded text-xs font-medium hover:bg-amber-500/30 transition"
+                          onClick={() => setSwapAmount(dfaithBalance?.displayValue || "0")}
+                        >
+                          MAX
+                        </button>
                       </div>
                     </div>
-                    
-                    <div className="flex justify-end mt-3">
-                      <button 
-                        className="px-3 py-1 bg-amber-500/20 text-amber-400 rounded-lg hover:bg-amber-500/30 transition text-xs font-medium"
-                        onClick={() => setSwapAmount(dfaithBalance?.displayValue || "0")}
-                      >
-                        MAX verwenden
-                      </button>
+                  </div>
+
+                  {/* Kompakter Tausch-Pfeil */}
+                  <div className="flex justify-center -my-1">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 border-2 border-zinc-900 flex items-center justify-center">
+                      <FaArrowDown className="text-white text-xs" />
                     </div>
                   </div>
 
-                  {/* Tausch Icon */}
-                  <div className="flex justify-center -my-2">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 border-4 border-zinc-900 flex items-center justify-center shadow-lg">
-                      <FaArrowDown className="text-white text-sm" />
-                    </div>
-                  </div>
-
-                  {/* Zu Token */}
-                  <div className="bg-zinc-800 rounded-xl border border-zinc-700 p-4">
-                    <div className="flex justify-between items-center mb-3">
-                      <span className="text-sm text-zinc-400 font-medium">Du erhältst</span>
-                      <span className="text-xs text-zinc-500">
-                        Geschätzt
-                      </span>
+                  {/* Zu Token - komprimiert */}
+                  <div className="bg-zinc-800 rounded-lg border border-zinc-700 p-3">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-xs text-zinc-400">Du erhältst</span>
+                      <span className="text-xs text-zinc-500">Geschätzt</span>
                     </div>
                     
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center gap-3 bg-zinc-900 px-4 py-3 rounded-xl border border-zinc-700 min-w-0">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-r from-purple-400 to-purple-600 flex items-center justify-center flex-shrink-0">
-                          <span className="text-sm font-bold text-white">P</span>
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 bg-zinc-900 px-3 py-2 rounded-lg border border-zinc-700">
+                        <div className="w-6 h-6 rounded-full bg-gradient-to-r from-purple-400 to-purple-600 flex items-center justify-center">
+                          <span className="text-xs font-bold text-white">P</span>
                         </div>
-                        <div className="min-w-0">
-                          <div className="text-sm font-medium text-purple-400">POL</div>
-                          <div className="text-xs text-zinc-500">Polygon Token</div>
-                        </div>
+                        <span className="text-sm text-purple-400">POL</span>
                       </div>
                       
                       <div className="flex-1 text-right">
-                        <div className="text-2xl font-bold text-purple-400">
+                        <div className="text-lg font-bold text-purple-400">
                           {estimatedOutput}
-                        </div>
-                        <div className="text-xs text-zinc-500 mt-1">
-                          ≈ €0.00
                         </div>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Handelsdetails */}
-                <div className="bg-zinc-800/50 rounded-xl p-4 border border-zinc-700">
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
+                {/* Kompakte Handelsdetails */}
+                <div className="bg-zinc-800/50 rounded-lg p-3 border border-zinc-700">
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between text-xs">
                       <span className="text-zinc-400">Kurs</span>
                       <span className="text-zinc-300">1 D.FAITH = {exchangeRate} POL</span>
                     </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-zinc-400">Slippage Toleranz</span>
-                      <div className="flex items-center gap-2">
-                        <select 
-                          className="bg-zinc-700 border border-zinc-600 rounded px-2 py-1 text-xs text-amber-400"
-                          value={slippage}
-                          onChange={(e) => setSlippage(e.target.value)}
-                        >
-                          <option value="0.5">0.5%</option>
-                          <option value="1">1%</option>
-                          <option value="2">2%</option>
-                          <option value="3">3%</option>
-                        </select>
-                      </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-zinc-400">Slippage</span>
+                      <select 
+                        className="bg-zinc-700 border border-zinc-600 rounded px-1 py-0.5 text-xs text-amber-400"
+                        value={slippage}
+                        onChange={(e) => setSlippage(e.target.value)}
+                      >
+                        <option value="0.5">0.5%</option>
+                        <option value="1">1%</option>
+                        <option value="2">2%</option>
+                        <option value="3">3%</option>
+                      </select>
                     </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-zinc-400">Netzwerkgebühren</span>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-zinc-400">Gebühren</span>
                       <span className="text-zinc-300">~0.002 POL</span>
                     </div>
-                    <div className="flex justify-between text-sm">
+                    <div className="flex justify-between text-xs">
                       <span className="text-zinc-400">Mindesterhalt</span>
                       <span className="text-zinc-300">
-                        {(parseFloat(estimatedOutput) * (1 - parseFloat(slippage) / 100)).toFixed(6)} POL
+                        {(parseFloat(estimatedOutput) * (1 - parseFloat(slippage) / 100)).toFixed(4)} POL
                       </span>
                     </div>
                   </div>
                 </div>
 
-                {/* Warnung wenn Approval nötig */}
+                {/* Kompakte Approval-Warnung */}
                 {needsApproval && (
-                  <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4">
-                    <div className="flex items-start gap-3">
-                      <FaInfoCircle className="text-blue-400 text-lg mt-0.5 flex-shrink-0" />
-                      <div>
+                  <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
+                    <div className="flex items-center gap-2">
+                      <FaInfoCircle className="text-blue-400 text-sm flex-shrink-0" />
+                      <div className="text-xs">
                         <div className="font-medium text-blue-400 mb-1">Token-Freigabe erforderlich</div>
-                        <div className="text-sm text-zinc-400">
-                          Vor dem ersten Swap musst du Thirdweb erlauben, deine D.FAITH Token zu verwenden. 
-                          Dies ist eine einmalige Transaktion für erhöhte Sicherheit.
+                        <div className="text-zinc-400">
+                          Einmalige Freigabe für Thirdweb DEX erforderlich.
                         </div>
                       </div>
                     </div>
                   </div>
                 )}
 
-                {/* Action Button */}
+                {/* Action Button - optimiert für mobile */}
                 <Button
-                  className={`w-full py-4 font-bold rounded-xl text-lg transition-all ${
+                  className={`w-full py-3 font-bold rounded-xl transition-all ${
                     parseFloat(swapAmount) > 0 && !isTransactionPending
                       ? needsApproval
                         ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700"
@@ -868,32 +853,38 @@ export default function WalletTab() {
                   {parseFloat(swapAmount) <= 0 ? (
                     "Betrag eingeben"
                   ) : needsApproval ? (
-                    "Token freigeben"
+                    <div className="flex items-center justify-center gap-2">
+                      <FaCheckCircle className="text-sm" />
+                      <span>Token freigeben</span>
+                    </div>
                   ) : (
-                    `${swapAmount} D.FAITH zu POL tauschen`
+                    <div className="flex items-center justify-center gap-2">
+                      <FaExchangeAlt className="text-sm" />
+                      <span>Jetzt tauschen</span>
+                    </div>
                   )}
                 </Button>
               </>
             )}
 
             {swapStep === "approve" && (
-              <div className="flex flex-col items-center justify-center py-8 space-y-4">
-                <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+              <div className="flex flex-col items-center justify-center py-6 space-y-3">
+                <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
                 <div className="text-center">
-                  <div className="text-lg font-bold text-blue-400 mb-2">Token-Freigabe läuft...</div>
+                  <div className="font-bold text-blue-400 mb-1">Token-Freigabe läuft...</div>
                   <div className="text-sm text-zinc-400">
-                    Bitte bestätige die Transaktion in deinem Wallet
+                    Bestätige die Transaktion in deinem Wallet
                   </div>
                 </div>
               </div>
             )}
 
             {swapStep === "swap" && (
-              <div className="flex flex-col items-center justify-center py-8 space-y-4">
-                <div className="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
+              <div className="flex flex-col items-center justify-center py-6 space-y-3">
+                <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
                 <div className="text-center">
-                  <div className="text-lg font-bold text-purple-400 mb-2">Swap wird durchgeführt...</div>
-                  <div className="text-sm text-zinc-400 mb-4">
+                  <div className="font-bold text-purple-400 mb-1">Swap wird durchgeführt...</div>
+                  <div className="text-sm text-zinc-400 mb-2">
                     {swapAmount} D.FAITH → {estimatedOutput} POL
                   </div>
                   <div className="text-xs text-zinc-500">
@@ -904,17 +895,17 @@ export default function WalletTab() {
             )}
 
             {swapStep === "success" && (
-              <div className="flex flex-col items-center justify-center py-8 space-y-4">
-                <div className="w-16 h-16 rounded-full bg-green-500/20 border-2 border-green-500 flex items-center justify-center">
-                  <FaCheckCircle className="text-green-400 text-2xl" />
+              <div className="flex flex-col items-center justify-center py-6 space-y-3">
+                <div className="w-12 h-12 rounded-full bg-green-500/20 border-2 border-green-500 flex items-center justify-center">
+                  <FaCheckCircle className="text-green-400 text-xl" />
                 </div>
                 <div className="text-center">
-                  <div className="text-lg font-bold text-green-400 mb-2">Swap erfolgreich!</div>
-                  <div className="text-sm text-zinc-400 mb-4">
-                    Du hast {swapAmount} D.FAITH gegen {estimatedOutput} POL getauscht
+                  <div className="font-bold text-green-400 mb-1">Swap erfolgreich!</div>
+                  <div className="text-sm text-zinc-400 mb-2">
+                    {swapAmount} D.FAITH → {estimatedOutput} POL
                   </div>
                   <div className="text-xs text-zinc-500">
-                    Deine Balances werden aktualisiert...
+                    Balances werden aktualisiert...
                   </div>
                 </div>
               </div>
@@ -922,14 +913,31 @@ export default function WalletTab() {
             
           </div>
           
-          {swapStep === "input" && (
+          {/* Schließen-Button immer sichtbar */}
+          <div className="flex gap-2 mt-4">
             <Button 
-              className="mt-6 w-full bg-zinc-800 border border-zinc-700 text-zinc-400 hover:bg-zinc-700" 
-              onClick={() => setShowSell(false)}
+              className="flex-1 bg-zinc-800 border border-zinc-700 text-zinc-400 hover:bg-zinc-700 py-2" 
+              onClick={() => {
+                setShowSell(false);
+                setSwapStep("input");
+                setSwapAmount("");
+                setEstimatedOutput("0");
+              }}
             >
-              Abbrechen
+              {swapStep === "success" ? "Fertig" : "Abbrechen"}
             </Button>
-          )}
+            {swapStep === "input" && parseFloat(swapAmount) > 0 && (
+              <Button 
+                className="px-4 bg-amber-500/20 border border-amber-500/30 text-amber-400 hover:bg-amber-500/30 py-2 text-sm"
+                onClick={() => {
+                  setSwapAmount("");
+                  setEstimatedOutput("0");
+                }}
+              >
+                Reset
+              </Button>
+            )}
+          </div>
         </Modal>
 
         <Modal open={showSend} onClose={() => setShowSend(false)} title="Token senden">
