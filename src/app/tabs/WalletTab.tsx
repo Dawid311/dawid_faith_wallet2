@@ -24,7 +24,7 @@ export function Button({ children, ...props }: React.ButtonHTMLAttributes<HTMLBu
 }
 
 const client = createThirdwebClient({
-  clientId: "....", // <-- Deine Client-ID
+  clientId: process.env.NEXT_PUBLIC_TEMPLATE_CLIENT_ID!,
 });
 
 const wallets = [
