@@ -6,17 +6,18 @@ import Navigation from "./Navigation";
 
 export default function Home() {
   return (
-    <main className="min-h-screen flex flex-col justify-between bg-zinc-950">
-      <div className="flex-1 flex flex-col items-center justify-center">
+    <main className="min-h-screen flex flex-col bg-zinc-950">
+      <Navigation />
+      <section className="flex-1 flex flex-col items-center justify-center pt-24 pb-8">
         <ConnectButton
           client={client}
           appMetadata={{
             name: "Faith Wallet",
             url: "https://example.com",
           }}
+          theme="dark"
         />
-      </div>
-      <Navigation />
+      </section>
     </main>
   );
 }
