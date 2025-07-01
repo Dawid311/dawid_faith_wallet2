@@ -2,7 +2,17 @@ import { ConnectButton } from "thirdweb/react";
 import { client } from "../app/client";
 import { useState } from "react";
 
-export default function Navbar() {
+export default function Home() {
+  return (
+    <div className="min-h-screen bg-zinc-900 text-zinc-100">
+      <Navbar />
+      {/* Rest der Home-Komponente */}
+    </div>
+  );
+}
+
+// Navbar Component
+function Navbar() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
   return (
