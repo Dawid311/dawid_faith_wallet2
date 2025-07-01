@@ -104,6 +104,11 @@ export default function WalletTab() {
     symbol: "D.INVEST"
   };
 
+  const STAKING_CONTRACT = {
+    address: "0x333C4053048D542f039bd3de08f35AB998a6e68E", // D.INVEST Staking Contract
+    name: "D.INVEST Staking"
+  };
+
   const POL_TOKEN = {
     address: "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270", // WMATIC
     decimals: 18,
@@ -476,7 +481,7 @@ export default function WalletTab() {
             </div>
 
             {/* Action Buttons mit besseren Gradienten */}
-            <div className="grid grid-cols-3 gap-2 md:gap-4 mb-6">
+            <div className="grid grid-cols-4 gap-2 md:gap-4 mb-6">
               <Button
                 className="flex flex-col items-center justify-center gap-1 px-1 py-3.5 md:py-4.5 bg-gradient-to-br from-zinc-800/90 to-zinc-900 hover:from-zinc-800 hover:to-zinc-800 shadow-lg shadow-black/20 rounded-xl hover:scale-[1.02] transition-all duration-300 border border-zinc-700/80"
                 onClick={() => setShowBuy(true)}
@@ -503,6 +508,15 @@ export default function WalletTab() {
                   <FaPaperPlane className="text-black text-sm" />
                 </div>
                 <span className="text-xs bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 bg-clip-text text-transparent font-medium">Senden</span>
+              </Button>
+              <Button
+                className="flex flex-col items-center justify-center gap-1 px-1 py-3.5 md:py-4.5 bg-gradient-to-br from-zinc-800/90 to-zinc-900 hover:from-zinc-800 hover:to-zinc-800 shadow-lg shadow-black/20 rounded-xl hover:scale-[1.02] transition-all duration-300 border border-zinc-700/80"
+                onClick={() => setShowStake(true)}
+              >
+                <div className="w-8 h-8 flex items-center justify-center bg-gradient-to-br from-amber-400 to-yellow-500 rounded-full mb-1 shadow-inner">
+                  <FaLock className="text-black text-sm" />
+                </div>
+                <span className="text-xs bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 bg-clip-text text-transparent font-medium">Staking</span>
               </Button>
             </div>
             
@@ -860,7 +874,7 @@ export default function WalletTab() {
               <div className="flex items-center gap-1.5">
                 <FaLock className="text-amber-400 text-[10px]" />
                 <span className="text-zinc-400">Smart Contract:</span>
-                <span className="font-mono text-amber-400/70 break-all">0x333C4053048D542f039bd3de08f35AB998a6e68E</span>
+                <span className="font-mono text-amber-400/70 break-all">{STAKING_CONTRACT.address}</span>
               </div>
             </div>
           </div>
