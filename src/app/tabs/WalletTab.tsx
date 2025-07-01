@@ -203,40 +203,17 @@ export default function WalletTab() {
             </button>
           </div>
 
-          {/* Balances mit Gold/Gradient Style */}
-          <div className="flex flex-col items-center mb-6">
-            <span className="uppercase text-xs tracking-widest text-zinc-500 mb-2">Deine Token</span>
-            
-            {/* DFAITH Balance */}
-            <div className="mb-4">
-              <div className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 drop-shadow">
-                {dfaithBalance ? Number(dfaithBalance.displayValue).toFixed(4) : "0.00"}
-              </div>
-              <span className="text-sm font-semibold text-amber-400/80 mt-1">DFAITH</span>
+          {/* DFAITH Balance */}
+          <div className="flex flex-col items-center mb-8">
+            <span className="uppercase text-xs tracking-widest text-zinc-500 mb-2">Kontostand</span>
+            <div className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 drop-shadow">
+              {dfaithBalance ? Number(dfaithBalance.displayValue).toFixed(4) : "0.00"}
             </div>
-            
-            {/* D.INVEST Balance */}
-            <div className="flex flex-col items-center p-4 bg-zinc-800/50 rounded-xl border border-zinc-700 w-full mb-6">
-              <div className="flex items-center justify-between w-full mb-1">
-                <span className="text-sm text-zinc-400">D.INVEST</span>
-                <button 
-                  onClick={() => setShowStake(true)}
-                  className="text-xs px-2 py-1 rounded-lg bg-amber-600/20 text-amber-400 hover:bg-amber-600/30 transition"
-                >
-                  Staken
-                </button>
-              </div>
-              <div className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500">
-                {dinvestBalance ? Number(dinvestBalance.displayValue).toFixed(0) : "0"}
-              </div>
-              <div className="text-xs text-zinc-500 mt-1 w-full overflow-hidden text-ellipsis">
-                Smart Contract: 0xa3f0...7643
-              </div>
-            </div>
+            <span className="text-sm font-semibold text-amber-400/80 mt-1">DFAITH</span>
           </div>
 
           {/* Action Buttons mit besseren Gradienten - jetzt immer nebeneinander */}
-          <div className="grid grid-cols-3 gap-2 md:gap-4">
+          <div className="grid grid-cols-3 gap-2 md:gap-4 mb-8">
             <Button
               className="flex flex-col items-center justify-center gap-1 px-1 py-4 md:py-5 bg-gradient-to-br from-zinc-800 to-zinc-900 font-bold shadow-xl rounded-xl hover:scale-[1.03] hover:shadow-amber-500/20 transition-all duration-300 border border-zinc-700"
               onClick={() => setShowBuy(true)}
@@ -258,6 +235,25 @@ export default function WalletTab() {
               <FaPaperPlane className="text-lg md:text-xl text-amber-400" />
               <span className="text-xs md:text-sm bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 bg-clip-text text-transparent">Senden</span>
             </Button>
+          </div>
+          
+          {/* D.INVEST Balance - jetzt unter den Buttons */}
+          <div className="flex flex-col items-center p-4 bg-zinc-800/50 rounded-xl border border-zinc-700 w-full">
+            <div className="flex items-center justify-between w-full mb-2">
+              <span className="text-sm text-zinc-400">D.INVEST Token</span>
+              <button 
+                onClick={() => setShowStake(true)}
+                className="text-xs px-3 py-1 rounded-lg bg-amber-600/20 text-amber-400 hover:bg-amber-600/30 transition"
+              >
+                Staken
+              </button>
+            </div>
+            <div className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500">
+              {dinvestBalance ? Number(dinvestBalance.displayValue).toFixed(0) : "0"}
+            </div>
+            <div className="text-xs text-zinc-500 mt-1 w-full overflow-hidden text-ellipsis text-center">
+              Contract: 0xa3f0Bf2a9d7f1a0958989Ea4c4DBE8B595117643
+            </div>
           </div>
         </CardContent>
       </Card>
