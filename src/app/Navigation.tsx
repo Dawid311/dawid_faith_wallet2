@@ -8,8 +8,10 @@ import {
   FaInstagram,
   FaTiktok,
   FaFacebook,
+  FaMusic,
 } from "react-icons/fa";
 import { FiChevronDown } from "react-icons/fi";
+import { SiSpotify } from "react-icons/si";
 import { useState } from "react";
 
 type NavigationProps = {
@@ -149,11 +151,11 @@ export default function Navigation({ activeTab, setActiveTab }: NavigationProps)
             onClick={() => setActiveTab("stream")}
             className="flex items-center"
           >
-            <FaVideo
+            <SiSpotify
               size={22}
               className={`transition-colors ${
-                activeTab === "stream" ? "text-red-400" : "text-zinc-400"
-              } hover:text-red-400`}
+                activeTab === "stream" ? "text-green-500" : "text-zinc-400"
+              } hover:text-green-500`}
             />
           </button>
         </li>
@@ -164,7 +166,7 @@ export default function Navigation({ activeTab, setActiveTab }: NavigationProps)
             onClick={() => setActiveTab("live")}
             className="flex items-center"
           >
-            <FaBroadcastTower
+            <FaMusic
               size={22}
               className={`transition-colors ${
                 activeTab === "live" ? "text-purple-400" : "text-zinc-400"
