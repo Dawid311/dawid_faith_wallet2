@@ -17,8 +17,25 @@ type NavigationProps = {
   setActiveTab: (tab: string) => void;
 };
 
+const socialIcons = {
+  instagram: <FaInstagram size={22} className="text-pink-500" />,
+  tiktok: <FaTiktok size={22} className="text-black dark:text-white" />,
+  facebook: <FaFacebook size={22} className="text-blue-600" />,
+};
+
 export default function Navigation({ activeTab, setActiveTab }: NavigationProps) {
   const [open, setOpen] = useState(false);
+  // Standard: Instagram, wenn noch nichts gewählt wurde
+  const [activeSocial, setActiveSocial] = useState<"instagram" | "tiktok" | "facebook">("instagram");
+
+  // Wenn ein Social-Tab aktiv ist, setze auch activeSocial
+  if (
+    (activeTab === "instagram" && activeSocial !== "instagram") ||
+    (activeTab === "tiktok" && activeSocial !== "tiktok") ||
+    (activeTab === "facebook" && activeSocial !== "facebook")
+  ) {
+    setActiveSocial(activeTab as "instagram" | "tiktok" | "facebook");
+  }
 
   return (
     <nav className="fixed top-0 left-0 w-full bg-zinc-900 border-b border-zinc-800 z-50">
@@ -53,34 +70,25 @@ export default function Navigation({ activeTab, setActiveTab }: NavigationProps)
             />
           </button>
         </li>
-        {/* Instagram immer sichtbar */}
-        <li>
+        {/* Social Media Icon + Dropdown */}
+        <li className="relative flex items-center">
           <button
-            title="Instagram"
-            onClick={() => setActiveTab("instagram")}
+            title={activeSocial.charAt(0).toUpperCase() + activeSocial.slice(1)}
+            onClick={() => setActiveTab(activeSocial)}
             className="flex items-center"
           >
-            <FaInstagram
-              size={22}
-              className={`transition-colors ${
-                activeTab === "instagram" ? "text-pink-500" : "text-zinc-400"
-              } hover:text-pink-500`}
-            />
+            {socialIcons[activeSocial]}
           </button>
-        </li>
-        {/* Chevron für Dropdown */}
-        <li className="relative">
           <button
             onClick={() => setOpen((v) => !v)}
-            className="flex items-center"
+            className="flex items-center ml-1"
             title="Weitere Social Media"
+            tabIndex={-1}
           >
             <FiChevronDown
               size={22}
               className={`transition-colors ${
-                open || activeTab === "tiktok" || activeTab === "facebook"
-                  ? "text-pink-400"
-                  : "text-zinc-400"
+                open ? "text-pink-400" : "text-zinc-400"
               } hover:text-pink-400`}
             />
           </button>
@@ -88,35 +96,33 @@ export default function Navigation({ activeTab, setActiveTab }: NavigationProps)
             <div className="absolute left-1/2 -translate-x-1/2 mt-2 bg-zinc-800 rounded shadow-lg flex flex-col z-50 min-w-[120px]">
               <button
                 onClick={() => {
-                  setActiveTab("tiktok");
+                  setActiveTab("instagram");
+                  setActiveSocial("instagram");
                   setOpen(false);
                 }}
                 className="flex items-center gap-2 px-4 py-2 hover:bg-zinc-700 text-zinc-100 w-full"
               >
-                <FaTiktok
-                  className={`${
-                    activeTab === "tiktok"
-                      ? "text-black dark:text-white"
-                      : "text-zinc-400"
-                  }`}
-                />{" "}
-                TikTok
+                <FaInstagram className="text-pink-500" /> Instagram
+              </button>
+              <button
+                onClick={() => {
+                  setActiveTab("tiktok");
+                  setActiveSocial("tiktok");
+                  setOpen(false);
+                }}
+                className="flex items-center gap-2 px-4 py-2 hover:bg-zinc-700 text-zinc-100 w-full"
+              >
+                <FaTiktok className="text-black dark:text-white" /> TikTok
               </button>
               <button
                 onClick={() => {
                   setActiveTab("facebook");
+                  setActiveSocial("facebook");
                   setOpen(false);
                 }}
                 className="flex items-center gap-2 px-4 py-2 hover:bg-zinc-700 text-zinc-100 w-full"
               >
-                <FaFacebook
-                  className={`${
-                    activeTab === "facebook"
-                      ? "text-blue-600"
-                      : "text-zinc-400"
-                  }`}
-                />{" "}
-                Facebook
+                <FaFacebook className="text-blue-600" /> Facebook
               </button>
             </div>
           )}
