@@ -83,9 +83,9 @@ export default function Navigation({ activeTab, setActiveTab }: NavigationProps)
             <div className="absolute left-1/2 -translate-x-1/2 mt-2 bg-zinc-800 rounded shadow-lg flex flex-col z-50 min-w-[120px]">
               <button
                 onClick={() => {
+                  setOpen(false);
                   setActiveSocial("instagram");
                   setActiveTab("instagram");
-                  setOpen(false);
                 }}
                 className="flex items-center gap-2 px-4 py-2 hover:bg-zinc-700 text-zinc-100 w-full"
               >

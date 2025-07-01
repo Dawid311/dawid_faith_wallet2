@@ -3,26 +3,10 @@ import { createThirdwebClient } from "thirdweb";
 import { useActiveAccount, useActiveWalletConnectionStatus } from "thirdweb/react";
 import { ConnectButton } from "thirdweb/react";
 import { inAppWallet, createWallet } from "thirdweb/wallets";
+import { Card, CardContent } from "../../../components/ui/card";
+import { Button } from "../../../components/ui/button";
 
-// Placeholder-Komponenten für Card und CardContent
-export function Card({ children, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div {...props}>{children}</div>;
-}
-export function CardContent({ children, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div {...props}>{children}</div>;
-}
-export function Button({ children, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement>) {
-  return (
-    <button
-      className="px-4 py-2 rounded border border-zinc-300 bg-zinc-100 hover:bg-zinc-200 text-black text-sm font-medium transition"
-      {...props}
-    >
-      {children}
-    </button>
-  );
-}
-
-// Einfache Modal-Komponente
+// Modal wie gehabt
 function Modal({ open, onClose, title, children }: { open: boolean, onClose: () => void, title: string, children: React.ReactNode }) {
   if (!open) return null;
   return (
@@ -68,9 +52,6 @@ const wallets = [
   createWallet("com.trustwallet.app"),
 ];
 
-const DFAITH_CONTRACT = "0xEE27258975a2DA946CD5025134D70E5E24F6789F";
-const WMATIC_CONTRACT = "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270";
-
 export default function WalletTab() {
   const account = useActiveAccount();
   const status = useActiveWalletConnectionStatus();
@@ -82,6 +63,7 @@ export default function WalletTab() {
   const [showBuy, setShowBuy] = useState(false);
   const [showSell, setShowSell] = useState(false);
   const [showSend, setShowSend] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
 
   useEffect(() => {
     async function fetchBalances() {
@@ -132,9 +114,36 @@ export default function WalletTab() {
     <div className="flex justify-center">
       <Card className="w-full max-w-2xl bg-white text-black shadow-2xl relative">
         <CardContent className="p-8">
-          {/* MATIC Badge */}
-          <div className="absolute top-4 left-4 bg-gray-100 rounded-2xl px-3 py-2 text-sm font-bold text-purple-600 flex items-center gap-2">
-            MATIC: {maticBalance ? Number(maticBalance.displayValue).toFixed(4) : "0.00"}
+          {/* Header mit MATIC, History und Wallet-Connect */}
+          <div className="flex justify-between items-center mb-6">
+            {/* MATIC Badge */}
+            <div className="bg-gray-100 rounded-2xl px-3 py-2 text-sm font-bold text-purple-600 flex items-center gap-2">
+              MATIC: {maticBalance ? Number(maticBalance.displayValue).toFixed(4) : "0.00"}
+            </div>
+            <div className="flex items-center gap-2">
+              {/* History Button */}
+              <Button
+                className="bg-zinc-100 border border-zinc-300 hover:bg-zinc-200 text-black px-3 py-2 rounded-lg text-sm font-medium"
+                onClick={() => setShowHistory(true)}
+                title="Transaktionshistorie"
+              >
+                <svg className="w-5 h-5 mr-1 inline-block" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Historie
+              </Button>
+              {/* Thirdweb ConnectButton */}
+              <ConnectButton
+                client={client}
+                connectButton={{ label: "" }}
+                connectModal={{ size: "compact" }}
+                wallets={wallets}
+                chain={{
+                  id: 137,
+                  rpc: "https://polygon-rpc.com",
+                }}
+              />
+            </div>
           </div>
 
           <h2 className="text-2xl font-bold text-center mb-6 bg-gradient-to-r from-orange-400 via-pink-500 to-purple-600 bg-clip-text text-transparent">
@@ -157,14 +166,14 @@ export default function WalletTab() {
           </div>
 
           {/* Action Buttons */}
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button className="flex-1" onClick={() => setShowBuy(true)}>
+          <div className="flex flex-row gap-4 justify-center">
+            <Button className="flex-1 bg-gradient-to-r from-orange-400 via-pink-500 to-purple-600 text-white font-bold shadow-lg" onClick={() => setShowBuy(true)}>
               Kaufen
             </Button>
-            <Button className="flex-1" onClick={() => setShowSell(true)}>
+            <Button className="flex-1 bg-gradient-to-r from-purple-600 via-pink-500 to-orange-400 text-white font-bold shadow-lg" onClick={() => setShowSell(true)}>
               Verkaufen
             </Button>
-            <Button className="flex-1" onClick={() => setShowSend(true)}>
+            <Button className="flex-1 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-white font-bold shadow-lg" onClick={() => setShowSend(true)}>
               Senden
             </Button>
           </div>
@@ -173,19 +182,20 @@ export default function WalletTab() {
 
       {/* Modale */}
       <Modal open={showBuy} onClose={() => setShowBuy(false)} title="DFAITH kaufen">
-        {/* Hier Kauf-Formular */}
         <div className="text-center">Kauf-Funktion kommt hier hin.</div>
         <Button className="mt-4 w-full" onClick={() => setShowBuy(false)}>Schließen</Button>
       </Modal>
       <Modal open={showSell} onClose={() => setShowSell(false)} title="DFAITH verkaufen">
-        {/* Hier Verkauf-Formular */}
         <div className="text-center">Verkauf-Funktion kommt hier hin.</div>
         <Button className="mt-4 w-full" onClick={() => setShowSell(false)}>Schließen</Button>
       </Modal>
       <Modal open={showSend} onClose={() => setShowSend(false)} title="Token senden">
-        {/* Hier Sende-Formular */}
         <div className="text-center">Sende-Funktion kommt hier hin.</div>
         <Button className="mt-4 w-full" onClick={() => setShowSend(false)}>Schließen</Button>
+      </Modal>
+      <Modal open={showHistory} onClose={() => setShowHistory(false)} title="Transaktionshistorie">
+        <div className="text-center">Hier könnte deine Transaktionshistorie stehen.</div>
+        <Button className="mt-4 w-full" onClick={() => setShowHistory(false)}>Schließen</Button>
       </Modal>
     </div>
   );
