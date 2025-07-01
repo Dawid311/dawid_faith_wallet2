@@ -112,7 +112,10 @@ export default function WalletTab() {
             connectButton={{ label: "Login" }}
             connectModal={{ size: "compact" }}
             wallets={wallets}
-            chain={{ chainId: 137 }} // Polygon
+            chain={{
+              id: 137,
+              rpc: "https://polygon-rpc.com",
+            }} // Polygon
           />
         </div>
       </div>
