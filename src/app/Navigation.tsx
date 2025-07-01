@@ -75,8 +75,8 @@ export default function Navigation({ activeTab, setActiveTab }: NavigationProps)
         {/* Social Media Icon + Dropdown */}
         <li className="relative flex items-center">
           <button
-            title={activeSocial.charAt(0).toUpperCase() + activeSocial.slice(1)}
-            onClick={() => setOpen((v) => !v)} // Nur Dropdown öffnen/schließen!
+            title="Social Media"
+            onClick={() => setOpen((v) => !v)}
             className="flex items-center"
             aria-haspopup="true"
             aria-expanded={open}
