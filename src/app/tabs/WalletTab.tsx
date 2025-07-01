@@ -421,6 +421,46 @@ export default function WalletTab() {
     }
   };
 
+  // --- NEU: Polygonscan API Transaktionshistorie ---
+  const POLYGONSCAN_API_KEY = "V6Q5223DMWPP3HQJE9IJ8UIHSP3NUHID5K";
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [txLoading, setTxLoading] = useState(false);
+  const [txError, setTxError] = useState<string | null>(null);
+  const [txFilter, setTxFilter] = useState<"ALL" | "DFAITH" | "DINVEST">("ALL");
+
+  useEffect(() => {
+    if (showHistory && account?.address) {
+      fetchTransactions();
+    }
+    // eslint-disable-next-line
+  }, [showHistory, account?.address]);
+
+  const fetchTransactions = async () => {
+    if (!account?.address) {
+      setTransactions([]);
+      return;
+    }
+    setTxLoading(true);
+    setTxError(null);
+    setTransactions([]);
+    try {
+      const url = `https://api.polygonscan.com/api?module=account&action=tokentx&address=${account.address}&startblock=0&endblock=99999999&sort=desc&apikey=${POLYGONSCAN_API_KEY}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data.status === "1" && Array.isArray(data.result)) {
+        setTransactions(data.result);
+      } else {
+        setTransactions([]);
+        setTxError("Keine Transaktionen gefunden");
+      }
+    } catch (e) {
+      setTxError("Fehler beim Laden der Transaktionen");
+      setTransactions([]);
+    } finally {
+      setTxLoading(false);
+    }
+  };
+
   if (status !== "connected" || !account?.address) {
     return (
       <div className="flex flex-col items-center min-h-[70vh] justify-center bg-black py-8">
@@ -613,7 +653,7 @@ export default function WalletTab() {
                 
                 <div className="flex items-center justify-between">
                   <div className="text-2xl md:text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500">
-                    {Number(dinvestBalance?.displayValue || 0).toFixed(4)}
+                    {dinvestBalance ? parseInt(dinvestBalance.displayValue, 10) : 0}
                   </div>
                   
                   <button 
@@ -624,7 +664,6 @@ export default function WalletTab() {
                     <span className="text-sm font-medium">Staken & Verdienen</span>
                   </button>
                 </div>
-                
                 {/* Gestaked Anzeige */}
                 <div className="text-xs text-zinc-500 mt-2">
                   Gestaked: <span className="text-amber-400/80">0</span>
@@ -714,10 +753,10 @@ export default function WalletTab() {
               <>
                 {/* Horizontale Token-Eingabe (links nach rechts) */}
                 <div className="space-y-4">
-                  {/* Swap Container - horizontal */}
-                  <div className="flex items-center gap-3">
-                    {/* Von Token (links) */}
-                    <div className="flex-1 bg-zinc-800 rounded-lg border border-zinc-700 p-3">
+                  {/* Swap Container - responsive horizontal/vertikal */}
+                  <div className="flex flex-col sm:flex-row items-stretch gap-3">
+                    {/* Von Token (links/oben) */}
+                    <div className="flex-1 min-w-0 bg-zinc-800 rounded-lg border border-zinc-700 p-3 w-full">
                       <div className="flex justify-between items-center mb-2">
                         <span className="text-xs text-zinc-400">Du verkaufst</span>
                         <span className="text-xs text-zinc-500">
@@ -726,7 +765,6 @@ export default function WalletTab() {
                           </span>
                         </span>
                       </div>
-                      
                       {/* Token-Label */}
                       <div className="flex items-center gap-2 mb-2">
                         <div className="w-6 h-6 rounded-full bg-gradient-to-r from-amber-400 to-yellow-500 flex items-center justify-center">
@@ -734,12 +772,11 @@ export default function WalletTab() {
                         </div>
                         <span className="text-sm text-amber-400 font-medium">D.FAITH</span>
                       </div>
-                      
                       {/* Eingabefeld - GRÖSSER und SICHTBARER */}
                       <div className="flex items-center gap-2">
                         <input 
                           type="number"
-                          className="flex-1 bg-zinc-900 border border-amber-500/30 rounded-lg px-3 py-2 text-lg font-bold text-amber-400 placeholder-amber-600/50 focus:outline-none focus:border-amber-500 focus:bg-zinc-800"
+                          className="flex-1 min-w-0 bg-zinc-900 border border-amber-500/30 rounded-lg px-3 py-2 text-lg font-bold text-amber-400 placeholder-amber-600/50 focus:outline-none focus:border-amber-500 focus:bg-zinc-800"
                           placeholder="0.0000"
                           value={swapAmount}
                           onChange={(e) => setSwapAmount(e.target.value)}
@@ -756,19 +793,18 @@ export default function WalletTab() {
                     </div>
 
                     {/* Horizontaler Tausch-Pfeil */}
-                    <div className="flex items-center justify-center">
+                    <div className="flex items-center justify-center my-2 sm:my-0">
                       <div className="w-10 h-10 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 border-2 border-zinc-900 flex items-center justify-center shadow-lg">
                         <FaArrowRight className="text-white text-sm" />
                       </div>
                     </div>
 
-                    {/* Zu Token (rechts) */}
-                    <div className="flex-1 bg-zinc-800 rounded-lg border border-zinc-700 p-3">
+                    {/* Zu Token (rechts/unten) */}
+                    <div className="flex-1 min-w-0 bg-zinc-800 rounded-lg border border-zinc-700 p-3 w-full">
                       <div className="flex justify-between items-center mb-2">
                         <span className="text-xs text-zinc-400">Du erhältst</span>
                         <span className="text-xs text-zinc-500">Geschätzt</span>
                       </div>
-                      
                       {/* Token-Label */}
                       <div className="flex items-center gap-2 mb-2">
                         <div className="w-6 h-6 rounded-full bg-gradient-to-r from-purple-400 to-purple-600 flex items-center justify-center">
@@ -776,7 +812,6 @@ export default function WalletTab() {
                         </div>
                         <span className="text-sm text-purple-400 font-medium">POL</span>
                       </div>
-                      
                       {/* Output-Anzeige */}
                       <div className="bg-zinc-900 border border-purple-500/30 rounded-lg px-3 py-2">
                         <div className="text-lg font-bold text-purple-400">
@@ -973,7 +1008,7 @@ export default function WalletTab() {
                   </div>
                   <span className="text-xs font-medium">D.INVEST</span>
                   <span className="text-[10px] text-zinc-500">
-                    {dinvestBalance ? Number(dinvestBalance.displayValue).toFixed(4) : "0.0000"}
+                    {dinvestBalance ? parseInt(dinvestBalance.displayValue, 10) : "0"}
                   </span>
                 </button>
                 
@@ -1206,158 +1241,51 @@ export default function WalletTab() {
           <div className="flex flex-col gap-4 max-h-96 overflow-y-auto">
             {/* Filter Buttons */}
             <div className="flex gap-2 mb-4">
-              <button className="px-3 py-1 rounded-lg bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs font-medium">
-                Alle
-              </button>
-              <button className="px-3 py-1 rounded-lg bg-zinc-700 text-zinc-400 border border-zinc-600 text-xs font-medium hover:bg-zinc-600">
-                D.FAITH
-              </button>
-              <button className="px-3 py-1 rounded-lg bg-zinc-700 text-zinc-400 border border-zinc-600 text-xs font-medium hover:bg-zinc-600">
-                D.INVEST
-              </button>
+              <button onClick={() => setTxFilter("ALL")} className={`px-3 py-1 rounded-lg border text-xs font-medium ${txFilter==="ALL" ? "bg-amber-500/20 text-amber-400 border-amber-500/30" : "bg-zinc-700 text-zinc-400 border-zinc-600 hover:bg-zinc-600"}`}>Alle</button>
+              <button onClick={() => setTxFilter("DFAITH")} className={`px-3 py-1 rounded-lg border text-xs font-medium ${txFilter==="DFAITH" ? "bg-amber-500/20 text-amber-400 border-amber-500/30" : "bg-zinc-700 text-zinc-400 border-zinc-600 hover:bg-zinc-600"}`}>D.FAITH</button>
+              <button onClick={() => setTxFilter("DINVEST")} className={`px-3 py-1 rounded-lg border text-xs font-medium ${txFilter==="DINVEST" ? "bg-amber-500/20 text-amber-400 border-amber-500/30" : "bg-zinc-700 text-zinc-400 border-zinc-600 hover:bg-zinc-600"}`}>D.INVEST</button>
             </div>
 
-            {/* Aktuelle Transaktionen */}
+            {/* Echte Transaktionen */}
             <div className="space-y-3">
-              {/* D.FAITH Transfer - heute */}
-              <div className="bg-zinc-800 rounded-lg p-3 border border-zinc-700">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-green-400 to-green-600 flex items-center justify-center">
-                      <FaPaperPlane className="text-white text-xs" />
+              {txLoading ? (
+                <div className="text-center text-zinc-500 py-8">Lade Transaktionen...</div>
+              ) : txError ? (
+                <div className="text-center text-zinc-500 py-8">{txError}</div>
+              ) : transactions.length === 0 ? (
+                <div className="text-center text-zinc-500 py-8">Keine Transaktionen gefunden</div>
+              ) : (
+                transactions
+                  .filter(tx => {
+                    if (txFilter === "ALL") return true;
+                    if (txFilter === "DFAITH") return tx.contractAddress.toLowerCase() === DFAITH_TOKEN.address.toLowerCase();
+                    if (txFilter === "DINVEST") return tx.contractAddress.toLowerCase() === DINVEST_TOKEN.address.toLowerCase();
+                    return true;
+                  })
+                  .slice(0, 20)
+                  .map(tx => (
+                    <div key={tx.hash} className="bg-zinc-800 rounded-lg p-3 border border-zinc-700 text-xs flex flex-col gap-1">
+                      <div className="flex justify-between items-center">
+                        <span className="font-bold text-amber-400">{tx.tokenSymbol}</span>
+                        <span className="text-zinc-400">{new Date(Number(tx.timeStamp)*1000).toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-zinc-400">{tx.from.toLowerCase() === account.address.toLowerCase() ? "Gesendet" : "Empfangen"}</span>
+                        <span className={tx.from.toLowerCase() === account.address.toLowerCase() ? "text-red-400" : "text-green-400"}>
+                          {tx.from.toLowerCase() === account.address.toLowerCase() ? "-" : "+"}
+                          {(Number(tx.value) / Math.pow(10, tx.tokenDecimal)).toFixed(4)} {tx.tokenSymbol}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <a href={`https://polygonscan.com/tx/${tx.hash}`} target="_blank" rel="noopener noreferrer" className="text-blue-400 underline">Details</a>
+                        <span className="text-zinc-500">Block: {tx.blockNumber}</span>
+                      </div>
                     </div>
-                    <div>
-                      <div className="text-sm font-medium text-amber-400">D.FAITH Transfer</div>
-                      <div className="text-xs text-zinc-500">vor 45 Minuten</div>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-sm font-bold text-red-400">-250.0000</div>
-                    <div className="text-xs text-zinc-500">D.FAITH</div>
-                  </div>
-                </div>
-                <div className="text-xs text-zinc-500">
-                  An: 0x8A7b...C4d9 | Hash: 0xa1b2...c3d4
-                </div>
-              </div>
-
-              {/* D.INVEST Bridge - heute */}
-              <div className="bg-zinc-800 rounded-lg p-3 border border-zinc-700">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-cyan-400 to-cyan-600 flex items-center justify-center">
-                      <FaExchangeAlt className="text-white text-xs" />
-                    </div>
-                    <div>
-                      <div className="text-sm font-medium text-amber-400">D.INVEST Bridge</div>
-                      <div className="text-xs text-zinc-500">vor 3 Stunden</div>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-sm font-bold text-cyan-400">+75</div>
-                    <div className="text-xs text-zinc-500">D.INVEST</div>
-                  </div>
-                </div>
-                <div className="text-xs text-zinc-500">
-                  via Thirdweb Bridge | Hash: 0x5e6f...7890
-                </div>
-              </div>
-
-              {/* D.INVEST Staking - gestern */}
-              <div className="bg-zinc-800 rounded-lg p-3 border border-zinc-700">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-purple-400 to-purple-600 flex items-center justify-center">
-                      <FaLock className="text-white text-xs" />
-                    </div>
-                    <div>
-                      <div className="text-sm font-medium text-amber-400">D.INVEST Staking</div>
-                      <div className="text-xs text-zinc-500">vor 18 Stunden</div>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-sm font-bold text-purple-400">100</div>
-                    <div className="text-xs text-zinc-500">D.INVEST</div>
-                  </div>
-                </div>
-                <div className="text-xs text-zinc-500">
-                  Contract: {STAKING_CONTRACT.address.slice(0, 10)}...
-                </div>
-              </div>
-
-              {/* D.FAITH Empfangen - gestern */}
-              <div className="bg-zinc-800 rounded-lg p-3 border border-zinc-700">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-green-400 to-green-600 flex items-center justify-center">
-                      <FaArrowDown className="text-white text-xs" />
-                    </div>
-                    <div>
-                      <div className="text-sm font-medium text-amber-400">D.FAITH Empfangen</div>
-                      <div className="text-xs text-zinc-500">vor 1 Tag</div>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-sm font-bold text-green-400">+500.0000</div>
-                    <div className="text-xs text-zinc-500">D.FAITH</div>
-                  </div>
-                </div>
-                <div className="text-xs text-zinc-500">
-                  Von: 0x2B4c...E8f1 | Hash: 0xdef0...1234
-                </div>
-              </div>
-
-              {/* POL Swap - vor 2 Tagen */}
-              <div className="bg-zinc-800 rounded-lg p-3 border border-zinc-700">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-orange-400 to-orange-600 flex items-center justify-center">
-                      <FaExchangeAlt className="text-white text-xs" />
-                    </div>
-                    <div>
-                      <div className="text-sm font-medium text-amber-400">POL → D.FAITH Swap</div>
-                      <div className="text-xs text-zinc-500">vor 2 Tagen</div>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-sm font-bold text-orange-400">1.2 POL → 150.0000 D.FAITH</div>
-                    <div className="text-xs text-zinc-500">via Uniswap</div>
-                  </div>
-                </div>
-                <div className="text-xs text-zinc-500">
-                  Hash: 0x9abc...def0
-                </div>
-              </div>
-
-              {/* D.INVEST Reward - vor 3 Tagen */}
-              <div className="bg-zinc-800 rounded-lg p-3 border border-zinc-700">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-yellow-400 to-yellow-600 flex items-center justify-center">
-                      <FaCoins className="text-white text-xs" />
-                    </div>
-                    <div>
-                      <div className="text-sm font-medium text-amber-400">Staking Reward</div>
-                      <div className="text-xs text-zinc-500">vor 3 Tagen</div>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-sm font-bold text-yellow-400">+25</div>
-                    <div className="text-xs text-zinc-500">D.INVEST</div>
-                  </div>
-                </div>
-                <div className="text-xs text-zinc-500">
-                  Staking Reward | Hash: 0x3456...789a
-                </div>
-              </div>
+                  ))
+              )}
             </div>
-
-            {/* Load More Button */}
-            <Button className="w-full bg-zinc-700 hover:bg-zinc-600 text-zinc-300 font-medium py-2 mt-4">
-              Weitere laden
-            </Button>
+            {/* Load More Button (optional) kann später ergänzt werden */}
           </div>
-          
           {/* Schließen-Button */}
           <Button className="mt-4 w-full bg-zinc-800 border border-zinc-700 text-zinc-400 hover:bg-zinc-700" onClick={() => setShowHistory(false)}>
             Schließen
