@@ -415,23 +415,41 @@ export default function WalletTab() {
         </Modal>
         
         <Modal open={showStake} onClose={() => setShowStake(false)} title="D.INVEST staken">
-          <div className="text-zinc-300">
-            {/* Oberer Bereich mit Balances */}
-            <div className="grid grid-cols-2 gap-4 mb-6">
-              <div className="bg-zinc-800 rounded-lg p-3 text-center border border-zinc-700">
-                <p className="text-xs text-zinc-500 mb-1">Verfügbar</p>
-                <p className="text-lg font-bold text-amber-400">{dinvestBalance ? Number(dinvestBalance.displayValue).toFixed(0) : "0"}</p>
+          <div className="flex flex-col gap-5">
+            {/* Verfügbare & Gestakte Tokens */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-zinc-800 rounded-lg p-4 border border-zinc-700 text-center">
+                <div className="flex items-center justify-center gap-2 mb-3">
+                  <div className="p-1.5 bg-gradient-to-r from-yellow-400 to-amber-600 rounded-full">
+                    <FaCoins className="text-black text-sm" />
+                  </div>
+                  <span className="font-medium text-zinc-400">Verfügbar</span>
+                </div>
+                <div className="text-xl font-bold text-amber-400">
+                  {dinvestBalance ? Number(dinvestBalance.displayValue).toFixed(0) : "0"}
+                </div>
               </div>
-              <div className="bg-zinc-800 rounded-lg p-3 text-center border border-zinc-700">
-                <p className="text-xs text-zinc-500 mb-1">Gestaked</p>
-                <p className="text-lg font-bold text-amber-400">0</p>
+              
+              <div className="bg-zinc-800 rounded-lg p-4 border border-zinc-700 text-center">
+                <div className="flex items-center justify-center gap-2 mb-3">
+                  <div className="p-1.5 bg-gradient-to-r from-amber-500 to-amber-600 rounded-full">
+                    <FaLock className="text-black text-sm" />
+                  </div>
+                  <span className="font-medium text-zinc-400">Gestaked</span>
+                </div>
+                <div className="text-xl font-bold text-amber-400">0</div>
               </div>
             </div>
             
-            {/* Eingabefeld für Staking */}
-            <div className="bg-zinc-800 rounded-lg p-4 mb-6 border border-zinc-700">
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-sm text-zinc-400">Betrag:</span>
+            {/* Staking-Option */}
+            <div className="bg-zinc-800 rounded-lg p-4 border border-zinc-700">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 bg-gradient-to-r from-yellow-400 to-amber-600 rounded-full">
+                    <FaLock className="text-black text-sm" />
+                  </div>
+                  <span className="font-medium text-amber-400">D.INVEST staken</span>
+                </div>
                 <button 
                   className="text-xs px-2 py-0.5 bg-zinc-700 hover:bg-zinc-600 rounded text-amber-400"
                   onClick={() => {/* Maximalbetrag setzen */}}
@@ -439,7 +457,8 @@ export default function WalletTab() {
                   MAX
                 </button>
               </div>
-              <div className="relative">
+              
+              <div className="relative mb-3">
                 <input 
                   type="number"
                   placeholder="0"
@@ -449,51 +468,86 @@ export default function WalletTab() {
                   D.INVEST
                 </div>
               </div>
+              
+              <Button 
+                className="w-full bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-2"
+                onClick={() => {/* Stake-Logik */}}
+              >
+                Jetzt staken
+              </Button>
             </div>
             
-            {/* Aktions-Buttons */}
-            <div className="grid grid-cols-2 gap-4 mb-6">
+            {/* Unstaking-Option */}
+            <div className="bg-zinc-800 rounded-lg p-4 border border-zinc-700">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 bg-gradient-to-r from-zinc-400 to-zinc-500 rounded-full">
+                    <FaLock className="text-black text-sm" />
+                  </div>
+                  <span className="font-medium text-zinc-400">D.INVEST unstaken</span>
+                </div>
+                <button 
+                  className="text-xs px-2 py-0.5 bg-zinc-700 hover:bg-zinc-600 rounded text-zinc-400"
+                  onClick={() => {/* Maximalbetrag setzen */}}
+                >
+                  MAX
+                </button>
+              </div>
+              
+              <div className="relative mb-3">
+                <input 
+                  type="number"
+                  placeholder="0"
+                  className="w-full bg-zinc-900 border border-zinc-700 rounded p-2 text-zinc-400 focus:border-zinc-600 focus:outline-none"
+                />
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-zinc-500">
+                  D.INVEST
+                </div>
+              </div>
+              
               <Button 
-                onClick={() => {/* Stake-Logik */}}
-                className="bg-gradient-to-r from-amber-500 to-amber-600 text-black font-bold py-2"
-              >
-                Staken
-              </Button>
-              <Button 
+                className="w-full bg-zinc-700 hover:bg-zinc-600 text-zinc-300 font-bold py-2"
                 onClick={() => {/* Unstake-Logik */}}
-                className="bg-zinc-800 border border-zinc-700 text-amber-400 font-bold py-2 hover:bg-zinc-700"
               >
                 Unstaken
               </Button>
             </div>
             
-            {/* Rewards-Bereich */}
-            <div className="bg-zinc-800 rounded-lg p-4 mb-6 border border-zinc-700">
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-sm text-zinc-400">Verdiente Belohnungen:</span>
-                <span className="text-amber-400 font-bold">0 DFAITH</span>
+            {/* Rewards */}
+            <div className="bg-zinc-800 rounded-lg p-4 border border-zinc-700">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 bg-gradient-to-r from-yellow-400 to-amber-600 rounded-full">
+                    <FaCoins className="text-black text-sm" />
+                  </div>
+                  <span className="font-medium text-amber-400">Belohnungen</span>
+                </div>
+                <span className="text-xs text-zinc-400">Gesammelt: <span className="text-amber-400 font-bold">0 DFAITH</span></span>
               </div>
+              
               <Button 
-                onClick={() => {/* Claim-Logik */}} 
-                className="w-full bg-gradient-to-r from-amber-500 to-amber-600 text-black font-bold py-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-2 opacity-50 cursor-not-allowed"
                 disabled={true}
               >
                 Belohnungen einfordern
               </Button>
             </div>
             
-            {/* Info-Bereich */}
-            <div className="bg-zinc-800/50 rounded-lg p-4 mb-4 text-xs">
-              <div className="flex items-center mb-2 gap-2">
-                <FaLock className="text-amber-400" />
-                <span className="text-zinc-300">Smart Contract:</span>
+            {/* Smart Contract Info */}
+            <div className="bg-zinc-800/50 rounded-lg p-4 border border-zinc-700">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <FaLock className="text-amber-400 text-xs" />
+                  <span className="text-xs text-zinc-400">Staking Smart Contract:</span>
+                </div>
               </div>
-              <div className="font-mono text-amber-400/80 break-all text-xs">
+              <div className="font-mono text-xs text-amber-400/70 break-all">
                 0x333C4053048D542f039bd3de08f35AB998a6e68E
               </div>
             </div>
           </div>
-          <Button className="mt-2 w-full bg-zinc-800 border border-zinc-700 text-zinc-400 hover:bg-zinc-700" onClick={() => setShowStake(false)}>
+          
+          <Button className="mt-5 w-full bg-zinc-800 border border-zinc-700 text-zinc-400 hover:bg-zinc-700" onClick={() => setShowStake(false)}>
             Schließen
           </Button>
         </Modal>
