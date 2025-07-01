@@ -74,13 +74,13 @@ export default function Navigation({ activeTab, setActiveTab }: NavigationProps)
             {socialIcons[activeSocial]}
             <FiChevronDown
               size={22}
-              className={`ml-1 transition-colors ${
-                open ? "text-pink-400" : "text-zinc-400"
+              className={`ml-1 transition-transform duration-300 ${
+                open ? "text-pink-400 rotate-180" : "text-zinc-400"
               } hover:text-pink-400`}
             />
           </button>
           {open && (
-            <div className="absolute left-1/2 -translate-x-1/2 mt-2 bg-zinc-800 rounded shadow-lg flex flex-col z-50 min-w-[120px]">
+            <div className="absolute left-1/2 -translate-x-1/2 top-full mt-3 bg-zinc-800 rounded-lg shadow-xl flex flex-col z-50 min-w-[140px] border border-zinc-700 overflow-hidden">
               {activeSocial !== "instagram" && (
                 <button
                   onClick={() => {
@@ -88,9 +88,10 @@ export default function Navigation({ activeTab, setActiveTab }: NavigationProps)
                     setActiveSocial("instagram");
                     setActiveTab("instagram");
                   }}
-                  className="flex items-center gap-2 px-4 py-2 hover:bg-zinc-700 text-zinc-100 w-full"
+                  className="flex items-center gap-2 px-4 py-3 hover:bg-zinc-700 text-zinc-100 w-full transition-colors duration-200 border-b border-zinc-700"
                 >
-                  <FaInstagram className="text-pink-500" /> Instagram
+                  <FaInstagram className="text-pink-500" /> 
+                  <span className="font-medium">Instagram</span>
                 </button>
               )}
               {activeSocial !== "tiktok" && (
@@ -100,9 +101,10 @@ export default function Navigation({ activeTab, setActiveTab }: NavigationProps)
                     setActiveTab("tiktok");
                     setOpen(false);
                   }}
-                  className="flex items-center gap-2 px-4 py-2 hover:bg-zinc-700 text-zinc-100 w-full"
+                  className="flex items-center gap-2 px-4 py-3 hover:bg-zinc-700 text-zinc-100 w-full transition-colors duration-200 border-b border-zinc-700"
                 >
-                  <FaTiktok className="text-black dark:text-white" /> TikTok
+                  <FaTiktok className="text-zinc-100" /> 
+                  <span className="font-medium">TikTok</span>
                 </button>
               )}
               {activeSocial !== "facebook" && (
@@ -112,9 +114,10 @@ export default function Navigation({ activeTab, setActiveTab }: NavigationProps)
                     setActiveTab("facebook");
                     setOpen(false);
                   }}
-                  className="flex items-center gap-2 px-4 py-2 hover:bg-zinc-700 text-zinc-100 w-full"
+                  className="flex items-center gap-2 px-4 py-3 hover:bg-zinc-700 text-zinc-100 w-full transition-colors duration-200"
                 >
-                  <FaFacebook className="text-blue-600" /> Facebook
+                  <FaFacebook className="text-blue-600" /> 
+                  <span className="font-medium">Facebook</span>
                 </button>
               )}
             </div>

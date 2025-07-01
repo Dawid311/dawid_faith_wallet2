@@ -30,24 +30,28 @@ const wallets = [
   inAppWallet({
     auth: {
       options: [
+        "email", // Email als erste Option für einfachen Zugang
         "google",
-        "discord",
-        "telegram",
-        "email",
-        "x",
-        "passkey",
-        "phone",
         "facebook",
         "apple",
+        "x", // Twitter
+        "phone",
+        // Optionale weitere Optionen
+        "discord",
+        "telegram",
+        "passkey",
         "coinbase",
+        // Weniger häufig genutzte Optionen weiter unten
         "twitch",
         "steam",
         "github",
       ],
     },
   }),
+  // Gängige Web3 Wallets zuerst
   createWallet("io.metamask"),
   createWallet("com.coinbase.wallet"),
+  // Weitere Wallets
   createWallet("me.rainbow"),
   createWallet("io.rabby"),
   createWallet("io.zerion.wallet"),
@@ -95,8 +99,18 @@ export default function WalletTab() {
           </h2>
           <ConnectButton
             client={client}
-            connectButton={{ label: "Wallet verbinden" }}
-            connectModal={{ size: "compact" }}
+            connectButton={{ 
+              label: "Wallet verbinden",
+              theme: "dark" 
+            }}
+            connectModal={{ 
+              size: "compact", 
+              title: "Verbinde deine Wallet",
+              welcomeScreen: {
+                title: "Dawid Faith Wallet",
+                subtitle: "Verbinde dich, um auf deine Token zuzugreifen"
+              }
+            }}
             wallets={wallets}
             chain={{
               id: 137,
@@ -109,14 +123,21 @@ export default function WalletTab() {
   }
 
   return (
-    <div className="flex justify-center min-h-[70vh] items-center bg-gradient-to-br from-zinc-100 via-white to-zinc-200 py-8">
-      <Card className="w-full max-w-xl bg-white/90 rounded-3xl shadow-2xl border border-zinc-200 relative">
-        <CardContent className="p-10">
-          {/* Header */}
-          <div className="flex justify-between items-center mb-8">
+    <div className="flex justify-center min-h-[70vh] items-center py-8 bg-zinc-100">
+      <Card className="w-full max-w-xl bg-gradient-to-br from-zinc-900 to-black rounded-3xl shadow-2xl border border-zinc-700 relative overflow-hidden">
+        {/* Glanzeffekt/Highlight oben */}
+        <div className="absolute top-0 left-0 w-full h-1/3 bg-gradient-to-r from-pink-500/10 via-purple-500/10 to-blue-500/10 rounded-t-3xl"></div>
+        
+        <CardContent className="p-10 relative z-10">
+          {/* Header mit Gold-Akzent */}
+          <div className="flex justify-between items-center mb-10">
             <div className="flex items-center gap-3">
-              <FaCoins className="text-yellow-400 text-2xl" />
-              <span className="text-lg font-bold text-zinc-700">Dawid Faith Wallet</span>
+              <div className="p-2 bg-gradient-to-r from-yellow-400 to-amber-600 rounded-full">
+                <FaCoins className="text-black text-xl" />
+              </div>
+              <span className="text-lg font-bold bg-gradient-to-r from-amber-200 to-yellow-400 bg-clip-text text-transparent">
+                Dawid Faith Wallet
+              </span>
             </div>
             <ConnectButton
               client={client}
@@ -130,46 +151,45 @@ export default function WalletTab() {
             />
           </div>
 
-          {/* Wallet Address */}
-          <div className="flex justify-between items-center bg-zinc-100 rounded-xl p-4 mb-8 border border-zinc-200">
-            <span className="font-mono text-zinc-700 text-base">{formatAddress(account.address)}</span>
+          {/* Wallet Address mit besserem Styling */}
+          <div className="flex justify-between items-center bg-zinc-800/80 backdrop-blur-sm rounded-2xl p-4 mb-10 border border-zinc-700">
+            <span className="font-mono text-zinc-300 text-base">{formatAddress(account.address)}</span>
             <button
-              onClick={() => {
-                copyWalletAddress();
-              }}
-              className="flex items-center gap-2 px-3 py-1 rounded-lg bg-zinc-200 hover:bg-zinc-300 text-zinc-700 text-sm font-medium transition"
+              onClick={copyWalletAddress}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-700 hover:bg-zinc-600 text-zinc-200 text-sm font-medium transition-all duration-200"
               title="Adresse kopieren"
             >
               <FaRegCopy /> Kopieren
             </button>
           </div>
 
-          {/* Balance */}
-          <div className="flex flex-col items-center mb-10">
-            <span className="uppercase text-xs tracking-widest text-zinc-400 mb-1">Kontostand</span>
-            <div className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-orange-400 via-pink-500 to-purple-600 drop-shadow">
-              {dfaithBalance ? Number(dfaithBalance.displayValue).toFixed(4) : "0.00"} <span className="text-lg font-bold">DFAITH</span>
+          {/* Balance mit Gold/Gradient Style */}
+          <div className="flex flex-col items-center mb-12">
+            <span className="uppercase text-xs tracking-widest text-zinc-500 mb-2">Kontostand</span>
+            <div className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 drop-shadow">
+              {dfaithBalance ? Number(dfaithBalance.displayValue).toFixed(4) : "0.00"}
             </div>
+            <span className="text-sm font-semibold text-amber-400/80 mt-1">DFAITH</span>
           </div>
 
-          {/* Action Buttons */}
+          {/* Action Buttons mit besseren Gradienten */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <Button
-              className="flex flex-col items-center justify-center gap-2 py-5 bg-gradient-to-r from-orange-400 via-pink-500 to-purple-600 text-white font-bold shadow-lg rounded-xl hover:scale-[1.03] transition"
+              className="flex flex-col items-center justify-center gap-2 py-5 bg-gradient-to-br from-zinc-800 to-zinc-900 text-amber-400 font-bold shadow-xl rounded-xl hover:scale-[1.03] hover:shadow-amber-500/20 transition-all duration-300 border border-zinc-700"
               onClick={() => setShowBuy(true)}
             >
               <FaArrowDown className="text-xl" />
               <span>Kaufen</span>
             </Button>
             <Button
-              className="flex flex-col items-center justify-center gap-2 py-5 bg-gradient-to-r from-purple-600 via-pink-500 to-orange-400 text-white font-bold shadow-lg rounded-xl hover:scale-[1.03] transition"
+              className="flex flex-col items-center justify-center gap-2 py-5 bg-gradient-to-br from-zinc-800 to-zinc-900 text-amber-400 font-bold shadow-xl rounded-xl hover:scale-[1.03] hover:shadow-amber-500/20 transition-all duration-300 border border-zinc-700"
               onClick={() => setShowSell(true)}
             >
               <FaArrowUp className="text-xl" />
               <span>Verkaufen</span>
             </Button>
             <Button
-              className="flex flex-col items-center justify-center gap-2 py-5 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-white font-bold shadow-lg rounded-xl hover:scale-[1.03] transition"
+              className="flex flex-col items-center justify-center gap-2 py-5 bg-gradient-to-br from-zinc-800 to-zinc-900 text-amber-400 font-bold shadow-xl rounded-xl hover:scale-[1.03] hover:shadow-amber-500/20 transition-all duration-300 border border-zinc-700"
               onClick={() => setShowSend(true)}
             >
               <FaPaperPlane className="text-xl" />
@@ -182,15 +202,23 @@ export default function WalletTab() {
       {/* Modale */}
       <Modal open={showBuy} onClose={() => setShowBuy(false)} title="DFAITH kaufen">
         <div className="text-center text-zinc-700">Kauf-Funktion kommt hier hin.</div>
-        <Button className="mt-6 w-full" onClick={() => setShowBuy(false)}>Schließen</Button>
+        <Button className="mt-6 w-full bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold" onClick={() => setShowBuy(false)}>
+          Schließen
+        </Button>
       </Modal>
+
       <Modal open={showSell} onClose={() => setShowSell(false)} title="DFAITH verkaufen">
         <div className="text-center text-zinc-700">Verkauf-Funktion kommt hier hin.</div>
-        <Button className="mt-6 w-full" onClick={() => setShowSell(false)}>Schließen</Button>
+        <Button className="mt-6 w-full bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold" onClick={() => setShowSell(false)}>
+          Schließen
+        </Button>
       </Modal>
+
       <Modal open={showSend} onClose={() => setShowSend(false)} title="Token senden">
         <div className="text-center text-zinc-700">Sende-Funktion kommt hier hin.</div>
-        <Button className="mt-6 w-full" onClick={() => setShowSend(false)}>Schließen</Button>
+        <Button className="mt-6 w-full bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold" onClick={() => setShowSend(false)}>
+          Schließen
+        </Button>
       </Modal>
     </div>
   );
