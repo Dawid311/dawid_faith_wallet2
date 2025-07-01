@@ -374,10 +374,33 @@ export default function WalletTab() {
 
         {/* Übrige Modals bleiben unverändert */}
         <Modal open={showSell} onClose={() => setShowSell(false)} title="DFAITH verkaufen">
-          <div className="text-center text-zinc-300">
-            Verkauf-Funktion kommt hier hin.
+          <div className="text-zinc-300">
+            <div className="mb-3 text-center text-sm text-zinc-400">
+              Tausche DFAITH gegen POL mit Uniswap
+            </div>
+            
+            {/* Uniswap Widget Container */}
+            <div 
+              ref={uniswapWidgetRef} 
+              className="w-full min-h-[360px] rounded-lg overflow-hidden bg-zinc-800 flex items-center justify-center"
+            >
+              {!uniswapLoaded && (
+                <div className="text-center py-6">
+                  <div className="animate-spin w-8 h-8 border-t-2 border-amber-400 border-r-2 rounded-full mx-auto mb-3"></div>
+                  <p className="text-zinc-400 text-sm">Widget wird geladen...</p>
+                </div>
+              )}
+            </div>
+            
+            <div className="mt-4 text-xs text-zinc-500">
+              <div className="flex items-center gap-1.5 mb-1">
+                <FaCoins className="text-amber-400" size={12} />
+                <span>Swap wird über Uniswap ausgeführt</span>
+              </div>
+              <p>Die genauen Beträge und Gebühren werden im Widget angezeigt.</p>
+            </div>
           </div>
-          <Button className="mt-6 w-full bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold" onClick={() => setShowSell(false)}>
+          <Button className="mt-5 w-full bg-zinc-800 border border-zinc-700 text-zinc-400 hover:bg-zinc-700" onClick={() => setShowSell(false)}>
             Schließen
           </Button>
         </Modal>
