@@ -89,11 +89,11 @@ export default function WalletTab() {
   const [exchangeRate, setExchangeRate] = useState("0");
   const [slippage, setSlippage] = useState("1"); // Default 1%
   
-  // Konstanten für Token
+  // Konstanten für Token korrigieren
   const DFAITH_TOKEN = {
-    address: "0xB83D1B711BdB57B47e10BC9D5B874B4Fd99C23d6", // Geänderte Adresse
+    address: "0xB83D1B711BdB57B47e10BC9D5B874B4Fd99C23d6", 
     decimals: 18,
-    symbol: "DFAITH"
+    symbol: "D.FAITH" // Geändert zu D.FAITH
   };
 
   const POL_TOKEN = {
@@ -110,8 +110,9 @@ export default function WalletTab() {
         return;
       }
       // Hier echte Balance-Logik einbauen!
-      setDfaithBalance({ displayValue: "0.00" });
-      setDinvestBalance({ displayValue: "0.00" });
+      // In einer echten Implementierung würdest du hier Web3-Aufrufe machen
+      setDfaithBalance({ displayValue: "1052.6842" }); // Beispielwert
+      setDinvestBalance({ displayValue: "500" });      // Beispielwert
     }
     fetchBalances();
   }, [account?.address]);
@@ -139,9 +140,9 @@ export default function WalletTab() {
           jsonRpcEndpoint: "https://polygon-rpc.com", // Expliziten RPC Endpoint angeben
           tokenList: [
             {
-              "name": "DFAITH Token",
-              "address": "0xB83D1B711BdB57B47e10BC9D5B874B4Fd99C23d6", // Geänderte Adresse
-              "symbol": "DFAITH",
+              "name": "D.FAITH Token",
+              "address": "0xB83D1B711BdB57B47e10BC9D5B874B4Fd99C23d6",
+              "symbol": "D.FAITH",
               "decimals": 18,
               "chainId": 137,
               "logoURI": "https://placehold.co/200x200/gold/black?text=DF"
@@ -411,9 +412,9 @@ export default function WalletTab() {
               </button>
             </div>
 
-            {/* DFAITH Token-Karte - jetzt als einzelne Karte */}
+            {/* DFAITH Token-Karte - jetzt mit D.FAITH */}
             <div className="flex flex-col items-center p-4 bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl border border-zinc-700 w-full mb-6">
-              <span className="uppercase text-xs tracking-widest text-amber-500/80 mb-2">DFAITH</span>
+              <span className="uppercase text-xs tracking-widest text-amber-500/80 mb-2">D.FAITH</span>
               <div className="text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 drop-shadow-sm">
                 {dfaithBalance ? Number(dfaithBalance.displayValue).toFixed(4) : "0.00"}
               </div>
@@ -542,7 +543,7 @@ export default function WalletTab() {
         </Modal>
 
         {/* Modifiziertes Verkaufs-Modal */}
-        <Modal open={showSell} onClose={() => setShowSell(false)} title="DFAITH verkaufen">
+        <Modal open={showSell} onClose={() => setShowSell(false)} title="D.FAITH verkaufen">
           <div className="flex flex-col gap-4">
             {/* Provider Auswahl */}
             <div className="flex items-center justify-between bg-zinc-800/70 rounded-lg p-3 border border-zinc-700">
@@ -587,7 +588,7 @@ export default function WalletTab() {
                   <div className="w-6 h-6 rounded-full bg-gradient-to-r from-amber-400 to-yellow-500 flex items-center justify-center">
                     <span className="text-xs font-bold text-black">DF</span>
                   </div>
-                  <span className="text-sm text-amber-400">DFAITH</span>
+                  <span className="text-sm text-amber-400">D.FAITH</span>
                 </div>
                 <input 
                   type="number"
@@ -647,7 +648,7 @@ export default function WalletTab() {
               
               <div className="flex justify-between mt-2">
                 <span className="text-xs text-zinc-500">
-                  Kurs: 1 DFAITH = {exchangeRate} MATIC
+                  Kurs: 1 D.FAITH = {exchangeRate} POL
                 </span>
                 <span className="text-xs text-zinc-500">
                   Slippage: 
@@ -791,7 +792,7 @@ export default function WalletTab() {
                   <span className="font-medium text-amber-400">Belohnungen</span>
                 </div>
                 <span className="text-xs text-zinc-400">
-                  Gesammelt: <span className="text-amber-400 font-bold">0 DFAITH</span>
+                  Gesammelt: <span className="text-amber-400 font-bold">0 D.FAITH</span>
                 </span>
               </div>
               
