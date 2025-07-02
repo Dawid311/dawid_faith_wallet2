@@ -10,6 +10,9 @@ import { Button } from "../../../components/ui/button";
 import { FaRegCopy } from "react-icons/fa";
 import { FaCoins, FaArrowDown, FaArrowUp, FaPaperPlane, FaLock, FaExchangeAlt, FaCheckCircle, FaInfoCircle, FaArrowRight } from "react-icons/fa";
 import Script from "next/script";
+import { ThirdwebSDK } from "@thirdweb-dev/sdk";
+import { useDfaithToPolSwap } from "./thirdwebUniversalBridge";
+import { useQueryClient } from "@tanstack/react-query";
 
 // Modal mit dunklem Farbschema
 function Modal({ open, onClose, title, children }: { open: boolean, onClose: () => void, title: string, children: React.ReactNode }) {
@@ -67,6 +70,31 @@ const wallets = [
   createWallet("com.trustwallet.app"),
 ];
 
+// Konstanten für Token mit echten Contract-Adressen
+const DFAITH_TOKEN = {
+  address: "0x67f1439bd51Cfb0A46f739Ec8D5663F41d027bff", // D.FAITH Token-Contract
+  decimals: 18,
+  symbol: "D.FAITH"
+};
+
+const DINVEST_TOKEN = {
+  address: "0x72a428F03d7a301cEAce084366928b99c4d757bD", // D.INVEST Token-Contract
+  decimals: 18,
+  symbol: "D.INVEST"
+};
+
+const POL_TOKEN = {
+  address: "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270", // WMATIC
+  decimals: 18,
+  symbol: "POL"
+};
+
+const STAKING_CONTRACT = {
+  address: "0x1234567890123456789012345678901234567890", // Placeholder Staking Contract
+  decimals: 18,
+  symbol: "STAKING"
+};
+
 export default function WalletTab() {
   const account = useActiveAccount();
   const status = useActiveWalletConnectionStatus();
@@ -87,42 +115,118 @@ export default function WalletTab() {
   // Neue States für den Swap - vereinfacht nur für Thirdweb
   const [swapAmount, setSwapAmount] = useState("");
   const [estimatedOutput, setEstimatedOutput] = useState("0");
-  const [isLoading, setIsLoading] = useState(false);
   const [exchangeRate, setExchangeRate] = useState("0.002"); // Fixer Rate für Demo
   const [slippage, setSlippage] = useState("1"); // Default 1%
-  const [needsApproval, setNeedsApproval] = useState(false);
-  const [isApproving, setIsApproving] = useState(false);
-  const [swapStep, setSwapStep] = useState<"input" | "approve" | "swap" | "success">("input");
+  const [swapStep, setSwapStep] = useState<"input" | "approve" | "swap" | "success" | "error">("input");
   
-  // Neue States für das Senden Modal
+  // States for the swap modal
+  const [isSwapping, setIsSwapping] = useState(false);
+  const [approving, setApproving] = useState(false);
+  const [swapError, setSwapError] = useState<string | null>(null);
+  const [swapSuccess, setSwapSuccess] = useState(false);
+  
+  // Send modal state
   const [sendAmount, setSendAmount] = useState("");
   const [sendToAddress, setSendToAddress] = useState("");
-  const [selectedSendToken, setSelectedSendToken] = useState("DFAITH"); // "DFAITH", "DINVEST", "POL"
+  const [selectedSendToken, setSelectedSendToken] = useState(DFAITH_TOKEN);
   const [isSending, setIsSending] = useState(false);
-  
-  // Konstanten für Token mit echten Contract-Adressen
-  const DFAITH_TOKEN = {
-    address: "0x67f1439bd51Cfb0A46f739Ec8D5663F41d027bff", // D.FAITH Token-Contract
-    decimals: 18,
-    symbol: "D.FAITH"
+
+  // Thirdweb SDK Instanz für Universal Bridge
+  const sdk = typeof window !== "undefined" && account?.address
+    ? new ThirdwebSDK("polygon", { clientId: process.env.NEXT_PUBLIC_TEMPLATE_CLIENT_ID })
+    : undefined;
+  const queryClient = useQueryClient();
+  const dfaithAddress = DFAITH_TOKEN.address;
+  const polAddress = POL_TOKEN.address;
+  const { mutate: swapMutate, isPending: isSwapPending, isSuccess: isSwapSuccess, isError: isSwapError, error: swapErrorObj, reset: resetSwap } = useDfaithToPolSwap(
+    sdk!,
+    dfaithAddress,
+    polAddress
+  );
+
+  // Approval-Status prüfen (Thirdweb: allowance)
+  const [needsApproval, setNeedsApproval] = useState(false);
+  useEffect(() => {
+    const checkAllowance = async () => {
+      if (!account?.address || !swapAmount || !sdk) {
+        setNeedsApproval(false);
+        return;
+      }
+      try {
+        const dfaithContract = await sdk.getContract(dfaithAddress);
+        // Thirdweb Universal Router Adresse (Polygon):
+        const thirdwebRouter = "0x1111111254EEB25477B68fb85Ed929f73A960582";
+        const allowance = await dfaithContract.erc20.allowance(thirdwebRouter);
+        const required = BigInt(Math.floor(parseFloat(swapAmount) * Math.pow(10, DFAITH_TOKEN.decimals)));
+        setNeedsApproval(BigInt(allowance.value.toString()) < required);
+      } catch (e) {
+        setNeedsApproval(true);
+      }
+    };
+    checkAllowance();
+  }, [account?.address, swapAmount, sdk, dfaithAddress]);
+
+  // Approval durchführen
+  const handleApproval = async () => {
+    if (!account?.address || !swapAmount || !sdk) return;
+    setSwapStep("approve");
+    setSwapError(null);
+    try {
+      const dfaithContract = await sdk.getContract(dfaithAddress);
+      const thirdwebRouter = "0x1111111254EEB25477B68fb85Ed929f73A960582";
+      const amountWei = (parseFloat(swapAmount) * Math.pow(10, DFAITH_TOKEN.decimals)).toLocaleString("fullwide", {useGrouping:false});
+      await dfaithContract.erc20.setAllowance(thirdwebRouter, amountWei);
+      setNeedsApproval(false);
+      setSwapStep("input");
+    } catch (e: any) {
+      setSwapError("Freigabe fehlgeschlagen: " + (e?.message || e));
+      setSwapStep("input");
+    }
   };
 
-  const DINVEST_TOKEN = {
-    address: "0x72a428F03d7a301cEAce084366928b99c4d757bD", // D.INVEST Token-Contract
-    decimals: 18,
-    symbol: "D.INVEST"
+  // Swap durchführen
+  const handleSwap = async () => {
+    if (!account?.address || !swapAmount || !sdk) return;
+    setSwapStep("swap");
+    setSwapError(null);
+    const amountWei = (parseFloat(swapAmount) * Math.pow(10, DFAITH_TOKEN.decimals)).toLocaleString("fullwide", {useGrouping:false});
+    swapMutate(
+      {
+        fromAddress: account.address,
+        amount: amountWei,
+        slippage: parseFloat(slippage)
+      },
+      {
+        onSuccess: async () => {
+          setSwapStep("success");
+          setTimeout(() => {
+            setSwapAmount("");
+            setEstimatedOutput("0");
+            setSwapStep("input");
+            setShowSell(false);
+            fetchBalances();
+            resetSwap();
+          }, 3000);
+        },
+        onError: (err: any) => {
+          setSwapError("Swap fehlgeschlagen: " + (err?.message || err));
+          setSwapStep("input");
+        }
+      }
+    );
   };
 
-  const STAKING_CONTRACT = {
-    address: "0xe730555afA4DeA022976DdDc0cC7DBba1C98568A", // D.INVEST Staking Contract
-    name: "D.INVEST Staking"
-  };
-
-  const POL_TOKEN = {
-    address: "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270", // WMATIC
-    decimals: 18,
-    symbol: "POL"
-  };
+  // Estimate Output (optional: kann später mit Thirdweb-Quote ersetzt werden)
+  useEffect(() => {
+    if (!swapAmount || parseFloat(swapAmount) <= 0) {
+      setEstimatedOutput("0");
+      return;
+    }
+    const inputAmount = parseFloat(swapAmount);
+    const rate = parseFloat(exchangeRate);
+    const estimated = (inputAmount * rate).toFixed(6);
+    setEstimatedOutput(estimated);
+  }, [swapAmount, exchangeRate]);
 
   useEffect(() => {
     fetchBalances();
@@ -191,146 +295,6 @@ export default function WalletTab() {
   };
 
   const formatAddress = (address: string) => `${address.slice(0, 6)}...${address.slice(-4)}`;
-
-  // Token-Freigabe behandeln
-  const handleApproval = async () => {
-    if (!account?.address || !swapAmount) return;
-    
-    setSwapStep("approve");
-    setIsApproving(true);
-    
-    try {
-      // Simuliere Token-Freigabe - in Realität würde hier die echte approve Funktion verwendet
-      await new Promise(resolve => setTimeout(resolve, 2000)); // Simuliere Netzwerk-Delay
-      
-      console.log("Token-Freigabe erfolgreich für:", swapAmount + " D.FAITH");
-      
-      setNeedsApproval(false);
-      setSwapStep("input");
-      
-    } catch (error) {
-      console.error("Freigabe fehlgeschlagen:", error);
-      setSwapStep("input");
-    } finally {
-      setIsApproving(false);
-    }
-  };
-
-  // Schätzung berechnen
-  const calculateEstimate = () => {
-    if (!swapAmount || parseFloat(swapAmount) <= 0) {
-      setEstimatedOutput("0");
-      return;
-    }
-    
-    const inputAmount = parseFloat(swapAmount);
-    const rate = parseFloat(exchangeRate);
-    const estimated = (inputAmount * rate).toFixed(6);
-    setEstimatedOutput(estimated);
-  };
-
-  // Prüfe ob Token-Freigabe benötigt wird
-  const checkApprovalStatus = async () => {
-    if (!account?.address || !swapAmount || parseFloat(swapAmount) <= 0) {
-      setNeedsApproval(false);
-      return;
-    }
-    
-    // Simuliere Freigabe-Check - normalerweise würde hier die allowance geprüft
-    // Für Demo-Zwecke: Erste Transaktion benötigt immer Freigabe
-    const hasApproval = localStorage.getItem(`approval_${account.address}_dfaith`) === "true";
-    setNeedsApproval(!hasApproval);
-  };
-
-  // Überprüfe Approval Status
-  const checkRealApprovalStatus = async () => {
-    if (!account?.address || !swapAmount || parseFloat(swapAmount) <= 0) {
-      setNeedsApproval(false);
-      return;
-    }
-    
-    try {
-      const dfaithContract = getContract({
-        client,
-        chain: polygon,
-        address: DFAITH_TOKEN.address
-      });
-      
-      // Thirdweb Universal Router Adresse (Beispiel)
-      const thirdwebRouter = "0x1111111254EEB25477B68fb85Ed929f73A960582";
-      
-      const currentAllowance = await allowance({
-        contract: dfaithContract,
-        owner: account.address,
-        spender: thirdwebRouter
-      });
-      
-      const requiredAmount = BigInt(parseFloat(swapAmount) * Math.pow(10, DFAITH_TOKEN.decimals));
-      setNeedsApproval(currentAllowance < requiredAmount);
-      
-    } catch (error) {
-      console.error("Fehler beim Überprüfen der Allowance:", error);
-      setNeedsApproval(true);
-    }
-  };
-
-  // Swap durchführen
-  const executeThirdwebSwap = async () => {
-    if (!account?.address || !swapAmount || parseFloat(swapAmount) <= 0) return;
-    
-    setIsLoading(true);
-    setSwapStep("swap");
-    
-    try {
-      // Simuliere Thirdweb Swap - in Realität würde hier die echte Thirdweb DEX API verwendet
-      await new Promise(resolve => setTimeout(resolve, 2000)); // Simuliere Netzwerk-Delay
-      
-      console.log("Thirdweb Swap erfolgreich:", {
-        from: swapAmount + " D.FAITH",
-        to: estimatedOutput + " POL",
-        rate: exchangeRate
-      });
-      
-      // Simuliere erfolgreichen Swap
-      setSwapStep("success");
-      
-      // Nach 3 Sekunden zurücksetzen
-      setTimeout(() => {
-        setSwapAmount("");
-        setEstimatedOutput("0");
-        setSwapStep("input");
-        setShowSell(false);
-        fetchBalances(); // Balances aktualisieren
-      }, 3000);
-      
-    } catch (error) {
-      console.error("Swap fehlgeschlagen:", error);
-      setSwapStep("input");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Berechne Schätzung wenn sich Betrag ändert
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      calculateEstimate();
-      checkApprovalStatus();
-    }, 300); // Schnellere Response
-    
-    return () => clearTimeout(timer);
-  }, [swapAmount, exchangeRate]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Hauptfunktion für Swap-Prozess
-  const handleSwapAction = async () => {
-    if (!account?.address || !swapAmount || parseFloat(swapAmount) <= 0) return;
-    
-    if (needsApproval && swapStep === "input") {
-      await handleApproval();
-    } else if (!needsApproval || swapStep === "swap") {
-      await executeThirdwebSwap();
-    }
-  };
 
   // Hilfsfunktion für Balance-Aktualisierung
   const fetchBalances = async () => {
@@ -409,10 +373,10 @@ export default function WalletTab() {
 
   // Hilfsfunktion um verfügbares Guthaben für gewählten Token zu bekommen
   const getAvailableBalance = () => {
-    switch (selectedSendToken) {
-      case "DFAITH":
+    switch (selectedSendToken.symbol) {
+      case "D.FAITH":
         return dfaithBalance ? Number(dfaithBalance.displayValue) : 0;
-      case "DINVEST":
+      case "D.INVEST":
         return dinvestBalance ? Number(dinvestBalance.displayValue) : 0;
       case "POL":
         return 0; // POL Balance würde hier abgerufen werden
@@ -736,6 +700,8 @@ export default function WalletTab() {
           setSwapStep("input");
           setSwapAmount("");
           setEstimatedOutput("0");
+          setSwapError(null);
+          resetSwap();
         }} title="D.FAITH zu POL tauschen">
           <div className="flex flex-col gap-4">
             {/* Kompakte Thirdweb Branding */}
@@ -870,17 +836,24 @@ export default function WalletTab() {
                   </div>
                 )}
 
+                {/* Fehleranzeige */}
+                {swapError && (
+                  <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 text-red-400 text-xs mb-2">
+                    {swapError}
+                  </div>
+                )}
+
                 {/* Action Button - optimiert für mobile */}
                 <Button
                   className={`w-full py-3 font-bold rounded-xl transition-all ${
-                    parseFloat(swapAmount) > 0 && !isTransactionPending
+                    parseFloat(swapAmount) > 0 && !isSwapPending
                       ? needsApproval
                         ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700"
                         : "bg-gradient-to-r from-purple-500 to-blue-500 text-white hover:from-purple-600 hover:to-blue-600"
                       : "bg-zinc-700 text-zinc-400 cursor-not-allowed"
                   }`}
-                  onClick={handleSwapAction}
-                  disabled={parseFloat(swapAmount) <= 0 || isTransactionPending}
+                  onClick={needsApproval ? handleApproval : handleSwap}
+                  disabled={parseFloat(swapAmount) <= 0 || isSwapPending}
                 >
                   {parseFloat(swapAmount) <= 0 ? (
                     "Betrag eingeben"
@@ -954,6 +927,8 @@ export default function WalletTab() {
                 setSwapStep("input");
                 setSwapAmount("");
                 setEstimatedOutput("0");
+                setSwapError(null);
+                resetSwap();
               }}
             >
               {swapStep === "success" ? "Fertig" : "Abbrechen"}
@@ -964,6 +939,8 @@ export default function WalletTab() {
                 onClick={() => {
                   setSwapAmount("");
                   setEstimatedOutput("0");
+                  setSwapError(null);
+                  resetSwap();
                 }}
               >
                 Reset
@@ -980,11 +957,11 @@ export default function WalletTab() {
               <div className="grid grid-cols-3 gap-2">
                 <button 
                   className={`flex flex-col items-center gap-2 p-3 rounded-lg border transition ${
-                    selectedSendToken === "DFAITH" 
+                    selectedSendToken.symbol === "D.FAITH" 
                       ? "bg-amber-500/20 text-amber-400 border-amber-500/30" 
                       : "bg-zinc-800 text-zinc-400 border-zinc-700 hover:bg-zinc-700"
                   }`}
-                  onClick={() => setSelectedSendToken("DFAITH")}
+                  onClick={() => setSelectedSendToken(DFAITH_TOKEN)}
                 >
                   <div className="w-8 h-8 rounded-full bg-gradient-to-r from-amber-400 to-yellow-500 flex items-center justify-center">
                     <span className="text-xs font-bold text-black">DF</span>
@@ -997,11 +974,11 @@ export default function WalletTab() {
                 
                 <button 
                   className={`flex flex-col items-center gap-2 p-3 rounded-lg border transition ${
-                    selectedSendToken === "DINVEST" 
+                    selectedSendToken.symbol === "D.INVEST" 
                       ? "bg-amber-500/20 text-amber-400 border-amber-500/30" 
                       : "bg-zinc-800 text-zinc-400 border-zinc-700 hover:bg-zinc-700"
                   }`}
-                  onClick={() => setSelectedSendToken("DINVEST")}
+                  onClick={() => setSelectedSendToken(DINVEST_TOKEN)}
                 >
                   <div className="w-8 h-8 rounded-full bg-gradient-to-r from-amber-400 to-yellow-500 flex items-center justify-center">
                     <FaLock className="text-black text-xs" />
@@ -1014,11 +991,11 @@ export default function WalletTab() {
                 
                 <button 
                   className={`flex flex-col items-center gap-2 p-3 rounded-lg border transition ${
-                    selectedSendToken === "POL" 
+                    selectedSendToken.symbol === "POL" 
                       ? "bg-purple-500/20 text-purple-400 border-purple-500/30" 
                       : "bg-zinc-800 text-zinc-400 border-zinc-700 hover:bg-zinc-700"
                   }`}
-                  onClick={() => setSelectedSendToken("POL")}
+                  onClick={() => setSelectedSendToken(POL_TOKEN)}
                 >
                   <div className="w-8 h-8 rounded-full bg-gradient-to-r from-purple-400 to-purple-600 flex items-center justify-center">
                     <span className="text-xs font-bold text-white">P</span>
@@ -1047,9 +1024,9 @@ export default function WalletTab() {
                 <span className="text-sm text-zinc-300">Betrag:</span>
                 <span className="text-xs text-zinc-500">
                   Verfügbar: <span className={`${
-                    selectedSendToken === "POL" ? "text-purple-400" : "text-amber-400"
+                    selectedSendToken.symbol === "POL" ? "text-purple-400" : "text-amber-400"
                   }`}>
-                    {getAvailableBalance().toFixed(4)} {selectedSendToken}
+                    {getAvailableBalance().toFixed(4)} {selectedSendToken.symbol}
                   </span>
                 </span>
               </div>
@@ -1080,7 +1057,7 @@ export default function WalletTab() {
               <div className="flex justify-between text-xs mt-1">
                 <span className="text-zinc-500">Gesamtkosten:</span>
                 <span className="text-zinc-300">
-                  {sendAmount || "0"} {selectedSendToken} + 0.001 POL
+                  {sendAmount || "0"} {selectedSendToken.symbol} + 0.001 POL
                 </span>
               </div>
             </div>
@@ -1089,7 +1066,7 @@ export default function WalletTab() {
             <Button
               className={`w-full py-3 font-bold rounded-xl ${
                 parseFloat(sendAmount) > 0 && sendToAddress && !isSending
-                  ? selectedSendToken === "POL" 
+                  ? selectedSendToken.symbol === "POL" 
                     ? "bg-gradient-to-r from-purple-500 to-purple-600 text-white"
                     : "bg-gradient-to-r from-amber-400 to-yellow-500 text-black"
                   : "bg-zinc-700 text-zinc-400 cursor-not-allowed"
@@ -1100,7 +1077,7 @@ export default function WalletTab() {
               {isSending ? (
                 <div className="flex justify-center items-center gap-2">
                   <div className={`w-5 h-5 border-t-2 border-r-2 ${
-                    selectedSendToken === "POL" ? "border-white" : "border-black"
+                    selectedSendToken.symbol === "POL" ? "border-white" : "border-black"
                   } rounded-full animate-spin`}></div>
                   <span>Wird gesendet...</span>
                 </div>
