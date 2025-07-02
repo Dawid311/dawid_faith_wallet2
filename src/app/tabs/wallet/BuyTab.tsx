@@ -3,7 +3,7 @@ import { Button } from "../../../../components/ui/button";
 import { FaCoins, FaLock, FaExchangeAlt } from "react-icons/fa";
 import { useActiveAccount, useSendTransaction, BuyWidget } from "thirdweb/react";
 import { polygon } from "thirdweb/chains";
-import { NATIVE_TOKEN_ADDRESS, getContract, prepareContractCall, sendAndConfirmTransaction } from "thirdweb";
+import { NATIVE_TOKEN_ADDRESS, getContract, prepareContractCall, sendAndConfirmTransaction, readContract } from "thirdweb";
 import { client } from "../../client";
 import { balanceOf, approve } from "thirdweb/extensions/erc20";
 
@@ -145,19 +145,45 @@ export default function BuyTab() {
   // POL Balance laden
   useEffect(() => {
     const fetchPolBalance = async () => {
-      if (!account?.address) return;
+      if (!account?.address) {
+        console.log("No account connected");
+        return;
+      }
       try {
-        const polContract = getContract({
-          client,
-          chain: polygon,
-          address: POL_TOKEN
+        console.log("Fetching native POL balance for:", account.address);
+        
+        // Native POL Balance direkt über readContract abrufen
+        const balance = await readContract({
+          contract: getContract({
+            client,
+            chain: polygon,
+            address: "0x0000000000000000000000000000000000000000" // Dummy für native token
+          }),
+          method: "function balanceOf(address) view returns (uint256)",
+          params: [account.address]
+        }).catch(async () => {
+          // Fallback: Verwende eth_getBalance über RPC
+          const response = await fetch(polygon.rpc, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              jsonrpc: '2.0',
+              method: 'eth_getBalance',
+              params: [account.address, 'latest'],
+              id: 1
+            })
+          });
+          const data = await response.json();
+          return BigInt(data.result);
         });
-        const balance = await balanceOf({
-          contract: polContract,
-          address: account.address
-        });
-        const formatted = (Number(balance) / Math.pow(10, 18)).toFixed(4);
-        setPolBalance(formatted);
+        
+        console.log("Native POL Balance raw:", balance.toString());
+        
+        const polFormatted = Number(balance) / Math.pow(10, 18);
+        console.log("Native POL formatted:", polFormatted);
+        
+        setPolBalance(polFormatted.toFixed(4));
+        
       } catch (error) {
         console.error("Fehler beim Laden der POL Balance:", error);
         setPolBalance("0");
@@ -165,6 +191,9 @@ export default function BuyTab() {
     };
     
     fetchPolBalance();
+    // Balance alle 10 Sekunden aktualisieren
+    const interval = setInterval(fetchPolBalance, 10000);
+    return () => clearInterval(interval);
   }, [account?.address]);
 
   // D.FAITH Swap Funktion
@@ -177,41 +206,25 @@ export default function BuyTab() {
     try {
       const amountInWei = (parseFloat(swapAmountPol) * Math.pow(10, 18)).toString();
       
-      // 1. POL Token Contract
-      const polContract = getContract({
-        client,
-        chain: polygon,
-        address: POL_TOKEN
-      });
-      
-      // 2. Approve Router to spend POL using the approve extension
-      const approveTx = approve({
-        contract: polContract,
-        spender: UNISWAP_ROUTER,
-        amount: amountInWei
-      });
-      
-      await sendTransaction(approveTx);
-      
-      // 3. Router Contract
+      // Router Contract
       const router = getContract({
         client,
         chain: polygon,
         address: UNISWAP_ROUTER
       });
       
-      // 4. Perform Swap
+      // Für native POL verwenden wir swapExactETHForTokens
       const deadline = Math.floor(Date.now() / 1000) + 60 * 20; // 20 minutes
       const swapTx = prepareContractCall({
         contract: router,
-        method: "function swapExactTokensForTokens(uint256 amountIn, uint256 amountOutMin, address[] calldata path, address to, uint256 deadline) external returns (uint256[] memory amounts)",
+        method: "function swapExactETHForTokens(uint256 amountOutMin, address[] calldata path, address to, uint256 deadline) external payable returns (uint256[] memory amounts)",
         params: [
-          BigInt(amountInWei), // amountIn
           BigInt("0"), // amountOutMin (should be calculated properly in production)
-          [POL_TOKEN, DFAITH_TOKEN], // path
+          [POL_TOKEN, DFAITH_TOKEN], // path: WMATIC -> DFAITH
           account.address, // to
           BigInt(deadline) // deadline
-        ]
+        ],
+        value: BigInt(amountInWei) // Native POL amount as value
       });
       
       await sendTransaction(swapTx);
@@ -345,6 +358,9 @@ export default function BuyTab() {
                     <span className="text-zinc-400">Verfügbare POL:</span>
                     <span className="text-purple-400 font-bold">{polBalance}</span>
                   </div>
+                  <div className="text-xs text-zinc-500 mt-1">
+                    Native POL Token für Swaps
+                  </div>
                 </div>
                 
                 {/* Swap Input */}
@@ -362,10 +378,13 @@ export default function BuyTab() {
                     <button
                       className="absolute right-3 top-1/2 transform -translate-y-1/2 text-xs px-2 py-1 bg-purple-500/20 text-purple-400 rounded hover:bg-purple-500/30 transition"
                       onClick={() => setSwapAmountPol((parseFloat(polBalance) * 0.95).toFixed(4))} // 95% für Gas
-                      disabled={isSwapping}
+                      disabled={isSwapping || parseFloat(polBalance) <= 0}
                     >
                       MAX
                     </button>
+                  </div>
+                  <div className="text-xs text-zinc-500 mt-1">
+                    Native POL wird direkt für den Swap verwendet
                   </div>
                 </div>
                 
@@ -377,6 +396,21 @@ export default function BuyTab() {
                       <span className="text-amber-400 font-bold">
                         ~{(parseFloat(swapAmountPol) * dfaithPrice).toFixed(0)}
                       </span>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Info wenn keine POL verfügbar */}
+                {parseFloat(polBalance) <= 0 && (
+                  <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <span className="text-yellow-400 text-xs">⚠️</span>
+                      <div className="text-sm text-yellow-400">
+                        Sie benötigen POL Token für den Swap
+                      </div>
+                    </div>
+                    <div className="text-xs text-yellow-300/70 mt-1">
+                      Kaufen Sie zuerst POL Token oben über das BuyWidget
                     </div>
                   </div>
                 )}
@@ -399,10 +433,12 @@ export default function BuyTab() {
                   <Button
                     className="w-full bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-3 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50"
                     onClick={handleDfaithSwap}
-                    disabled={!swapAmountPol || parseFloat(swapAmountPol) <= 0 || isSwapping || !account?.address}
+                    disabled={!swapAmountPol || parseFloat(swapAmountPol) <= 0 || isSwapping || !account?.address || parseFloat(polBalance) <= 0}
                   >
                     <FaExchangeAlt className="inline mr-2" />
-                    {isSwapping ? "Swapping..." : `${swapAmountPol || "0"} POL → D.FAITH`}
+                    {isSwapping ? "Swapping..." : 
+                     parseFloat(polBalance) <= 0 ? "Keine POL verfügbar" :
+                     `${swapAmountPol || "0"} POL → D.FAITH`}
                   </Button>
                   
                   <Button
