@@ -12,7 +12,6 @@ import { FaCoins, FaArrowDown, FaArrowUp, FaPaperPlane, FaLock, FaExchangeAlt, F
 import Script from "next/script";
 import { ThirdwebSDK } from "@thirdweb-dev/sdk";
 import { useDfaithToPolSwap } from "./thirdwebUniversalBridge";
-import { useQueryClient } from "@tanstack/react-query";
 
 // Modal mit dunklem Farbschema
 function Modal({ open, onClose, title, children }: { open: boolean, onClose: () => void, title: string, children: React.ReactNode }) {
@@ -135,11 +134,10 @@ export default function WalletTab() {
   const sdk = typeof window !== "undefined" && account?.address
     ? new ThirdwebSDK("polygon", { clientId: process.env.NEXT_PUBLIC_TEMPLATE_CLIENT_ID })
     : undefined;
-  const queryClient = useQueryClient();
   const dfaithAddress = DFAITH_TOKEN.address;
   const polAddress = POL_TOKEN.address;
   const { mutate: swapMutate, isPending: isSwapPending, isSuccess: isSwapSuccess, isError: isSwapError, error: swapErrorObj, reset: resetSwap } = useDfaithToPolSwap(
-    sdk!,
+    sdk || new ThirdwebSDK("polygon", { clientId: process.env.NEXT_PUBLIC_TEMPLATE_CLIENT_ID }),
     dfaithAddress,
     polAddress
   );

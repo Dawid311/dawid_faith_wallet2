@@ -2,8 +2,12 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThirdwebProvider } from "thirdweb/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 const inter = Inter({ subsets: ["latin"] });
+
+// QueryClient für React Query
+const queryClient = new QueryClient();
 
 export const metadata: Metadata = {
   title: "thirdweb SDK + Next starter",
@@ -19,7 +23,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <ThirdwebProvider>{children}</ThirdwebProvider>
+        <QueryClientProvider client={queryClient}>
+          <ThirdwebProvider>{children}</ThirdwebProvider>
+        </QueryClientProvider>
       </body>
     </html>
   );
