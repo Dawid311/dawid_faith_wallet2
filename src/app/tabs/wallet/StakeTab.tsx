@@ -50,7 +50,14 @@ export default function StakeTab() {
         console.log('DINVEST_TOKEN:', DINVEST_TOKEN, 'Account:', account.address);
         const bal = await contractRead(dinvest, "balanceOf", [account.address]);
         console.log('Balance Rückgabe:', bal);
-        setAvailable((Number(bal) / Math.pow(10, decimals)).toFixed(4));
+        let availableValue = "0";
+        if (bal && typeof bal === "object") {
+          if (typeof bal.displayValue === "string") availableValue = bal.displayValue;
+          else if (typeof bal.asNumber === "number") availableValue = bal.asNumber.toString();
+        } else if (typeof bal === "number" || typeof bal === "string") {
+          availableValue = (Number(bal) / Math.pow(10, decimals)).toFixed(4);
+        }
+        setAvailable(availableValue);
         const staking = getContract({ client, chain: polygon, address: STAKING_CONTRACT });
         const stakedBal = await contractRead(staking, "balanceOf", [account.address]);
         setStaked((Number(stakedBal) / Math.pow(10, decimals)).toFixed(4));
