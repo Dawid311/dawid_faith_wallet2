@@ -2,17 +2,13 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThirdwebProvider } from "thirdweb/react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Providers } from "./providers";
 
 const inter = Inter({ subsets: ["latin"] });
 
-// QueryClient für React Query
-const queryClient = new QueryClient();
-
 export const metadata: Metadata = {
-  title: "thirdweb SDK + Next starter",
-  description:
-    "Starter template for using thirdweb SDK with Next.js App router",
+  title: "Dawid Faith Wallet",
+  description: "Dawid Faith Wallet - D.FAITH & D.INVEST Token Management",
 };
 
 export default function RootLayout({
@@ -23,9 +19,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <QueryClientProvider client={queryClient}>
+        <Providers>
           <ThirdwebProvider>{children}</ThirdwebProvider>
-        </QueryClientProvider>
+        </Providers>
       </body>
     </html>
   );

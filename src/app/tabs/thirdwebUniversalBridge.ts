@@ -11,7 +11,7 @@ export async function swapDfaithToPol({
   polAddress,
   slippage
 }: {
-  sdk: ThirdwebSDK,
+  sdk: ThirdwebSDK | null,
   fromAddress: string,
   amount: string, // in Wei
   dfaithAddress: string,
@@ -52,12 +52,15 @@ export async function swapDfaithToPol({
 }
 
 export function useDfaithToPolSwap(
-  sdk: ThirdwebSDK,
+  sdk: ThirdwebSDK | null,
   dfaithAddress: string,
   polAddress: string
 ) {
   return useMutation({
     mutationFn: async ({ fromAddress, amount, slippage }: { fromAddress: string; amount: string; slippage: number }) => {
+      if (!sdk) {
+        throw new Error("SDK nicht verfügbar");
+      }
       return swapDfaithToPol({
         sdk,
         fromAddress,

@@ -1,3 +1,5 @@
+"use client";
+
 import { useEffect, useState, useRef } from "react";
 import { createThirdwebClient, getContract, prepareContractCall } from "thirdweb";
 import { useActiveAccount, useActiveWalletConnectionStatus, useSendTransaction } from "thirdweb/react";
@@ -130,17 +132,21 @@ export default function WalletTab() {
   const [selectedSendToken, setSelectedSendToken] = useState(DFAITH_TOKEN);
   const [isSending, setIsSending] = useState(false);
 
-  // Thirdweb SDK Instanz für Universal Bridge
+  // Thirdweb SDK Instanz für Universal Bridge - nur wenn benötigt
   const sdk = typeof window !== "undefined" && account?.address
     ? new ThirdwebSDK("polygon", { clientId: process.env.NEXT_PUBLIC_TEMPLATE_CLIENT_ID })
-    : undefined;
+    : null;
   const dfaithAddress = DFAITH_TOKEN.address;
   const polAddress = POL_TOKEN.address;
-  const { mutate: swapMutate, isPending: isSwapPending, isSuccess: isSwapSuccess, isError: isSwapError, error: swapErrorObj, reset: resetSwap } = useDfaithToPolSwap(
-    sdk || new ThirdwebSDK("polygon", { clientId: process.env.NEXT_PUBLIC_TEMPLATE_CLIENT_ID }),
+  
+  // Hook nur verwenden wenn SDK verfügbar ist
+  const swapHook = useDfaithToPolSwap(
+    sdk,
     dfaithAddress,
     polAddress
   );
+  
+  const { mutate: swapMutate, isPending: isSwapPending, isSuccess: isSwapSuccess, isError: isSwapError, error: swapErrorObj, reset: resetSwap } = swapHook;
 
   // Approval-Status prüfen (Thirdweb: allowance)
   const [needsApproval, setNeedsApproval] = useState(false);
