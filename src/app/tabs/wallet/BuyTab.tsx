@@ -23,35 +23,74 @@ export default function BuyTab() {
   const { mutate: sendTransaction, isPending: isSwapPending } = useSendTransaction();
   const [swapStatus, setSwapStatus] = useState<string | null>(null);
 
-  // D.FAITH Preis von Paraswap holen
+  // D.FAITH Preis von mehreren Quellen holen
   useEffect(() => {
     const fetchDfaithPrice = async () => {
+      setIsLoadingPrice(true);
+      setPriceError(null);
+      let price: number | null = null;
+      let errorMsg = "";
+      // 1. Paraswap
       try {
-        setIsLoadingPrice(true);
-        setPriceError(null);
-        // Paraswap Quote API für D.FAITH/POL Paar
         const response = await fetch(
-          `https://apiv5.paraswap.io/prices?srcToken=0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270&destToken=0x67f1439bd51Cfb0A46f739Ec8D5663F41d027bff&amount=1000000000000000000&srcDecimals=18&destDecimals=18&network=137`
+          `https://apiv5.paraswap.io/transactions/1/price?srcToken=0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270&destToken=0x67f1439bd51Cfb0A46f739Ec8D5663F41d027bff&amount=1000000000000000000&srcDecimals=18&destDecimals=18&network=137`
         );
         if (response.ok) {
           const data = await response.json();
           if (data && data.priceRoute && data.priceRoute.destAmount) {
-            const dfaithPerPol = Number(data.priceRoute.destAmount) / Math.pow(10, 18);
-            setDfaithPrice(dfaithPerPol);
-          } else {
-            setDfaithPrice(null);
-            setPriceError("Keine Preisroute gefunden");
+            price = Number(data.priceRoute.destAmount) / Math.pow(10, 18);
           }
         } else {
-          setDfaithPrice(null);
-          setPriceError("API-Fehler: " + response.status);
+          errorMsg = "Paraswap: " + response.status;
         }
-      } catch (error) {
-        setDfaithPrice(null);
-        setPriceError("Fehler beim Abrufen des Preises");
-      } finally {
-        setIsLoadingPrice(false);
+      } catch (e) {
+        errorMsg = "Paraswap Fehler";
       }
+      // 2. 1inch (nur wenn Paraswap fehlschlägt)
+      if (!price) {
+        try {
+          const response = await fetch(
+            `https://api.1inch.dev/swap/v5.2/137/quote?src=0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270&dst=0x67f1439bd51Cfb0A46f739Ec8D5663F41d027bff&amount=1000000000000000000`,
+            { headers: { 'Authorization': 'Bearer 1inch-api-key' } } // ggf. API-Key nötig
+          );
+          if (response.ok) {
+            const data = await response.json();
+            if (data && data.toTokenAmount) {
+              price = Number(data.toTokenAmount) / Math.pow(10, 18);
+            }
+          } else {
+            errorMsg += " | 1inch: " + response.status;
+          }
+        } catch (e) {
+          errorMsg += " | 1inch Fehler";
+        }
+      }
+      // 3. Uniswap (nur wenn beide fehlschlagen)
+      if (!price) {
+        try {
+          const response = await fetch(
+            `https://api.uniswap.org/v1/quote?protocols=v3&tokenInAddress=0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270&tokenInChainId=137&tokenOutAddress=0x67f1439bd51Cfb0A46f739Ec8D5663F41d027bff&tokenOutChainId=137&amount=1000000000000000000&type=exactIn`
+          );
+          if (response.ok) {
+            const data = await response.json();
+            if (data && data.quote && data.quote.tokenOutAmount) {
+              price = Number(data.quote.tokenOutAmount) / Math.pow(10, 18);
+            }
+          } else {
+            errorMsg += " | Uniswap: " + response.status;
+          }
+        } catch (e) {
+          errorMsg += " | Uniswap Fehler";
+        }
+      }
+      if (price) {
+        setDfaithPrice(price);
+        setPriceError(null);
+      } else {
+        setDfaithPrice(null);
+        setPriceError(errorMsg || "Preis nicht verfügbar");
+      }
+      setIsLoadingPrice(false);
     };
 
     fetchDfaithPrice();
