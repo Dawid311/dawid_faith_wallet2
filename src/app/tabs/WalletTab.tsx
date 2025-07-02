@@ -11,6 +11,7 @@ import { FaRegCopy } from "react-icons/fa";
 import { FaCoins, FaArrowDown, FaArrowUp, FaPaperPlane, FaLock, FaExchangeAlt } from "react-icons/fa";
 import Script from "next/script";
 import axios from "axios";
+import { ethers } from "ethers";
 
 // Modal mit dunklem Farbschema
 function Modal({ open, onClose, title, children }: { open: boolean, onClose: () => void, title: string, children: React.ReactNode }) {
@@ -333,27 +334,54 @@ export default function WalletTab() {
     return () => clearTimeout(timer);
   }, [swapAmount, slippage]); // Entfernt selectedProvider aus den Dependencies
 
-  // Swap-Funktion
+  // Swap-Funktion (echter Swap mit OpenOcean)
   const executeSwap = async () => {
     if (!account?.address || !swapAmount || parseFloat(swapAmount) <= 0) {
       return;
     }
-    
     setIsLoading(true);
-    
     try {
-      // Hier würde die Transaktion vorbereitet und gesendet werden
-      // Diese Funktion benötigt die vollständige Web3-Integration
-      
-      alert("In einer echten Implementierung würde jetzt der Swap durchgeführt werden.");
-      
-      // Nach erfolgreichem Swap zurücksetzen
+      // 1. Quote & Tx-Daten von OpenOcean holen
+      const quoteRes = await axios.get(`https://open-api.openocean.finance/v3/137/swap_quote`, {
+        params: {
+          inTokenAddress: DFAITH_TOKEN.address,
+          outTokenAddress: POL_TOKEN.address,
+          amount: (parseFloat(swapAmount) * Math.pow(10, DFAITH_TOKEN.decimals)).toString(),
+          account: account.address,
+          slippage: slippage,
+        }
+      });
+      const quote = quoteRes.data.data;
+      if (!quote) throw new Error("Keine Quote erhalten");
+
+      // 2. Prüfe Allowance & Approve falls nötig
+      const provider = new ethers.providers.Web3Provider((window as any).ethereum);
+      const signer = provider.getSigner();
+      const erc20 = new ethers.Contract(DFAITH_TOKEN.address, [
+        "function allowance(address owner, address spender) view returns (uint256)",
+        "function approve(address spender, uint256 amount) returns (bool)"
+      ], signer);
+      const allowance = await erc20.allowance(account.address, quote.approveTarget);
+      if (allowance.lt(ethers.BigNumber.from(quote.inAmount))) {
+        const txApprove = await erc20.approve(quote.approveTarget, quote.inAmount);
+        await txApprove.wait();
+      }
+
+      // 3. Swap-Transaktion senden
+      const tx = await signer.sendTransaction({
+        to: quote.to,
+        data: quote.data,
+        value: ethers.BigNumber.from(quote.value || "0"),
+        gasLimit: quote.gasLimit ? ethers.BigNumber.from(quote.gasLimit) : undefined
+      });
+      await tx.wait();
+      alert("Swap erfolgreich! Hash: " + tx.hash);
       setSwapAmount("");
       setEstimatedOutput("0");
       setExchangeRate("0");
-      
-    } catch (error) {
+    } catch (error: any) {
       console.error("Fehler beim Ausführen des Swaps:", error);
+      alert("Swap fehlgeschlagen: " + (error?.message || error));
     } finally {
       setIsLoading(false);
     }
