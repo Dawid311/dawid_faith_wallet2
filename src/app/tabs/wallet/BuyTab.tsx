@@ -2,9 +2,81 @@ import { useEffect, useState } from "react";
 import { Button } from "../../../../components/ui/button";
 import { FaCoins, FaLock, FaExchangeAlt } from "react-icons/fa";
 import { useActiveAccount, useSendTransaction, BuyWidget } from "thirdweb/react";
-import { polygon, ethereum } from "thirdweb/chains";
+import { polygon } from "thirdweb/chains";
 import { NATIVE_TOKEN_ADDRESS } from "thirdweb";
 import { client } from "../../client";
+import { getContract, sendAndConfirmTransaction, writeContract } from "thirdweb";
+import { JsonRpcProvider, parseUnits, Contract } from "ethers";
+
+// ABIs als const deklarieren
+const erc20Abi = [
+  {
+    inputs: [
+      { name: "_spender", type: "address" },
+      { name: "_value", type: "uint256" }
+    ],
+    name: "approve",
+    outputs: [
+      { name: "", type: "bool" }
+    ],
+    stateMutability: "nonpayable" as const,
+    type: "function" as const
+  }
+] as const;
+
+const quickswapRouterAbi = [
+  {
+    inputs: [
+      { internalType: "uint256", name: "amountIn", type: "uint256" },
+      { internalType: "uint256", name: "amountOutMin", type: "uint256" },
+      { internalType: "address[]", name: "path", type: "address[]" },
+      { internalType: "address", name: "to", type: "address" },
+      { internalType: "uint256", name: "deadline", type: "uint256" }
+    ],
+    name: "swapExactTokensForTokens",
+    outputs: [
+      { internalType: "uint256[]", name: "amounts", type: "uint256[]" }
+    ],
+    stateMutability: "nonpayable" as const,
+    type: "function" as const
+  }
+] as const;
+
+// Uniswap V3 Router (Polygon)
+const UNISWAP_V3_ROUTER = "0xE592427A0AEce92De3Edee1F18E0157C05861564";
+
+// Uniswap V3 ABI für exactInputSingle
+const uniswapV3RouterAbi = [
+  {
+    inputs: [
+      {
+        components: [
+          { internalType: "address", name: "tokenIn", type: "address" },
+          { internalType: "address", name: "tokenOut", type: "address" },
+          { internalType: "uint24", name: "fee", type: "uint24" },
+          { internalType: "address", name: "recipient", type: "address" },
+          { internalType: "uint256", name: "deadline", type: "uint256" },
+          { internalType: "uint256", name: "amountIn", type: "uint256" },
+          { internalType: "uint256", name: "amountOutMinimum", type: "uint256" },
+          { internalType: "uint160", name: "sqrtPriceLimitX96", type: "uint160" }
+        ],
+        internalType: "struct ISwapRouter.ExactInputSingleParams",
+        name: "params",
+        type: "tuple"
+      }
+    ],
+    name: "exactInputSingle",
+    outputs: [
+      { internalType: "uint256", name: "amountOut", type: "uint256" }
+    ],
+    stateMutability: "payable" as const,
+    type: "function" as const
+  }
+] as const;
+
+const QUICKSWAP_ROUTER = "0xa5E0829CaCEd8fFDD4De3c43696c57F7D7A678ff";
+const POL_TOKEN = "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270";
+const DFAITH_TOKEN = "0x67f1439bd51Cfb0A46f739Ec8D5663F41d027bff";
 
 export default function BuyTab() {
   const [dfaithPrice, setDfaithPrice] = useState<number | null>(null);
@@ -21,6 +93,10 @@ export default function BuyTab() {
   const [swapError, setSwapError] = useState<string | null>(null);
   const { mutate: sendTransaction, isPending: isSwapPending } = useSendTransaction();
   const [swapStatus, setSwapStatus] = useState<string | null>(null);
+
+  // Approve + Swap State
+  const [swapStep, setSwapStep] = useState<'input'|'approving'|'swapping'|'success'|'error'>("input");
+  const [swapErrorMsg, setSwapErrorMsg] = useState<string|null>(null);
 
   // D.FAITH Preis von mehreren Quellen holen
   useEffect(() => {
@@ -129,78 +205,6 @@ export default function BuyTab() {
     window.open('https://dein-stripe-link.de', '_blank');
   };
 
-  // Swap Quote holen (OpenOcean, Fallback Uniswap)
-  const fetchSwapQuote = async (amount: string) => {
-    setSwapLoading(true);
-    setSwapError(null);
-    setSwapQuote(null);
-    const srcToken = "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270"; // POL/MATIC
-    const destToken = "0x67f1439bd51Cfb0A46f739Ec8D5663F41d027bff"; // D.FAITH
-    const amountWei = (parseFloat(amount) * 1e18).toString();
-    // 1. OpenOcean
-    try {
-      const url = `https://open-api.openocean.finance/v4/polygon/swap?inTokenAddress=${srcToken}&outTokenAddress=${destToken}&amountDecimals=${amountWei}&slippage=1&account=${account?.address || ""}`;
-      const res = await fetch(url);
-      if (res.ok) {
-        const data = await res.json();
-        if (data && data.data && data.data.outAmount && data.data.txData) {
-          setSwapQuote({
-            provider: "OpenOcean",
-            quote: { tokenOutAmount: data.data.outAmount },
-            transaction: {
-              to: data.data.txTo,
-              data: data.data.txData,
-              value: data.data.value,
-            },
-            route: data.data.path || [],
-            slippagePercent: 1,
-          });
-          setSwapLoading(false);
-          return;
-        }
-      }
-      throw new Error("OpenOcean Quote nicht verfügbar");
-    } catch (e) {
-      // Fallback auf Uniswap
-    }
-    // 2. Uniswap
-    try {
-      const url = `https://api.uniswap.org/v1/quote?protocols=v3&tokenInAddress=${srcToken}&tokenInChainId=137&tokenOutAddress=${destToken}&tokenOutChainId=137&amount=${amountWei}&type=exactIn`;
-      const res = await fetch(url);
-      if (!res.ok) throw new Error("Uniswap API Fehler");
-      const data = await res.json();
-      setSwapQuote({
-        provider: "Uniswap",
-        quote: data.quote,
-        transaction: data.transaction,
-        route: data.route,
-        slippagePercent: data.quote?.slippagePercent,
-      });
-    } catch (e: any) {
-      setSwapError(e.message || "Fehler beim Abrufen der Quote");
-    } finally {
-      setSwapLoading(false);
-    }
-  };
-
-  const handleExecuteSwap = async () => {
-    if (!swapQuote || !swapQuote.transaction || !account?.address) return;
-    setSwapStatus("pending");
-    try {
-      const tx = swapQuote.transaction;
-      await sendTransaction({
-        to: tx.to,
-        data: tx.data,
-        value: tx.value ? BigInt(tx.value) : undefined,
-        chain: polygon,
-        client,
-      });
-      setSwapStatus("success");
-    } catch (e) {
-      setSwapStatus("error");
-    }
-  };
-
   return (
     <div className="flex flex-col gap-6 p-6">
       <div className="text-center mb-6">
@@ -238,32 +242,36 @@ export default function BuyTab() {
           </div>
           
           <div className="w-full mt-4">
-            {showPolBuyModal ? (
-              <div className="bg-zinc-800 rounded-xl p-4 border border-purple-500">
-                <div className="text-center text-white mb-4">
-                  <h3 className="text-lg font-bold">POL kaufen</h3>
-                  <p className="text-sm text-zinc-400 mb-4">Direkt POL kaufen mit Fiat oder Bridge von anderen Chains</p>
-                </div>
-                
-                {/* Thirdweb BuyWidget für POL */}
-                <div className="buy-widget-container mb-4">
-                  <BuyWidget
-                    client={client}
-                    chain={polygon}
-                    tokenAddress={NATIVE_TOKEN_ADDRESS}
-                    amount="1"
-                    theme="dark"
-                    className="w-full"
-                  />
-                </div>
-                
-                <Button
-                  className="w-full bg-zinc-600 hover:bg-zinc-700 text-white font-bold py-2 rounded-xl mt-4"
-                  onClick={() => setShowPolBuyModal(false)}
-                >
-                  Schließen
-                </Button>
+      {showPolBuyModal ? (
+        <div className="bg-zinc-800 rounded-xl p-2 sm:p-4 border border-purple-500 w-full max-w-full overflow-hidden">
+          <div className="text-center text-white mb-2 sm:mb-4">
+            <h3 className="text-base sm:text-lg font-bold">POL kaufen</h3>
+            <p className="text-xs sm:text-sm text-zinc-400 mb-2 sm:mb-4">Direkt POL kaufen mit Fiat oder Bridge von anderen Chains</p>
+          </div>
+          
+          {/* Thirdweb BuyWidget für POL - Mobile optimiert */}
+          <div className="buy-widget-container mb-2 sm:mb-4 w-full relative">
+            <div className="w-full overflow-hidden rounded-lg">
+              <div className="w-full">
+                <BuyWidget
+                  client={client}
+                  chain={polygon}
+                  tokenAddress={NATIVE_TOKEN_ADDRESS}
+                  amount="1"
+                  theme="dark"
+                  className="w-full"
+                />
               </div>
+            </div>
+          </div>
+          
+          <Button
+            className="w-full bg-zinc-600 hover:bg-zinc-700 text-white font-bold py-2 rounded-xl mt-2 sm:mt-4"
+            onClick={() => setShowPolBuyModal(false)}
+          >
+            Schließen
+          </Button>
+        </div>
             ) : (
               <Button
                 className="w-full bg-gradient-to-r from-purple-500 to-purple-700 text-white font-bold py-3 rounded-xl hover:opacity-90 transition-opacity"
@@ -310,13 +318,96 @@ export default function BuyTab() {
               <span className="text-zinc-300">0.001 POL</span>
             </div>
           </div>
-          
-          <Button
-            className="w-full mt-4 bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-3 rounded-xl hover:opacity-90 transition-opacity"
-            onClick={() => setShowBuyModal(true)}
-          >
-            D.FAITH kaufen
-          </Button>
+          <div className="w-full mt-4">
+            {showBuyModal ? (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+                <div className="bg-zinc-900 rounded-xl p-6 max-w-xs w-full border border-amber-400 text-center">
+                  <div className="mb-4 text-amber-400 text-2xl font-bold">D.FAITH Swap</div>
+                  <div className="mb-4 text-zinc-300 text-sm">
+                    {swapStep === "input" && (
+                      <>
+                        <div className="mb-2">Wie viel <span className="text-purple-400 font-bold">POL</span> möchtest du swappen?</div>
+                        <input
+                          type="number"
+                          min="0.001"
+                          step="0.001"
+                          className="w-full bg-zinc-800 border border-zinc-700 rounded-xl py-2 px-3 text-lg font-bold text-purple-400 mb-2"
+                          placeholder="0.01 POL"
+                          value={swapAmount}
+                          onChange={e => setSwapAmount(e.target.value)}
+                          disabled={swapStep !== "input"}
+                        />
+                        <Button
+                          className="w-full bg-gradient-to-r from-purple-500 to-purple-700 text-white font-bold py-2 rounded-xl mt-2"
+                          onClick={async () => {
+                            if (!account?.address) {
+                              setSwapErrorMsg("Bitte Wallet verbinden.");
+                              return;
+                            }
+                            setSwapStep("approving");
+                            setSwapErrorMsg(null);
+                            try {
+                              // Provider von thirdweb client holen (ggf. anpassen)
+                              const provider = new JsonRpcProvider((window as any).ethereum);
+                              const signer = await provider.getSigner();
+                              const router = new Contract(UNISWAP_V3_ROUTER, uniswapV3RouterAbi, signer);
+                              const tokenA = new Contract(POL_TOKEN, erc20Abi, signer);
+                              // Approve
+                              const approveTx = await tokenA.approve.populateTransaction(router.address, parseUnits(swapAmount, 18));
+                              const approveResponse = await signer.sendTransaction(approveTx);
+                              await approveResponse.wait();
+                              setSwapStep("swapping");
+                              // Swap über Uniswap V3
+                              const params = {
+                                tokenIn: POL_TOKEN,
+                                tokenOut: DFAITH_TOKEN,
+                                fee: 3000, // 0.3% Pool, ggf. anpassen
+                                recipient: account.address,
+                                deadline: Math.floor(Date.now() / 1000) + 60 * 20,
+                                amountIn: parseUnits(swapAmount, 18),
+                                amountOutMinimum: 0,
+                                sqrtPriceLimitX96: 0n
+                              };
+                              const swapTx = await router.exactInputSingle.populateTransaction(params, { value: 0 });
+                              const swapResponse = await signer.sendTransaction(swapTx);
+                              await swapResponse.wait();
+                              setSwapStep("success");
+                            } catch (e: any) {
+                              setSwapErrorMsg(e.message || "Fehler beim Swap");
+                              setSwapStep("error");
+                            }
+                          }}
+                          disabled={!swapAmount || parseFloat(swapAmount) <= 0}
+                        >
+                          Swappen & Bestätigen
+                        </Button>
+                        {swapErrorMsg && <div className="text-red-400 text-xs mt-2">{swapErrorMsg}</div>}
+                      </>
+                    )}
+                    {swapStep === "approving" && <div className="text-yellow-400">Genehmigung läuft...</div>}
+                    {swapStep === "swapping" && <div className="text-yellow-400">Swap läuft...</div>}
+                    {swapStep === "success" && <div className="text-green-400">Swap erfolgreich!</div>}
+                    {swapStep === "error" && <div className="text-red-400">Swap fehlgeschlagen! {swapErrorMsg}</div>}
+                  </div>
+                  <Button
+                    className="w-full bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-2 rounded-xl mt-4"
+                    onClick={() => { setShowBuyModal(false); setSwapStep("input"); setSwapErrorMsg(null); }}
+                    autoFocus
+                    disabled={swapStep === "approving" || swapStep === "swapping"}
+                  >
+                    Schließen
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <Button
+                className="w-full mt-4 bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-3 rounded-xl hover:opacity-90 transition-opacity"
+                onClick={() => setShowBuyModal(true)}
+              >
+                D.FAITH kaufen
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* D.INVEST kaufen */}
@@ -389,62 +480,6 @@ export default function BuyTab() {
               className="w-full mt-2 text-zinc-400 text-xs underline"
               onClick={() => setShowInvestModal(false)}
             >Abbrechen</button>
-          </div>
-        </div>
-      )}
-
-      {/* Swap Modal für D.FAITH */}
-      {showBuyModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <div className="bg-zinc-900 rounded-xl p-8 max-w-xs w-full border border-amber-400 text-center">
-            <div className="mb-4 text-amber-400 text-2xl font-bold">D.FAITH Swap</div>
-            <div className="mb-4 text-zinc-300 text-sm">
-              <div className="mb-2">Wie viel <span className="text-purple-400 font-bold">POL</span> möchtest du swappen?</div>
-              <input
-                type="number"
-                min="0"
-                step="0.001"
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-xl py-2 px-3 text-lg font-bold text-purple-400 mb-2"
-                placeholder="0.01 POL"
-                value={swapAmount}
-                onChange={e => setSwapAmount(e.target.value)}
-                disabled={isSwapPending}
-              />
-              <Button
-                className="w-full bg-gradient-to-r from-purple-500 to-purple-700 text-white font-bold py-2 rounded-xl mt-2"
-                onClick={() => swapAmount && parseFloat(swapAmount) > 0 && fetchSwapQuote(swapAmount)}
-                disabled={swapLoading || !swapAmount || parseFloat(swapAmount) <= 0 || isSwapPending}
-              >
-                {swapLoading ? "Lade Quote..." : "Quote holen"}
-              </Button>
-              {swapError && <div className="text-red-400 text-xs mt-2">{swapError}</div>}
-              {swapQuote && (
-                <div className="mt-4 text-left text-xs bg-zinc-800 rounded-lg p-3">
-                  <div><b>Provider:</b> {swapQuote.provider}</div>
-                  <div><b>Du erhältst:</b> <span className="text-amber-400 font-bold">{(Number(swapQuote.quote.tokenOutAmount) / 1e18).toFixed(4)} D.FAITH</span></div>
-                  <div><b>Slippage:</b> {swapQuote.quote.slippagePercent || "-"}%</div>
-                  <div><b>Route:</b> {swapQuote.route?.map((r: any) => r.tokenInSymbol + "→" + r.tokenOutSymbol).join(", ")}</div>
-                  <Button
-                    className="w-full bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-2 rounded-xl mt-4"
-                    onClick={handleExecuteSwap}
-                    disabled={isSwapPending}
-                  >
-                    {isSwapPending ? "Sende Swap..." : "Swap ausführen"}
-                  </Button>
-                  {swapStatus === "success" && <div className="text-green-400 text-xs mt-2">Swap erfolgreich!</div>}
-                  {swapStatus === "error" && <div className="text-red-400 text-xs mt-2">Swap fehlgeschlagen!</div>}
-                  {swapStatus === "pending" && <div className="text-yellow-400 text-xs mt-2">Transaktion läuft...</div>}
-                </div>
-              )}
-            </div>
-            <Button
-              className="w-full bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-2 rounded-xl mt-4"
-              onClick={() => setShowBuyModal(false)}
-              autoFocus
-              disabled={isSwapPending}
-            >
-              Schließen
-            </Button>
           </div>
         </div>
       )}

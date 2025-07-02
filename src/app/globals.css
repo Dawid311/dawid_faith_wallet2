@@ -20,3 +20,29 @@
 		@apply bg-zinc-950 text-neutral-200;
 	}
 }
+
+/* Mobile Optimierung für Thirdweb BuyWidget */
+@layer components {
+	.buy-widget-container {
+		width: 100%;
+		overflow: hidden;
+	}
+	
+	/* Auf sehr kleinen Bildschirmen das Widget skalieren */
+	@media (max-width: 375px) {
+		.buy-widget-container > div {
+			transform: scale(0.85);
+			transform-origin: top left;
+			width: 117.6%; /* 100/0.85 um den Container zu kompensieren */
+		}
+	}
+	
+	/* Auf mittelgroßen mobilen Bildschirmen leicht skalieren */
+	@media (min-width: 376px) and (max-width: 640px) {
+		.buy-widget-container > div {
+			transform: scale(0.9);
+			transform-origin: top left;
+			width: 111.1%; /* 100/0.9 um den Container zu kompensieren */
+		}
+	}
+}
