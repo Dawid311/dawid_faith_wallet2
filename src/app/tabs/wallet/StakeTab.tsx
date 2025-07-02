@@ -5,6 +5,7 @@ import { useActiveAccount } from "thirdweb/react";
 import { createThirdwebClient, getContract, prepareContractCall, resolveMethod } from "thirdweb";
 import { polygon } from "thirdweb/chains";
 import { useSendTransaction } from "thirdweb/react";
+import { balanceOf } from "thirdweb/extensions/erc20";
 
 const STAKING_CONTRACT = "0xe730555afA4DeA022976DdDc0cC7DBba1C98568A";
 const DINVEST_TOKEN = "0x72a428F03d7a301cEAce084366928b99c4d757bD";
@@ -38,26 +39,43 @@ export default function StakeTab() {
     setLoading(true);
     (async () => {
       try {
+        // D.INVEST Balance mit der korrekten balanceOf Funktion abrufen
         const dinvest = getContract({ client, chain: polygon, address: DINVEST_TOKEN });
-        // Decimals dynamisch abfragen
-        let decimals = 18;
-        try {
-          const dec = await contractRead(dinvest, "decimals");
-          if (typeof dec === "number") decimals = dec;
-          setDinvestDecimals(decimals);
-        } catch {}
-        // Balance abfragen
-        console.log('DINVEST_TOKEN:', DINVEST_TOKEN, 'Account:', account.address);
-        const bal = await contractRead(dinvest, "balanceOf", [account.address]);
-        console.log('Balance Rückgabe:', bal);
-        setAvailable((Number(bal) / Math.pow(10, decimals)).toFixed(4));
+        const dinvestBalanceResult = await balanceOf({
+          contract: dinvest,
+          address: account.address
+        });
+        
+        // Balance formatieren
+        const dinvestFormatted = Number(dinvestBalanceResult) / Math.pow(10, 18);
+        setAvailable(dinvestFormatted.toFixed(4));
+        
+        // Staking Contract für gestakte Balance und Rewards
         const staking = getContract({ client, chain: polygon, address: STAKING_CONTRACT });
-        const stakedBal = await contractRead(staking, "balanceOf", [account.address]);
-        setStaked((Number(stakedBal) / Math.pow(10, decimals)).toFixed(4));
-        const earned = await contractRead(staking, "earned", [account.address]);
-        setRewards((Number(earned) / Math.pow(10, decimals)).toFixed(4));
+        
+        // Gestakte Balance abrufen
+        try {
+          const stakedBal = await contractRead(staking, "balanceOf", [account.address]);
+          setStaked((Number(stakedBal) / Math.pow(10, 18)).toFixed(4));
+        } catch (e) {
+          console.error("Fehler beim Abrufen der gestakten Balance:", e);
+          setStaked("0");
+        }
+        
+        // Rewards abrufen
+        try {
+          const earned = await contractRead(staking, "earned", [account.address]);
+          setRewards((Number(earned) / Math.pow(10, 18)).toFixed(4));
+        } catch (e) {
+          console.error("Fehler beim Abrufen der Rewards:", e);
+          setRewards("0");
+        }
+        
       } catch (e) {
-        setAvailable("0"); setStaked("0"); setRewards("0");
+        console.error("Fehler beim Abrufen der D.INVEST Balance:", e);
+        setAvailable("0"); 
+        setStaked("0"); 
+        setRewards("0");
       } finally {
         setLoading(false);
       }
@@ -71,7 +89,7 @@ export default function StakeTab() {
     try {
       const staking = getContract({ client, chain: polygon, address: STAKING_CONTRACT });
       const dinvest = getContract({ client, chain: polygon, address: DINVEST_TOKEN });
-      const amountWei = (parseFloat(stakeAmount) * 1e18).toString();
+      const amountWei = (parseFloat(stakeAmount) * Math.pow(10, 18)).toString();
       // Approve
       await sendTransaction(prepareContractCall({ contract: dinvest, method: resolveMethod("approve"), params: [STAKING_CONTRACT, amountWei] }));
       // Stake
@@ -89,7 +107,7 @@ export default function StakeTab() {
     setTxStatus("pending");
     try {
       const staking = getContract({ client, chain: polygon, address: STAKING_CONTRACT });
-      const amountWei = (parseFloat(unstakeAmount) * 1e18).toString();
+      const amountWei = (parseFloat(unstakeAmount) * Math.pow(10, 18)).toString();
       await sendTransaction(prepareContractCall({ contract: staking, method: resolveMethod("withdraw"), params: [amountWei] }));
       setTxStatus("success");
       setUnstakeAmount("");
@@ -122,18 +140,22 @@ export default function StakeTab() {
       {/* Staking Overview */}
       <div className="grid grid-cols-2 gap-4 mb-6">
         <div className="bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl p-4 border border-zinc-700 text-center">
-          <div className="text-sm text-zinc-500 mb-1">Verfügbar</div>
-          <div className="text-xl font-bold text-amber-400">
-            {available}
+          <div className="text-center">
+            <div className="text-sm text-zinc-500 mb-1">Verfügbar</div>
+            <div className="text-xl font-bold text-amber-400">
+              {loading ? "Laden..." : available}
+            </div>
+            <div className="text-xs text-zinc-500">D.INVEST</div>
           </div>
-          <div className="text-xs text-zinc-500">D.INVEST</div>
         </div>
         <div className="bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl p-4 border border-zinc-700 text-center">
-          <div className="text-sm text-zinc-500 mb-1">Gestaked</div>
-          <div className="text-xl font-bold text-purple-400">
-            {staked}
+          <div className="text-center">
+            <div className="text-sm text-zinc-500 mb-1">Gestaked</div>
+            <div className="text-xl font-bold text-purple-400">
+              {loading ? "Laden..." : staked}
+            </div>
+            <div className="text-xs text-zinc-500">D.INVEST</div>
           </div>
-          <div className="text-xs text-zinc-500">D.INVEST</div>
         </div>
       </div>
 
@@ -149,7 +171,7 @@ export default function StakeTab() {
             <div className="text-xs text-zinc-500">Mindest-Lock</div>
           </div>
           <div>
-            <div className="text-2xl font-bold text-amber-400 mb-1">{rewards}</div>
+            <div className="text-2xl font-bold text-amber-400 mb-1">{loading ? "Laden..." : rewards}</div>
             <div className="text-xs text-zinc-500">Belohnungen</div>
           </div>
         </div>
@@ -188,10 +210,11 @@ export default function StakeTab() {
             <div className="flex justify-between items-center mb-3">
               <label className="text-sm font-medium text-zinc-300">D.INVEST Betrag</label>
               <div className="flex items-center gap-2">
-                <span className="text-xs text-zinc-500">Verfügbar: {available}</span>
+                <span className="text-xs text-zinc-500">Verfügbar: {loading ? "Laden..." : available}</span>
                 <button 
                   className="text-xs px-2 py-1 bg-amber-500/20 text-amber-400 rounded hover:bg-amber-500/30 transition"
                   onClick={() => setStakeAmount(available)}
+                  disabled={loading || parseFloat(available) <= 0}
                 >
                   MAX
                 </button>
