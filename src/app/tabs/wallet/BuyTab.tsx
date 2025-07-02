@@ -3,11 +3,14 @@ import { Button } from "../../../../components/ui/button";
 import { FaCoins, FaLock, FaExchangeAlt } from "react-icons/fa";
 import { useActiveAccount, useSendTransaction, BuyWidget } from "thirdweb/react";
 import { polygon } from "thirdweb/chains";
-import { NATIVE_TOKEN_ADDRESS } from "thirdweb";
+import { NATIVE_TOKEN_ADDRESS, getContract, prepareContractCall, sendAndConfirmTransaction } from "thirdweb";
 import { client } from "../../client";
+import { balanceOf, approve } from "thirdweb/extensions/erc20";
 
 const DFAITH_TOKEN = "0x67f1439bd51Cfb0A46f739Ec8D5663F41d027bff";
-const DFAITH_ICON = "https://assets.coingecko.com/coins/images/35564/large/dfaith.png"; // Optional, falls vorhanden
+const DFAITH_ICON = "https://assets.coingecko.com/coins/images/35564/large/dfaith.png";
+const POL_TOKEN = "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270"; // WMATIC/POL
+const UNISWAP_ROUTER = "0xa5E0829CaCEd8fFDD4De3c43696c57F7D7A678ff"; // QuickSwap Router auf Polygon
 
 export default function BuyTab() {
   const [dfaithPrice, setDfaithPrice] = useState<number | null>(null);
@@ -132,8 +135,97 @@ export default function BuyTab() {
     window.open('https://dein-stripe-link.de', '_blank');
   };
 
-  // State für D.FAITH PayModal
+  // State für D.FAITH Swap
   const [showDfaithBuyModal, setShowDfaithBuyModal] = useState(false);
+  const [swapAmountPol, setSwapAmountPol] = useState("");
+  const [polBalance, setPolBalance] = useState("0");
+  const [isSwapping, setIsSwapping] = useState(false);
+  const [swapTxStatus, setSwapTxStatus] = useState<string | null>(null);
+
+  // POL Balance laden
+  useEffect(() => {
+    const fetchPolBalance = async () => {
+      if (!account?.address) return;
+      try {
+        const polContract = getContract({
+          client,
+          chain: polygon,
+          address: POL_TOKEN
+        });
+        const balance = await balanceOf({
+          contract: polContract,
+          address: account.address
+        });
+        const formatted = (Number(balance) / Math.pow(10, 18)).toFixed(4);
+        setPolBalance(formatted);
+      } catch (error) {
+        console.error("Fehler beim Laden der POL Balance:", error);
+        setPolBalance("0");
+      }
+    };
+    
+    fetchPolBalance();
+  }, [account?.address]);
+
+  // D.FAITH Swap Funktion
+  const handleDfaithSwap = async () => {
+    if (!swapAmountPol || parseFloat(swapAmountPol) <= 0 || !account?.address) return;
+    
+    setIsSwapping(true);
+    setSwapTxStatus("pending");
+    
+    try {
+      const amountInWei = (parseFloat(swapAmountPol) * Math.pow(10, 18)).toString();
+      
+      // 1. POL Token Contract
+      const polContract = getContract({
+        client,
+        chain: polygon,
+        address: POL_TOKEN
+      });
+      
+      // 2. Approve Router to spend POL using the approve extension
+      const approveTx = approve({
+        contract: polContract,
+        spender: UNISWAP_ROUTER,
+        amount: amountInWei
+      });
+      
+      await sendTransaction(approveTx);
+      
+      // 3. Router Contract
+      const router = getContract({
+        client,
+        chain: polygon,
+        address: UNISWAP_ROUTER
+      });
+      
+      // 4. Perform Swap
+      const deadline = Math.floor(Date.now() / 1000) + 60 * 20; // 20 minutes
+      const swapTx = prepareContractCall({
+        contract: router,
+        method: "function swapExactTokensForTokens(uint256 amountIn, uint256 amountOutMin, address[] calldata path, address to, uint256 deadline) external returns (uint256[] memory amounts)",
+        params: [
+          BigInt(amountInWei), // amountIn
+          BigInt("0"), // amountOutMin (should be calculated properly in production)
+          [POL_TOKEN, DFAITH_TOKEN], // path
+          account.address, // to
+          BigInt(deadline) // deadline
+        ]
+      });
+      
+      await sendTransaction(swapTx);
+      
+      setSwapTxStatus("success");
+      setSwapAmountPol("");
+      
+    } catch (error) {
+      console.error("Swap Fehler:", error);
+      setSwapTxStatus("error");
+    } finally {
+      setIsSwapping(false);
+    }
+  };
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -244,24 +336,87 @@ export default function BuyTab() {
           {/* D.FAITH kaufen Modal */}
           {showDfaithBuyModal ? (
             <div className="fixed inset-0 z-50 flex items-center justify-center min-h-screen bg-black/60">
-              <div className="bg-zinc-900 rounded-xl p-4 max-w-full w-full sm:max-w-xs border border-amber-400 text-center overflow-y-auto h-[90vh] flex flex-col items-center justify-center">
-                <div className="mb-4 text-amber-400 text-2xl font-bold">D.FAITH kaufen</div>
-                <div className="w-full flex-1 flex items-center justify-center">
-                  <BuyWidget
-                    client={client}
-                    tokenAddress={DFAITH_TOKEN}
-                    chain={polygon}
-                    amount="1"
-                    theme="dark"
-                    className="w-full"
-                  />
+              <div className="bg-zinc-900 rounded-xl p-6 max-w-md w-full mx-4 border border-amber-400">
+                <div className="mb-6 text-amber-400 text-2xl font-bold text-center">D.FAITH kaufen</div>
+                
+                {/* POL Balance */}
+                <div className="mb-4 p-3 bg-zinc-800/50 rounded-lg">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-zinc-400">Verfügbare POL:</span>
+                    <span className="text-purple-400 font-bold">{polBalance}</span>
+                  </div>
                 </div>
-                <Button
-                  className="w-full bg-zinc-600 hover:bg-zinc-700 text-white font-bold py-2 rounded-xl mt-4"
-                  onClick={() => setShowDfaithBuyModal(false)}
-                >
-                  Schließen
-                </Button>
+                
+                {/* Swap Input */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-zinc-300 mb-2">POL Betrag</label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      placeholder="0.0"
+                      className="w-full bg-zinc-800 border border-zinc-600 rounded-xl py-3 px-4 text-lg font-bold text-purple-400 focus:border-amber-500 focus:outline-none"
+                      value={swapAmountPol}
+                      onChange={(e) => setSwapAmountPol(e.target.value)}
+                      disabled={isSwapping}
+                    />
+                    <button
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-xs px-2 py-1 bg-purple-500/20 text-purple-400 rounded hover:bg-purple-500/30 transition"
+                      onClick={() => setSwapAmountPol((parseFloat(polBalance) * 0.95).toFixed(4))} // 95% für Gas
+                      disabled={isSwapping}
+                    >
+                      MAX
+                    </button>
+                  </div>
+                </div>
+                
+                {/* Estimated Output */}
+                {swapAmountPol && parseFloat(swapAmountPol) > 0 && dfaithPrice && (
+                  <div className="mb-4 p-3 bg-zinc-800/50 rounded-lg">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-zinc-400">Geschätzte D.FAITH:</span>
+                      <span className="text-amber-400 font-bold">
+                        ~{(parseFloat(swapAmountPol) * dfaithPrice).toFixed(0)}
+                      </span>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Transaction Status */}
+                {swapTxStatus && (
+                  <div className={`mb-4 p-3 rounded-lg text-center ${
+                    swapTxStatus === "success" ? "bg-green-500/20 text-green-400" :
+                    swapTxStatus === "error" ? "bg-red-500/20 text-red-400" :
+                    "bg-yellow-500/20 text-yellow-400"
+                  }`}>
+                    {swapTxStatus === "success" && "Swap erfolgreich!"}
+                    {swapTxStatus === "error" && "Swap fehlgeschlagen!"}
+                    {swapTxStatus === "pending" && "Transaktion läuft..."}
+                  </div>
+                )}
+                
+                {/* Buttons */}
+                <div className="space-y-3">
+                  <Button
+                    className="w-full bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-3 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50"
+                    onClick={handleDfaithSwap}
+                    disabled={!swapAmountPol || parseFloat(swapAmountPol) <= 0 || isSwapping || !account?.address}
+                  >
+                    <FaExchangeAlt className="inline mr-2" />
+                    {isSwapping ? "Swapping..." : `${swapAmountPol || "0"} POL → D.FAITH`}
+                  </Button>
+                  
+                  <Button
+                    className="w-full bg-zinc-600 hover:bg-zinc-700 text-white font-bold py-2 rounded-xl"
+                    onClick={() => {
+                      setShowDfaithBuyModal(false);
+                      setSwapAmountPol("");
+                      setSwapTxStatus(null);
+                    }}
+                    disabled={isSwapping}
+                  >
+                    Schließen
+                  </Button>
+                </div>
               </div>
             </div>
           ) : (
