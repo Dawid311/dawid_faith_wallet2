@@ -6,8 +6,10 @@ import { useActiveAccount, useSendTransaction } from "thirdweb/react";
 const { PayEmbed } = require("thirdweb/react");
 import { polygon } from "thirdweb/chains";
 import { client } from "../../client";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 export default function BuyTab() {
+  const [modalQueryClient] = useState(() => new QueryClient());
   const [dfaithPrice, setDfaithPrice] = useState<number | null>(null);
   const [isLoadingPrice, setIsLoadingPrice] = useState(true);
   const account = useActiveAccount();
@@ -425,13 +427,15 @@ export default function BuyTab() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
           <div className="bg-zinc-900 rounded-xl p-6 max-w-xs w-full border border-purple-500 text-center">
             <div className="mb-4 text-purple-400 text-2xl font-bold">POL kaufen</div>
-            <PayEmbed
-              client={client}
-              chain={polygon}
-              token="0x0000000000000000000000000000000000001010" // POL/MATIC
-              onClose={() => setShowPolBuyModal(false)}
-              modalSize="compact"
-            />
+            <QueryClientProvider client={modalQueryClient}>
+              <PayEmbed
+                client={client}
+                chain={polygon}
+                token="0x0000000000000000000000000000000000001010" // POL/MATIC
+                onClose={() => setShowPolBuyModal(false)}
+                modalSize="compact"
+              />
+            </QueryClientProvider>
             <Button
               className="w-full bg-gradient-to-r from-purple-500 to-purple-700 text-white font-bold py-2 rounded-xl mt-4"
               onClick={() => setShowPolBuyModal(false)}
