@@ -75,7 +75,13 @@ export default function BuyTab() {
             </div>
           </div>
           
-          <Button className="w-full mt-4 bg-gradient-to-r from-blue-400 to-blue-600 text-white font-bold py-3 rounded-xl hover:opacity-90 transition-opacity">
+          <Button
+            className="w-full mt-4 bg-gradient-to-r from-blue-400 to-blue-600 text-white font-bold py-3 rounded-xl hover:opacity-90 transition-opacity"
+            onClick={() => {
+              // Thirdweb Kauf-Flow für POL (z.B. redirect zu Thirdweb oder Modal öffnen)
+              window.open('https://thirdweb.com/buy/polygon', '_blank');
+            }}
+          >
             POL kaufen
           </Button>
         </div>
@@ -112,7 +118,14 @@ export default function BuyTab() {
             </div>
           </div>
           
-          <Button className="w-full mt-4 bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-3 rounded-xl hover:opacity-90 transition-opacity">
+          <Button
+            className="w-full mt-4 bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-3 rounded-xl hover:opacity-90 transition-opacity"
+            onClick={() => {
+              // Swap-Modal für D.FAITH öffnen
+              // setShowBuyModal('DFAITH') oder eigenes Modal
+              alert('Swap-Modal für D.FAITH öffnen (Uniswap Router: 0xae55fa461c7f181e3a213a64fef7862447774401)');
+            }}
+          >
             D.FAITH kaufen
           </Button>
         </div>
@@ -143,7 +156,12 @@ export default function BuyTab() {
             </div>
           </div>
           
-          <Button className="w-full mt-4 bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-3 rounded-xl hover:opacity-90 transition-opacity">
+          <Button
+            className="w-full mt-4 bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-3 rounded-xl hover:opacity-90 transition-opacity"
+            onClick={() => {
+              window.open('https://dein-stripe-link.de', '_blank');
+            }}
+          >
             D.INVEST kaufen
           </Button>
         </div>
