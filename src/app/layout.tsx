@@ -1,10 +1,8 @@
-"use client";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThirdwebProvider } from "thirdweb/react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useState } from "react";
+import QueryProvider from "./QueryProvider";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -19,14 +17,11 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const [queryClient] = useState(() => new QueryClient());
   return (
     <html lang="en">
       <body className={inter.className}>
         <ThirdwebProvider>
-          <QueryClientProvider client={queryClient}>
-            {children}
-          </QueryClientProvider>
+          <QueryProvider>{children}</QueryProvider>
         </ThirdwebProvider>
       </body>
     </html>
