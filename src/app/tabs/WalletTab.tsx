@@ -111,6 +111,7 @@ export default function WalletTab() {
 
   const [dfaithBalance, setDfaithBalance] = useState<{ displayValue: string } | null>(null);
   const [dinvestBalance, setDinvestBalance] = useState<{ displayValue: string } | null>(null);
+  const [dfaithPriceEur, setDfaithPriceEur] = useState<number | null>(null);
   
   // Modal States
   const [showBuyModal, setShowBuyModal] = useState(false);
@@ -145,7 +146,34 @@ export default function WalletTab() {
 
   useEffect(() => {
     fetchBalances();
+    fetchDfaithPrice();
   }, [account?.address]);
+
+  // D.FAITH EUR-Preis holen (basierend auf POL-Preis)
+  const fetchDfaithPrice = async () => {
+    try {
+      // POL-Preis in EUR holen (ungefähr 0.50€)
+      const polPriceEur = 0.50;
+      
+      // D.FAITH pro POL von Paraswap holen
+      const response = await fetch(
+        `https://apiv5.paraswap.io/prices?srcToken=0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270&destToken=0x67f1439bd51Cfb0A46f739Ec8D5663F41d027bff&amount=1000000000000000000&srcDecimals=18&destDecimals=18&network=137`
+      );
+      
+      if (response.ok) {
+        const data = await response.json();
+        const dfaithPerPol = Number(data.priceRoute.destAmount) / Math.pow(10, 18);
+        const dfaithPriceEur = polPriceEur / dfaithPerPol;
+        setDfaithPriceEur(dfaithPriceEur);
+      } else {
+        // Fallback: 0.50€ / 500 = 0.001€ pro D.FAITH
+        setDfaithPriceEur(0.001);
+      }
+    } catch (error) {
+      console.error("Fehler beim Abrufen des D.FAITH EUR-Preises:", error);
+      setDfaithPriceEur(0.001);
+    }
+  };
 
   const copyWalletAddress = () => {
     if (account?.address) {
@@ -310,7 +338,10 @@ export default function WalletTab() {
               <div className="w-full h-px bg-gradient-to-r from-transparent via-zinc-700/50 to-transparent my-3"></div>
               
               <div className="text-xs text-zinc-500">
-                ≈ 0.00 EUR
+                ≈ {dfaithBalance && dfaithPriceEur 
+                  ? `${(Number(dfaithBalance.displayValue) * dfaithPriceEur).toFixed(2)} EUR`
+                  : "0.00 EUR"
+                }
               </div>
             </div>
 

@@ -1,8 +1,44 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "../../../../components/ui/button";
-import { FaCoins, FaLock } from "react-icons/fa";
+import { FaCoins, FaLock, FaExchangeAlt } from "react-icons/fa";
 
 export default function BuyTab() {
+  const [dfaithPrice, setDfaithPrice] = useState<number | null>(null);
+  const [isLoadingPrice, setIsLoadingPrice] = useState(true);
+
+  // D.FAITH Preis von Paraswap holen
+  useEffect(() => {
+    const fetchDfaithPrice = async () => {
+      try {
+        setIsLoadingPrice(true);
+        // Paraswap Quote API für D.FAITH/POL Paar
+        const response = await fetch(
+          `https://apiv5.paraswap.io/prices?srcToken=0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270&destToken=0x67f1439bd51Cfb0A46f739Ec8D5663F41d027bff&amount=1000000000000000000&srcDecimals=18&destDecimals=18&network=137`
+        );
+        
+        if (response.ok) {
+          const data = await response.json();
+          // Berechne D.FAITH pro POL basierend auf der Quote
+          const dfaithPerPol = Number(data.priceRoute.destAmount) / Math.pow(10, 18);
+          setDfaithPrice(dfaithPerPol);
+        } else {
+          // Fallback Preis wenn API nicht verfügbar
+          setDfaithPrice(500);
+        }
+      } catch (error) {
+        console.error("Fehler beim Abrufen des D.FAITH Preises:", error);
+        // Fallback Preis
+        setDfaithPrice(500);
+      } finally {
+        setIsLoadingPrice(false);
+      }
+    };
+
+    fetchDfaithPrice();
+    // Preis alle 30 Sekunden aktualisieren
+    const interval = setInterval(fetchDfaithPrice, 30000);
+    return () => clearInterval(interval);
+  }, []);
   return (
     <div className="flex flex-col gap-6 p-6">
       <div className="text-center mb-6">
@@ -13,6 +49,37 @@ export default function BuyTab() {
       </div>
 
       <div className="flex flex-col gap-4">
+        {/* POL kaufen */}
+        <div className="bg-gradient-to-br from-blue-800/30 to-blue-900/30 rounded-xl p-6 border border-blue-700/50">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-gradient-to-r from-blue-400 to-blue-600 rounded-full">
+                <FaExchangeAlt className="text-white text-lg" />
+              </div>
+              <div>
+                <h3 className="font-bold text-blue-400">POL Token</h3>
+                <p className="text-xs text-zinc-500">Polygon Native Token</p>
+              </div>
+            </div>
+            <span className="text-xs text-zinc-400 bg-zinc-700/50 px-2 py-1 rounded">mit EUR kaufen</span>
+          </div>
+          
+          <div className="space-y-3">
+            <div className="flex justify-between text-sm">
+              <span className="text-zinc-400">Aktueller Preis:</span>
+              <span className="text-blue-400">~0.50€ pro POL</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-zinc-400">Minimum:</span>
+              <span className="text-zinc-300">1 EUR</span>
+            </div>
+          </div>
+          
+          <Button className="w-full mt-4 bg-gradient-to-r from-blue-400 to-blue-600 text-white font-bold py-3 rounded-xl hover:opacity-90 transition-opacity">
+            POL kaufen
+          </Button>
+        </div>
+
         {/* DFAITH kaufen */}
         <div className="bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl p-6 border border-zinc-700">
           <div className="flex items-center justify-between mb-4">
@@ -31,7 +98,13 @@ export default function BuyTab() {
           <div className="space-y-3">
             <div className="flex justify-between text-sm">
               <span className="text-zinc-400">Aktueller Preis:</span>
-              <span className="text-amber-400">1 POL = 500 D.FAITH</span>
+              <span className="text-amber-400">
+                {isLoadingPrice ? (
+                  <span className="animate-pulse">Laden...</span>
+                ) : (
+                  `1 POL = ${dfaithPrice?.toFixed(0) || 500} D.FAITH`
+                )}
+              </span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-zinc-400">Minimum:</span>
@@ -62,11 +135,11 @@ export default function BuyTab() {
           <div className="space-y-3">
             <div className="flex justify-between text-sm">
               <span className="text-zinc-400">Aktueller Preis:</span>
-              <span className="text-amber-400">1 EUR = 10 D.INVEST</span>
+              <span className="text-amber-400">5€ pro D.INVEST</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-zinc-400">Minimum:</span>
-              <span className="text-zinc-300">1 EUR</span>
+              <span className="text-zinc-300">5 EUR</span>
             </div>
           </div>
           
