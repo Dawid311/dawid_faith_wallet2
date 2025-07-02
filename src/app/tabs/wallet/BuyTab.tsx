@@ -1,10 +1,9 @@
 import { useEffect, useState } from "react";
 import { Button } from "../../../../components/ui/button";
 import { FaCoins, FaLock, FaExchangeAlt } from "react-icons/fa";
-import { useActiveAccount, useSendTransaction } from "thirdweb/react";
-// @ts-ignore
-const { BuyDirectWidget } = require("thirdweb/react");
+import { useActiveAccount, useSendTransaction, BuyWidget } from "thirdweb/react";
 import { polygon } from "thirdweb/chains";
+import { NATIVE_TOKEN_ADDRESS } from "thirdweb";
 import { client } from "../../client";
 
 export default function BuyTab() {
@@ -240,17 +239,24 @@ export default function BuyTab() {
           
           <div className="w-full mt-4">
             {showPolBuyModal ? (
-              <div className="bg-zinc-800 rounded-xl p-4 border border-purple-500">
-                <BuyDirectWidget
-                  client={client}
-                  chain={polygon}
-                  tokenAddress="0x0000000000000000000000000000000000001010"
-                  theme="dark"
-                  onPurchaseComplete={() => {
-                    setShowPolBuyModal(false);
-                  }}
-                  onClose={() => setShowPolBuyModal(false)}
-                />
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+                <div className="bg-zinc-900 rounded-xl p-8 max-w-xs w-full border border-purple-500 text-center">
+                  <div className="mb-4 text-purple-400 text-2xl font-bold">POL kaufen</div>
+                  <BuyWidget
+                    client={client}
+                    tokenAddress={NATIVE_TOKEN_ADDRESS}
+                    chain={polygon}
+                    amount="1"
+                    theme="dark"
+                    className="w-full"
+                  />
+                  <Button
+                    className="w-full bg-zinc-600 hover:bg-zinc-700 text-white font-bold py-2 rounded-xl mt-4"
+                    onClick={() => setShowPolBuyModal(false)}
+                  >
+                    Schließen
+                  </Button>
+                </div>
               </div>
             ) : (
               <Button
