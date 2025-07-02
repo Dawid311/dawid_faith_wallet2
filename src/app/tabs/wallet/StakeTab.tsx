@@ -13,6 +13,9 @@ const client = createThirdwebClient({ clientId: process.env.NEXT_PUBLIC_TEMPLATE
 // Hilfsfunktion für Contract-Reads
 async function contractRead(contract: any, method: string, args: any[] = []) {
   if (!contract) return undefined;
+  if (contract.read && typeof contract.read[method] === "function") {
+    return await contract.read[method](...args);
+  }
   return await contract[method](...args);
 }
 
