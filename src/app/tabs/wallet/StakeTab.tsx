@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Button } from "../../../../components/ui/button";
 import { FaLock, FaUnlock, FaCoins, FaClock } from "react-icons/fa";
 import { useActiveAccount } from "thirdweb/react";
-import { createThirdwebClient, getContract, prepareContractCall, resolveMethod } from "thirdweb";
+import { createThirdwebClient, getContract, prepareContractCall, resolveMethod, readContract } from "thirdweb";
 import { polygon } from "thirdweb/chains";
 import { useSendTransaction } from "thirdweb/react";
 import { balanceOf } from "thirdweb/extensions/erc20";
@@ -10,15 +10,6 @@ import { balanceOf } from "thirdweb/extensions/erc20";
 const STAKING_CONTRACT = "0xe730555afA4DeA022976DdDc0cC7DBba1C98568A";
 const DINVEST_TOKEN = "0x72a428F03d7a301cEAce084366928b99c4d757bD";
 const client = createThirdwebClient({ clientId: process.env.NEXT_PUBLIC_TEMPLATE_CLIENT_ID! });
-
-// Hilfsfunktion für Contract-Reads
-async function contractRead(contract: any, method: string, args: any[] = []) {
-  if (!contract) return undefined;
-  if (contract.read && typeof contract.read[method] === "function") {
-    return await contract.read[method](...args);
-  }
-  return await contract[method](...args);
-}
 
 export default function StakeTab() {
   const account = useActiveAccount();
@@ -46,8 +37,11 @@ export default function StakeTab() {
           address: account.address
         });
         
+        console.log("D.INVEST Balance Raw:", dinvestBalanceResult);
+        
         // Balance formatieren
         const dinvestFormatted = Number(dinvestBalanceResult) / Math.pow(10, 18);
+        console.log("D.INVEST Balance Formatted:", dinvestFormatted);
         setAvailable(dinvestFormatted.toFixed(4));
         
         // Staking Contract für gestakte Balance und Rewards
@@ -55,7 +49,11 @@ export default function StakeTab() {
         
         // Gestakte Balance abrufen
         try {
-          const stakedBal = await contractRead(staking, "balanceOf", [account.address]);
+          const stakedBal = await readContract({
+            contract: staking,
+            method: "function balanceOf(address) view returns (uint256)",
+            params: [account.address]
+          });
           setStaked((Number(stakedBal) / Math.pow(10, 18)).toFixed(4));
         } catch (e) {
           console.error("Fehler beim Abrufen der gestakten Balance:", e);
@@ -64,7 +62,11 @@ export default function StakeTab() {
         
         // Rewards abrufen
         try {
-          const earned = await contractRead(staking, "earned", [account.address]);
+          const earned = await readContract({
+            contract: staking,
+            method: "function earned(address) view returns (uint256)",
+            params: [account.address]
+          });
           setRewards((Number(earned) / Math.pow(10, 18)).toFixed(4));
         } catch (e) {
           console.error("Fehler beim Abrufen der Rewards:", e);
