@@ -3,7 +3,7 @@ import { Button } from "../../../../components/ui/button";
 import { FaCoins, FaLock, FaExchangeAlt } from "react-icons/fa";
 import { useActiveAccount, useSendTransaction } from "thirdweb/react";
 // @ts-ignore
-const { Buy } = require("thirdweb/react");
+const { PayEmbed } = require("thirdweb/react");
 import { polygon } from "thirdweb/chains";
 import { client } from "../../client";
 
@@ -392,7 +392,7 @@ export default function BuyTab() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
           <div className="bg-zinc-900 rounded-xl p-6 max-w-xs w-full border border-purple-500 text-center">
             <div className="mb-4 text-purple-400 text-2xl font-bold">POL kaufen</div>
-            <Buy
+            <PayEmbed
               client={client}
               chain={polygon}
               token="0x0000000000000000000000000000000000001010" // POL/MATIC
