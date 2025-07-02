@@ -478,7 +478,7 @@ export default function BuyTab() {
       {/* Info Modal für D.INVEST */}
       {showInvestModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center min-h-screen bg-black/60">
-          <div className="bg-zinc-900 rounded-xl p-8 max-w-xs w-full border border-amber-400 text-center">
+          <div className="bg-zinc-900 rounded-xl p-8 w-full max-w-xs border border-amber-400 text-center flex flex-col items-center justify-center">
             <div className="mb-4 text-amber-400 text-2xl font-bold">Wichtiger Hinweis</div>
             <div className="mb-4 text-zinc-300 text-sm">
               {copied
