@@ -1,17 +1,15 @@
-import { useEffect, useState, useRef } from "react";
-import { createThirdwebClient, getContract, prepareContractCall } from "thirdweb";
+import { useEffect, useState } from "react";
+import { createThirdwebClient, getContract } from "thirdweb";
 import { useActiveAccount, useActiveWalletConnectionStatus, useSendTransaction } from "thirdweb/react";
 import { ConnectButton } from "thirdweb/react";
 import { inAppWallet, createWallet } from "thirdweb/wallets";
 import { polygon } from "thirdweb/chains";
-import { balanceOf, approve, allowance, transfer } from "thirdweb/extensions/erc20";
+import { balanceOf, approve, allowance } from "thirdweb/extensions/erc20";
 import { Card, CardContent } from "../../../components/ui/card";
 import { Button } from "../../../components/ui/button";
-import { FaRegCopy } from "react-icons/fa";
-import { FaCoins, FaArrowDown, FaArrowUp, FaPaperPlane, FaLock, FaExchangeAlt, FaCheckCircle, FaInfoCircle } from "react-icons/fa";
-import Script from "next/script";
+import { FaRegCopy, FaCoins, FaArrowDown, FaArrowUp, FaPaperPlane, FaLock } from "react-icons/fa";
 
-// Modal mit dunklem Farbschema
+// Modal Komponente
 function Modal({ open, onClose, title, children }: { open: boolean, onClose: () => void, title: string, children: React.ReactNode }) {
   if (!open) return null;
   return (
@@ -25,12 +23,6 @@ function Modal({ open, onClose, title, children }: { open: boolean, onClose: () 
   );
 }
 
-declare global {
-  interface Window {
-    SwapWidget: any;
-  }
-}
-
 const client = createThirdwebClient({
   clientId: process.env.NEXT_PUBLIC_TEMPLATE_CLIENT_ID!,
 });
@@ -38,33 +30,11 @@ const client = createThirdwebClient({
 const wallets = [
   inAppWallet({
     auth: {
-      options: [
-        "email", // Email als erste Option für einfachen Zugang
-        "google",
-        "facebook",
-        "apple",
-        "x", // Twitter
-        "phone",
-        // Optionale weitere Optionen
-        "discord",
-        "telegram",
-        "passkey",
-        "coinbase",
-        // Weniger häufig genutzte Optionen weiter unten
-        "twitch",
-        "steam",
-        "github",
-      ],
+      options: ["email", "google", "facebook"],
     },
   }),
-  // Gängige Web3 Wallets zuerst
   createWallet("io.metamask"),
   createWallet("com.coinbase.wallet"),
-  // Weitere Wallets
-  createWallet("me.rainbow"),
-  createWallet("io.rabby"),
-  createWallet("io.zerion.wallet"),
-  createWallet("com.trustwallet.app"),
 ];
 
 export default function WalletTab() {
@@ -77,27 +47,14 @@ export default function WalletTab() {
   
   // Modale State
   const [showBuy, setShowBuy] = useState(false);
-  const [showSell, setShowSell] = useState(false);
   const [showSend, setShowSend] = useState(false);
   const [showStake, setShowStake] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
-  const uniswapWidgetRef = useRef<HTMLDivElement>(null);
-  const [uniswapLoaded, setUniswapLoaded] = useState(false);
 
-  // Neue States für den Swap - vereinfacht nur für Thirdweb
-  const [swapAmount, setSwapAmount] = useState("");
-  const [estimatedOutput, setEstimatedOutput] = useState("0");
-  const [isLoading, setIsLoading] = useState(false);
-  const [exchangeRate, setExchangeRate] = useState("0.002"); // Fixer Rate für Demo
-  const [slippage, setSlippage] = useState("1"); // Default 1%
-  const [needsApproval, setNeedsApproval] = useState(false);
-  const [isApproving, setIsApproving] = useState(false);
-  const [swapStep, setSwapStep] = useState<"input" | "approve" | "swap" | "success">("input");
-  
-  // Neue States für das Senden Modal
+  // Sende States
   const [sendAmount, setSendAmount] = useState("");
   const [sendToAddress, setSendToAddress] = useState("");
-  const [selectedSendToken, setSelectedSendToken] = useState("DFAITH"); // "DFAITH", "DINVEST", "POL"
+  const [selectedSendToken, setSelectedSendToken] = useState("DFAITH");
   const [isSending, setIsSending] = useState(false);
   
   // Konstanten für Token mit echten Contract-Adressen
@@ -128,217 +85,15 @@ export default function WalletTab() {
     fetchBalances();
   }, [account?.address]);
 
-  // Uniswap Widget initialisieren, wenn Modal geöffnet wird
-  useEffect(() => {
-    if (showSell && uniswapWidgetRef.current && uniswapLoaded && window.SwapWidget) {
-      try {
-        const widget = new window.SwapWidget({
-          width: "100%",
-          theme: {
-            primary: "#1c1c1c",
-            secondary: "#2c2c2c",
-            interactive: "#fbbf24",
-            container: "#18181b",
-            module: "#27272a",
-            accent: "#f59e0b",
-            outline: "#3f3f46",
-            dialog: "#18181b",
-            fontFamily: "Inter"
-          },
-          defaultInputTokenAddress: "0x67f1439bd51Cfb0A46f739Ec8D5663F41d027bff", // D.FAITH Token-Contract-Adresse
-          defaultInputAmount: 1,
-          defaultOutputTokenAddress: "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270", // WMATIC auf Polygon
-          jsonRpcEndpoint: "https://polygon-rpc.com", // Expliziten RPC Endpoint angeben
-          tokenList: [
-            {
-              "name": "D.FAITH Token",
-              "address": "0x67f1439bd51Cfb0A46f739Ec8D5663F41d027bff", // D.FAITH Token-Contract
-              "symbol": "D.FAITH",
-              "decimals": 18,
-              "chainId": 137,
-              "logoURI": "https://placehold.co/200x200/gold/black?text=DF"
-            },
-            {
-              "name": "Wrapped Matic",
-              "address": "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270",
-              "symbol": "WMATIC",
-              "decimals": 18,
-              "chainId": 137,
-              "logoURI": "https://s2.coinmarketcap.com/static/img/coins/64x64/3890.png"
-            }
-          ]
-        });
-        
-        // Widget zum Container hinzufügen
-        const container = uniswapWidgetRef.current;
-        container.innerHTML = "";
-        widget.render(container);
-        
-        return () => {
-          if (container) container.innerHTML = "";
-        };
-      } catch (error) {
-        console.error("Fehler beim Initialisieren des Uniswap Widgets:", error);
-      }
-    }
-  }, [showSell, uniswapLoaded, account]);
-
   const copyWalletAddress = () => {
     if (account?.address) {
       navigator.clipboard.writeText(account.address);
-      // Optional: Snackbar statt alert für bessere UX
     }
   };
 
   const formatAddress = (address: string) => `${address.slice(0, 6)}...${address.slice(-4)}`;
 
-  // Vereinfachte Thirdweb Preisschätzung
-  const calculateEstimate = () => {
-    if (!swapAmount || parseFloat(swapAmount) <= 0) {
-      setEstimatedOutput("0");
-      return;
-    }
-    
-    // Simuliere Thirdweb DEX Preisberechnung
-    const rate = parseFloat(exchangeRate);
-    const outputAmount = parseFloat(swapAmount) * rate;
-    setEstimatedOutput(outputAmount.toFixed(6));
-  };
-
-  // Überprüfe Approval Status
-  const checkApprovalStatus = async () => {
-    if (!account?.address || !swapAmount || parseFloat(swapAmount) <= 0) {
-      setNeedsApproval(false);
-      return;
-    }
-    
-    try {
-      const dfaithContract = getContract({
-        client,
-        chain: polygon,
-        address: DFAITH_TOKEN.address
-      });
-      
-      // Thirdweb Universal Router Adresse (Beispiel)
-      const thirdwebRouter = "0x1111111254EEB25477B68fb85Ed929f73A960582";
-      
-      const currentAllowance = await allowance({
-        contract: dfaithContract,
-        owner: account.address,
-        spender: thirdwebRouter
-      });
-      
-      const requiredAmount = BigInt(parseFloat(swapAmount) * Math.pow(10, DFAITH_TOKEN.decimals));
-      setNeedsApproval(currentAllowance < requiredAmount);
-      
-    } catch (error) {
-      console.error("Fehler beim Überprüfen der Allowance:", error);
-      setNeedsApproval(true);
-    }
-  };
-
-  // Token freigeben
-  const handleApproval = async () => {
-    if (!account?.address || !swapAmount) return;
-    
-    setIsApproving(true);
-    setSwapStep("approve");
-    
-    try {
-      const dfaithContract = getContract({
-        client,
-        chain: polygon,
-        address: DFAITH_TOKEN.address
-      });
-      
-      const thirdwebRouter = "0x1111111254EEB25477B68fb85Ed929f73A960582";
-      const approveAmount = BigInt(parseFloat(swapAmount) * Math.pow(10, DFAITH_TOKEN.decimals));
-      
-      const transaction = approve({
-        contract: dfaithContract,
-        spender: thirdwebRouter,
-        amount: approveAmount.toString()
-      });
-      
-      sendTransaction(transaction, {
-        onSuccess: (result) => {
-          console.log("Approval erfolgreich:", result);
-          setNeedsApproval(false);
-          setSwapStep("swap");
-        },
-        onError: (error) => {
-          console.error("Approval fehlgeschlagen:", error);
-          setSwapStep("input");
-        }
-      });
-      
-    } catch (error) {
-      console.error("Fehler beim Approval:", error);
-      setSwapStep("input");
-    } finally {
-      setIsApproving(false);
-    }
-  };
-
-  // Swap durchführen
-  const executeThirdwebSwap = async () => {
-    if (!account?.address || !swapAmount || parseFloat(swapAmount) <= 0) return;
-    
-    setIsLoading(true);
-    setSwapStep("swap");
-    
-    try {
-      // Simuliere Thirdweb Swap - in Realität würde hier die echte Thirdweb DEX API verwendet
-      await new Promise(resolve => setTimeout(resolve, 2000)); // Simuliere Netzwerk-Delay
-      
-      console.log("Thirdweb Swap erfolgreich:", {
-        from: swapAmount + " D.FAITH",
-        to: estimatedOutput + " POL",
-        rate: exchangeRate
-      });
-      
-      // Simuliere erfolgreichen Swap
-      setSwapStep("success");
-      
-      // Nach 3 Sekunden zurücksetzen
-      setTimeout(() => {
-        setSwapAmount("");
-        setEstimatedOutput("0");
-        setSwapStep("input");
-        setShowSell(false);
-        fetchBalances(); // Balances aktualisieren
-      }, 3000);
-      
-    } catch (error) {
-      console.error("Swap fehlgeschlagen:", error);
-      setSwapStep("input");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Berechne Schätzung wenn sich Betrag ändert
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      calculateEstimate();
-      checkApprovalStatus();
-    }, 300); // Schnellere Response
-    
-    return () => clearTimeout(timer);
-  }, [swapAmount, exchangeRate]);
-
-  // Hauptfunktion für Swap-Prozess
-  const handleSwapAction = async () => {
-    if (!account?.address || !swapAmount || parseFloat(swapAmount) <= 0) return;
-    
-    if (needsApproval && swapStep === "input") {
-      await handleApproval();
-    } else if (!needsApproval || swapStep === "swap") {
-      await executeThirdwebSwap();
-    }
-  };
-
-  // Hilfsfunktion für Balance-Aktualisierung
+  // Balance-Aktualisierung
   const fetchBalances = async () => {
     if (!account?.address) {
       setDfaithBalance(null);
@@ -347,9 +102,6 @@ export default function WalletTab() {
     }
     
     try {
-      console.log("Wallet-Adresse:", account.address);
-      console.log("Lade Balances...");
-      
       // D.FAITH Balance abrufen
       const dfaithContract = getContract({
         client,
@@ -388,7 +140,7 @@ export default function WalletTab() {
     }
   };
 
-  // Sende-Funktion
+  // Sende-Funktion (vereinfacht)
   const executeSend = async () => {
     if (!account?.address || !sendAmount || parseFloat(sendAmount) <= 0 || !sendToAddress) {
       return;
@@ -397,15 +149,9 @@ export default function WalletTab() {
     setIsSending(true);
     
     try {
-      // Hier würde die Transaktion vorbereitet und gesendet werden
-      // Diese Funktion benötigt die vollständige Web3-Integration
-      
-      alert(`In einer echten Implementierung würde jetzt ${sendAmount} ${selectedSendToken} an ${sendToAddress} gesendet werden.`);
-      
-      // Nach erfolgreichem Senden zurücksetzen
+      alert(`${sendAmount} ${selectedSendToken} würde an ${sendToAddress} gesendet werden.`);
       setSendAmount("");
       setSendToAddress("");
-      
     } catch (error) {
       console.error("Fehler beim Senden:", error);
     } finally {
@@ -413,7 +159,7 @@ export default function WalletTab() {
     }
   };
 
-  // Hilfsfunktion um verfügbares Guthaben für gewählten Token zu bekommen
+  // Verfügbares Guthaben für gewählten Token
   const getAvailableBalance = () => {
     switch (selectedSendToken) {
       case "DFAITH":
@@ -421,7 +167,7 @@ export default function WalletTab() {
       case "DINVEST":
         return dinvestBalance ? Number(dinvestBalance.displayValue) : 0;
       case "POL":
-        return 0; // POL Balance würde hier abgerufen werden
+        return 0;
       default:
         return 0;
     }
@@ -449,7 +195,6 @@ export default function WalletTab() {
               Verbinde dich, um auf deine Token zuzugreifen
             </p>
             
-            {/* Angepasster Connect Button mit begrenzten Optionen - jetzt zentriert */}
             <div className="flex justify-center w-full">
               <ConnectButton
                 client={client}
@@ -462,27 +207,10 @@ export default function WalletTab() {
                   title: "Wallet verbinden", 
                   welcomeScreen: {
                     title: "Dawid Faith Wallet",
-                    subtitle: "Wähle deine bevorzugte Anmeldemethode",
-                    img: {
-                      src: "https://placehold.co/400x200/gold/black?text=DFAITH",
-                      width: 400,
-                      height: 200
-                    }
+                    subtitle: "Wähle deine bevorzugte Anmeldemethode"
                   },
                 }}
-                wallets={[
-                  inAppWallet({
-                    auth: {
-                      options: [
-                        "email", 
-                        "google",
-                        "facebook",
-                      ],
-                    },
-                  }),
-                  createWallet("io.metamask"),
-                  createWallet("com.coinbase.wallet"),
-                ]}
+                wallets={wallets}
                 chain={{
                   id: 137,
                   rpc: "https://polygon-rpc.com",
@@ -496,13 +224,7 @@ export default function WalletTab() {
   }
 
   return (
-    <>
-      <Script 
-        src="https://unpkg.com/@uniswap/widgets@latest/dist/uniswap-widgets.js" 
-        onLoad={() => setUniswapLoaded(true)}
-      />
-      
-      <div className="flex justify-center min-h-[70vh] items-center py-8 bg-black">
+    <div className="flex justify-center min-h-[70vh] items-center py-8 bg-black">
         <Card className="w-full max-w-xl bg-gradient-to-br from-zinc-900 to-black rounded-3xl shadow-2xl border border-zinc-700 relative overflow-hidden">
           {/* Verbesserte Glanzeffekte */}
           <div className="absolute top-0 left-0 w-full h-1/3 bg-gradient-to-r from-amber-500/5 via-yellow-500/10 to-amber-500/5 rounded-t-3xl"></div>
@@ -563,8 +285,8 @@ export default function WalletTab() {
               </div>
             </div>
 
-            {/* Action Buttons mit besseren Gradienten */}
-            <div className="grid grid-cols-4 gap-2 md:gap-4 mb-6">
+            {/* Action Buttons */}
+            <div className="grid grid-cols-3 gap-2 md:gap-4 mb-6">
               <Button
                 className="flex flex-col items-center justify-center gap-1 px-1 py-3.5 md:py-4.5 bg-gradient-to-br from-zinc-800/90 to-zinc-900 hover:from-zinc-800 hover:to-zinc-800 shadow-lg shadow-black/20 rounded-xl hover:scale-[1.02] transition-all duration-300 border border-zinc-700/80"
                 onClick={() => setShowBuy(true)}
@@ -573,15 +295,6 @@ export default function WalletTab() {
                   <FaArrowDown className="text-black text-sm" />
                 </div>
                 <span className="text-xs bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 bg-clip-text text-transparent font-medium">Kaufen</span>
-              </Button>
-              <Button
-                className="flex flex-col items-center justify-center gap-1 px-1 py-3.5 md:py-4.5 bg-gradient-to-br from-zinc-800/90 to-zinc-900 hover:from-zinc-800 hover:to-zinc-800 shadow-lg shadow-black/20 rounded-xl hover:scale-[1.02] transition-all duration-300 border border-zinc-700/80"
-                onClick={() => setShowSell(true)}
-              >
-                <div className="w-8 h-8 flex items-center justify-center bg-gradient-to-br from-amber-400 to-yellow-500 rounded-full mb-1 shadow-inner">
-                  <FaArrowUp className="text-black text-sm" />
-                </div>
-                <span className="text-xs bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 bg-clip-text text-transparent font-medium">Verkaufen</span>
               </Button>
               <Button
                 className="flex flex-col items-center justify-center gap-1 px-1 py-3.5 md:py-4.5 bg-gradient-to-br from-zinc-800/90 to-zinc-900 hover:from-zinc-800 hover:to-zinc-800 shadow-lg shadow-black/20 rounded-xl hover:scale-[1.02] transition-all duration-300 border border-zinc-700/80"
@@ -640,10 +353,9 @@ export default function WalletTab() {
           </CardContent>
         </Card>
 
-        {/* Kauf-Modal mit 3 Buttons */}
+        {/* Kauf-Modal */}
         <Modal open={showBuy} onClose={() => setShowBuy(false)} title="Token kaufen">
           <div className="flex flex-col gap-5">
-            {/* DFAITH mit POL kaufen */}
             <div className="bg-zinc-800 rounded-lg p-4 border border-zinc-700">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
@@ -659,7 +371,6 @@ export default function WalletTab() {
               </Button>
             </div>
             
-            {/* D.INVEST mit € kaufen */}
             <div className="bg-zinc-800 rounded-lg p-4 border border-zinc-700">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
@@ -674,22 +385,6 @@ export default function WalletTab() {
                 D.INVEST kaufen
               </Button>
             </div>
-            
-            {/* POL mit € kaufen */}
-            <div className="bg-zinc-800 rounded-lg p-4 border border-zinc-700">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <div className="p-1.5 bg-gradient-to-r from-purple-400 to-purple-600 rounded-full">
-                    <FaCoins className="text-black text-sm" />
-                  </div>
-                  <span className="font-medium text-purple-400">POLYGON</span>
-                </div>
-                <span className="text-xs text-zinc-400">mit € kaufen</span>
-              </div>
-              <Button className="w-full bg-gradient-to-r from-purple-500 to-purple-600 text-white font-bold py-2">
-                POL kaufen
-              </Button>
-            </div>
           </div>
           
           <Button className="mt-5 w-full bg-zinc-800 border border-zinc-700 text-zinc-400 hover:bg-zinc-700" onClick={() => setShowBuy(false)}>
@@ -697,500 +392,25 @@ export default function WalletTab() {
           </Button>
         </Modal>
 
-        {/* Verbessertes Thirdweb Verkaufs-Modal */}
-        <Modal open={showSell} onClose={() => setShowSell(false)} title="D.FAITH zu POL tauschen">
-          <div className="flex flex-col gap-6">
-            {/* Thirdweb Branding */}
-            <div className="flex items-center justify-center gap-2 bg-gradient-to-r from-purple-500/10 to-blue-500/10 rounded-lg p-3 border border-purple-500/20">
-              <div className="w-6 h-6 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 flex items-center justify-center">
-                <span className="text-white text-xs font-bold">T</span>
-              </div>
-              <span className="text-sm font-medium text-purple-400">Powered by Thirdweb DEX</span>
-              <div className="ml-auto text-xs text-zinc-500">
-                Beste Preise garantiert
-              </div>
-            </div>
-
-            {swapStep === "input" && (
-              <>
-                {/* Eingabe Sektion */}
-                <div className="space-y-4">
-                  {/* Von Token */}
-                  <div className="bg-zinc-800 rounded-xl border border-zinc-700 p-4">
-                    <div className="flex justify-between items-center mb-3">
-                      <span className="text-sm text-zinc-400 font-medium">Du verkaufst</span>
-                      <span className="text-xs text-zinc-500">
-                        Verfügbar: <span className="text-amber-400 font-medium">
-                          {dfaithBalance ? Number(dfaithBalance.displayValue).toFixed(4) : "0.00"} D.FAITH
-                        </span>
-                      </span>
-                    </div>
-                    
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center gap-3 bg-zinc-900 px-4 py-3 rounded-xl border border-zinc-700 min-w-0">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-r from-amber-400 to-yellow-500 flex items-center justify-center flex-shrink-0">
-                          <span className="text-sm font-bold text-black">DF</span>
-                        </div>
-                        <div className="min-w-0">
-                          <div className="text-sm font-medium text-amber-400">D.FAITH</div>
-                          <div className="text-xs text-zinc-500">Dawid Faith Token</div>
-                        </div>
-                      </div>
-                      
-                      <div className="flex-1">
-                        <input 
-                          type="number"
-                          className="w-full bg-transparent text-right text-2xl font-bold text-amber-400 placeholder-zinc-600 focus:outline-none"
-                          placeholder="0.0"
-                          value={swapAmount}
-                          onChange={(e) => setSwapAmount(e.target.value)}
-                          step="any"
-                          min="0"
-                        />
-                        <div className="text-right text-xs text-zinc-500 mt-1">
-                          ≈ €0.00
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="flex justify-end mt-3">
-                      <button 
-                        className="px-3 py-1 bg-amber-500/20 text-amber-400 rounded-lg hover:bg-amber-500/30 transition text-xs font-medium"
-                        onClick={() => setSwapAmount(dfaithBalance?.displayValue || "0")}
-                      >
-                        MAX verwenden
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Tausch Icon */}
-                  <div className="flex justify-center -my-2">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 border-4 border-zinc-900 flex items-center justify-center shadow-lg">
-                      <FaArrowDown className="text-white text-sm" />
-                    </div>
-                  </div>
-
-                  {/* Zu Token */}
-                  <div className="bg-zinc-800 rounded-xl border border-zinc-700 p-4">
-                    <div className="flex justify-between items-center mb-3">
-                      <span className="text-sm text-zinc-400 font-medium">Du erhältst</span>
-                      <span className="text-xs text-zinc-500">
-                        Geschätzt
-                      </span>
-                    </div>
-                    
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center gap-3 bg-zinc-900 px-4 py-3 rounded-xl border border-zinc-700 min-w-0">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-r from-purple-400 to-purple-600 flex items-center justify-center flex-shrink-0">
-                          <span className="text-sm font-bold text-white">P</span>
-                        </div>
-                        <div className="min-w-0">
-                          <div className="text-sm font-medium text-purple-400">POL</div>
-                          <div className="text-xs text-zinc-500">Polygon Token</div>
-                        </div>
-                      </div>
-                      
-                      <div className="flex-1 text-right">
-                        <div className="text-2xl font-bold text-purple-400">
-                          {estimatedOutput}
-                        </div>
-                        <div className="text-xs text-zinc-500 mt-1">
-                          ≈ €0.00
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Handelsdetails */}
-                <div className="bg-zinc-800/50 rounded-xl p-4 border border-zinc-700">
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-zinc-400">Kurs</span>
-                      <span className="text-zinc-300">1 D.FAITH = {exchangeRate} POL</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-zinc-400">Slippage Toleranz</span>
-                      <div className="flex items-center gap-2">
-                        <select 
-                          className="bg-zinc-700 border border-zinc-600 rounded px-2 py-1 text-xs text-amber-400"
-                          value={slippage}
-                          onChange={(e) => setSlippage(e.target.value)}
-                        >
-                          <option value="0.5">0.5%</option>
-                          <option value="1">1%</option>
-                          <option value="2">2%</option>
-                          <option value="3">3%</option>
-                        </select>
-                      </div>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-zinc-400">Netzwerkgebühren</span>
-                      <span className="text-zinc-300">~0.002 POL</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-zinc-400">Mindesterhalt</span>
-                      <span className="text-zinc-300">
-                        {(parseFloat(estimatedOutput) * (1 - parseFloat(slippage) / 100)).toFixed(6)} POL
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Warnung wenn Approval nötig */}
-                {needsApproval && (
-                  <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4">
-                    <div className="flex items-start gap-3">
-                      <FaInfoCircle className="text-blue-400 text-lg mt-0.5 flex-shrink-0" />
-                      <div>
-                        <div className="font-medium text-blue-400 mb-1">Token-Freigabe erforderlich</div>
-                        <div className="text-sm text-zinc-400">
-                          Vor dem ersten Swap musst du Thirdweb erlauben, deine D.FAITH Token zu verwenden. 
-                          Dies ist eine einmalige Transaktion für erhöhte Sicherheit.
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Action Button */}
-                <Button
-                  className={`w-full py-4 font-bold rounded-xl text-lg transition-all ${
-                    parseFloat(swapAmount) > 0 && !isTransactionPending
-                      ? needsApproval
-                        ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700"
-                        : "bg-gradient-to-r from-purple-500 to-blue-500 text-white hover:from-purple-600 hover:to-blue-600"
-                      : "bg-zinc-700 text-zinc-400 cursor-not-allowed"
-                  }`}
-                  onClick={handleSwapAction}
-                  disabled={parseFloat(swapAmount) <= 0 || isTransactionPending}
-                >
-                  {parseFloat(swapAmount) <= 0 ? (
-                    "Betrag eingeben"
-                  ) : needsApproval ? (
-                    "Token freigeben"
-                  ) : (
-                    `${swapAmount} D.FAITH zu POL tauschen`
-                  )}
-                </Button>
-              </>
-            )}
-
-            {swapStep === "approve" && (
-              <div className="flex flex-col items-center justify-center py-8 space-y-4">
-                <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                <div className="text-center">
-                  <div className="text-lg font-bold text-blue-400 mb-2">Token-Freigabe läuft...</div>
-                  <div className="text-sm text-zinc-400">
-                    Bitte bestätige die Transaktion in deinem Wallet
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {swapStep === "swap" && (
-              <div className="flex flex-col items-center justify-center py-8 space-y-4">
-                <div className="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
-                <div className="text-center">
-                  <div className="text-lg font-bold text-purple-400 mb-2">Swap wird durchgeführt...</div>
-                  <div className="text-sm text-zinc-400 mb-4">
-                    {swapAmount} D.FAITH → {estimatedOutput} POL
-                  </div>
-                  <div className="text-xs text-zinc-500">
-                    Dies kann einige Sekunden dauern
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {swapStep === "success" && (
-              <div className="flex flex-col items-center justify-center py-8 space-y-4">
-                <div className="w-16 h-16 rounded-full bg-green-500/20 border-2 border-green-500 flex items-center justify-center">
-                  <FaCheckCircle className="text-green-400 text-2xl" />
-                </div>
-                <div className="text-center">
-                  <div className="text-lg font-bold text-green-400 mb-2">Swap erfolgreich!</div>
-                  <div className="text-sm text-zinc-400 mb-4">
-                    Du hast {swapAmount} D.FAITH gegen {estimatedOutput} POL getauscht
-                  </div>
-                  <div className="text-xs text-zinc-500">
-                    Deine Balances werden aktualisiert...
-                  </div>
-                </div>
-              </div>
-            )}
-            
-          </div>
-          
-          {swapStep === "input" && (
-            <Button 
-              className="mt-6 w-full bg-zinc-800 border border-zinc-700 text-zinc-400 hover:bg-zinc-700" 
-              onClick={() => setShowSell(false)}
-            >
-              Abbrechen
-            </Button>
-          )}
-        </Modal>
-
+        {/* Senden Modal */}
         <Modal open={showSend} onClose={() => setShowSend(false)} title="Token senden">
           <div className="flex flex-col gap-4">
-            {/* Token Auswahl */}
-            <div className="flex flex-col gap-3">
-              <span className="text-sm text-zinc-300">Token auswählen:</span>
-              <div className="grid grid-cols-3 gap-2">
-                <button 
-                  className={`flex flex-col items-center gap-2 p-3 rounded-lg border transition ${
-                    selectedSendToken === "DFAITH" 
-                      ? "bg-amber-500/20 text-amber-400 border-amber-500/30" 
-                      : "bg-zinc-800 text-zinc-400 border-zinc-700 hover:bg-zinc-700"
-                  }`}
-                  onClick={() => setSelectedSendToken("DFAITH")}
-                >
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-r from-amber-400 to-yellow-500 flex items-center justify-center">
-                    <span className="text-xs font-bold text-black">DF</span>
-                  </div>
-                  <span className="text-xs font-medium">D.FAITH</span>
-                  <span className="text-[10px] text-zinc-500">
-                    {dfaithBalance ? Number(dfaithBalance.displayValue).toFixed(4) : "0.0000"}
-                  </span>
-                </button>
-                
-                <button 
-                  className={`flex flex-col items-center gap-2 p-3 rounded-lg border transition ${
-                    selectedSendToken === "DINVEST" 
-                      ? "bg-amber-500/20 text-amber-400 border-amber-500/30" 
-                      : "bg-zinc-800 text-zinc-400 border-zinc-700 hover:bg-zinc-700"
-                  }`}
-                  onClick={() => setSelectedSendToken("DINVEST")}
-                >
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-r from-amber-400 to-yellow-500 flex items-center justify-center">
-                    <FaLock className="text-black text-xs" />
-                  </div>
-                  <span className="text-xs font-medium">D.INVEST</span>
-                  <span className="text-[10px] text-zinc-500">
-                    {dinvestBalance ? Number(dinvestBalance.displayValue).toFixed(4) : "0.0000"}
-                  </span>
-                </button>
-                
-                <button 
-                  className={`flex flex-col items-center gap-2 p-3 rounded-lg border transition ${
-                    selectedSendToken === "POL" 
-                      ? "bg-purple-500/20 text-purple-400 border-purple-500/30" 
-                      : "bg-zinc-800 text-zinc-400 border-zinc-700 hover:bg-zinc-700"
-                  }`}
-                  onClick={() => setSelectedSendToken("POL")}
-                >
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-r from-purple-400 to-purple-600 flex items-center justify-center">
-                    <span className="text-xs font-bold text-white">P</span>
-                  </div>
-                  <span className="text-xs font-medium">POL</span>
-                  <span className="text-[10px] text-zinc-500">0.0000</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Empfänger Adresse */}
-            <div className="flex flex-col gap-2">
-              <span className="text-sm text-zinc-300">Empfänger Adresse:</span>
-              <input 
-                type="text"
-                placeholder="0x..."
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg py-3 px-4 text-zinc-300 focus:border-amber-500 focus:outline-none"
-                value={sendToAddress}
-                onChange={(e) => setSendToAddress(e.target.value)}
-              />
-            </div>
-
-            {/* Betrag */}
-            <div className="flex flex-col gap-2">
-              <div className="flex justify-between">
-                <span className="text-sm text-zinc-300">Betrag:</span>
-                <span className="text-xs text-zinc-500">
-                  Verfügbar: <span className={`${
-                    selectedSendToken === "POL" ? "text-purple-400" : "text-amber-400"
-                  }`}>
-                    {getAvailableBalance().toFixed(4)} {selectedSendToken}
-                  </span>
-                </span>
-              </div>
-              
-              <div className="relative">
-                <input 
-                  type="number"
-                  placeholder="0.0"
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg py-3 px-4 pr-16 text-zinc-300 focus:border-amber-500 focus:outline-none"
-                  value={sendAmount}
-                  onChange={(e) => setSendAmount(e.target.value)}
-                />
-                <button 
-                  className="absolute right-2 top-1/2 transform -translate-y-1/2 text-xs px-2 py-1 bg-amber-500/20 text-amber-400 rounded hover:bg-amber-500/30 transition"
-                  onClick={() => setSendAmount(getAvailableBalance().toString())}
-                >
-                  MAX
-                </button>
-              </div>
-            </div>
-
-            {/* Geschätzte Kosten */}
-            <div className="bg-zinc-800/50 rounded-lg p-3 border border-zinc-700">
-              <div className="flex justify-between text-xs">
-                <span className="text-zinc-500">Netzwerkgebühren:</span>
-                <span className="text-zinc-400">~0.001 POL</span>
-              </div>
-              <div className="flex justify-between text-xs mt-1">
-                <span className="text-zinc-500">Gesamtkosten:</span>
-                <span className="text-zinc-300">
-                  {sendAmount || "0"} {selectedSendToken} + 0.001 POL
-                </span>
-              </div>
-            </div>
-
-            {/* Senden Button */}
-            <Button
-              className={`w-full py-3 font-bold rounded-xl ${
-                parseFloat(sendAmount) > 0 && sendToAddress && !isSending
-                  ? selectedSendToken === "POL" 
-                    ? "bg-gradient-to-r from-purple-500 to-purple-600 text-white"
-                    : "bg-gradient-to-r from-amber-400 to-yellow-500 text-black"
-                  : "bg-zinc-700 text-zinc-400 cursor-not-allowed"
-              }`}
-              onClick={executeSend}
-              disabled={parseFloat(sendAmount) <= 0 || !sendToAddress || isSending}
-            >
-              {isSending ? (
-                <div className="flex justify-center items-center gap-2">
-                  <div className={`w-5 h-5 border-t-2 border-r-2 ${
-                    selectedSendToken === "POL" ? "border-white" : "border-black"
-                  } rounded-full animate-spin`}></div>
-                  <span>Wird gesendet...</span>
-                </div>
-              ) : parseFloat(sendAmount) <= 0 || !sendToAddress ? (
-                "Betrag und Adresse eingeben"
-              ) : (
-                `${selectedSendToken} senden`
-              )}
-            </Button>
-            
-            {/* Warnung */}
-            <div className="text-xs text-zinc-500 flex items-center gap-2 mt-2">
-              <div className="w-4 h-4 rounded-full bg-yellow-500/20 flex items-center justify-center">
-                <span className="text-yellow-400 text-[10px]">!</span>
-              </div>
-              <span>
-                Überprüfen Sie die Empfängeradresse sorgfältig. Transaktionen können nicht rückgängig gemacht werden.
-              </span>
+            <div className="text-center text-zinc-400">
+              Sende-Funktion wird implementiert
             </div>
           </div>
-          
           <Button className="mt-5 w-full bg-zinc-800 border border-zinc-700 text-zinc-400 hover:bg-zinc-700" onClick={() => setShowSend(false)}>
             Schließen
           </Button>
         </Modal>
         
+        {/* Staking Modal */}
         <Modal open={showStake} onClose={() => setShowStake(false)} title="D.INVEST staken">
           <div className="flex flex-col gap-4">
-            {/* Verfügbare & Gestakte Tokens */}
-            <div className="grid grid-cols-2 gap-4 mb-1">
-              <div className="bg-zinc-800 rounded-lg p-3 border border-zinc-700 text-center">
-                <span className="text-xs text-zinc-500 mb-1">Verfügbar</span>
-                <div className="text-lg font-bold text-amber-400">
-                  {dinvestBalance ? Number(dinvestBalance.displayValue) : 0}
-                </div>
-              </div>
-              <div className="bg-zinc-800 rounded-lg p-3 border border-zinc-700 text-center">
-                <span className="text-xs text-zinc-500 mb-1">Gestaked</span>
-                <div className="text-lg font-bold text-amber-400">0</div>
-              </div>
-            </div>
-            
-            {/* Stake und Unstake nebeneinander */}
-            <div className="grid grid-cols-2 gap-4">
-              {/* Staking-Option */}
-              <div className="bg-zinc-800 rounded-lg p-3 border border-zinc-700">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-medium text-amber-400">Staken</span>
-                  <button 
-                    className="text-[10px] px-1.5 py-0.5 bg-zinc-700 hover:bg-zinc-600 rounded text-amber-400"
-                    onClick={() => {/* Maximalbetrag setzen */}}
-                  >
-                    MAX
-                  </button>
-                </div>
-                <div className="relative mb-2">
-                  <input 
-                    type="number"
-                    placeholder="0"
-                    className="w-full bg-zinc-900 border border-zinc-700 rounded py-1.5 px-2 text-amber-400 focus:border-amber-500 focus:outline-none text-sm"
-                  />
-                </div>
-                <Button
-                  className="w-full bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-medium text-xs py-1.5"
-                  onClick={() => {/* Stake-Logik */}}
-                >
-                  Staken
-                </Button>
-              </div>
-              
-              {/* Unstaking-Option */}
-              <div className="bg-zinc-800 rounded-lg p-3 border border-zinc-700">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-medium text-zinc-400">Unstaken</span>
-                  <button 
-                    className="text-[10px] px-1.5 py-0.5 bg-zinc-700 hover:bg-zinc-600 rounded text-zinc-400"
-                    onClick={() => {/* Maximalbetrag setzen */}}
-                  >
-                    MAX
-                  </button>
-                </div>
-                <div className="relative mb-2">
-                  <input 
-                    type="number"
-                    placeholder="0"
-                    className="w-full bg-zinc-900 border border-zinc-700 rounded py-1.5 px-2 text-zinc-400 focus:border-zinc-600 focus:outline-none text-sm"
-                  />
-                </div>
-                <Button 
-                  className="w-full bg-zinc-700 hover:bg-zinc-600 text-zinc-300 font-medium text-xs py-1.5"
-                  onClick={() => {/* Unstake-Logik */}}
-                >
-                  Unstaken
-                </Button>
-              </div>
-            </div>
-            
-            {/* Rewards - bleibt unverändert */}
-            <div className="bg-zinc-800 rounded-lg p-4 border border-zinc-700">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <div className="p-1.5 bg-gradient-to-r from-yellow-400 to-amber-600 rounded-full">
-                    <FaCoins className="text-black text-sm" />
-                  </div>
-                  <span className="font-medium text-amber-400">Belohnungen</span>
-                </div>
-                <span className="text-xs text-zinc-400">
-                  Gesammelt: <span className="text-amber-400 font-bold">0 D.FAITH</span>
-                </span>
-              </div>
-              
-              <Button 
-                className="w-full bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-2 opacity-50 cursor-not-allowed"
-                disabled={true}
-              >
-                Belohnungen einfordern
-              </Button>
-            </div>
-            
-            {/* Smart Contract Info - etwas kompakter */}
-            <div className="bg-zinc-800/50 rounded-lg p-3 border border-zinc-700 text-xs">
-              <div className="flex items-center gap-1.5">
-                <FaLock className="text-amber-400 text-[10px]" />
-                <span className="text-zinc-400">Smart Contract:</span>
-                <span className="font-mono text-amber-400/70 break-all">{STAKING_CONTRACT.address}</span>
-              </div>
+            <div className="text-center text-zinc-400">
+              Staking-Funktion wird implementiert
             </div>
           </div>
-          
-          {/* Schließen-Button hinzugefügt */}
           <Button className="mt-4 w-full bg-zinc-800 border border-zinc-700 text-zinc-400 hover:bg-zinc-700" onClick={() => setShowStake(false)}>
             Schließen
           </Button>
@@ -1198,167 +418,15 @@ export default function WalletTab() {
 
         {/* History Modal */}
         <Modal open={showHistory} onClose={() => setShowHistory(false)} title="Transaktionshistorie">
-          <div className="flex flex-col gap-4 max-h-96 overflow-y-auto">
-            {/* Filter Buttons */}
-            <div className="flex gap-2 mb-4">
-              <button className="px-3 py-1 rounded-lg bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs font-medium">
-                Alle
-              </button>
-              <button className="px-3 py-1 rounded-lg bg-zinc-700 text-zinc-400 border border-zinc-600 text-xs font-medium hover:bg-zinc-600">
-                D.FAITH
-              </button>
-              <button className="px-3 py-1 rounded-lg bg-zinc-700 text-zinc-400 border border-zinc-600 text-xs font-medium hover:bg-zinc-600">
-                D.INVEST
-              </button>
+          <div className="flex flex-col gap-4">
+            <div className="text-center text-zinc-400">
+              Transaktionshistorie wird implementiert
             </div>
-
-            {/* Aktuelle Transaktionen */}
-            <div className="space-y-3">
-              {/* D.FAITH Transfer - heute */}
-              <div className="bg-zinc-800 rounded-lg p-3 border border-zinc-700">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-green-400 to-green-600 flex items-center justify-center">
-                      <FaPaperPlane className="text-white text-xs" />
-                    </div>
-                    <div>
-                      <div className="text-sm font-medium text-amber-400">D.FAITH Transfer</div>
-                      <div className="text-xs text-zinc-500">vor 45 Minuten</div>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-sm font-bold text-red-400">-250.0000</div>
-                    <div className="text-xs text-zinc-500">D.FAITH</div>
-                  </div>
-                </div>
-                <div className="text-xs text-zinc-500">
-                  An: 0x8A7b...C4d9 | Hash: 0xa1b2...c3d4
-                </div>
-              </div>
-
-              {/* D.INVEST Bridge - heute */}
-              <div className="bg-zinc-800 rounded-lg p-3 border border-zinc-700">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-cyan-400 to-cyan-600 flex items-center justify-center">
-                      <FaExchangeAlt className="text-white text-xs" />
-                    </div>
-                    <div>
-                      <div className="text-sm font-medium text-amber-400">D.INVEST Bridge</div>
-                      <div className="text-xs text-zinc-500">vor 3 Stunden</div>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-sm font-bold text-cyan-400">+75</div>
-                    <div className="text-xs text-zinc-500">D.INVEST</div>
-                  </div>
-                </div>
-                <div className="text-xs text-zinc-500">
-                  via Thirdweb Bridge | Hash: 0x5e6f...7890
-                </div>
-              </div>
-
-              {/* D.INVEST Staking - gestern */}
-              <div className="bg-zinc-800 rounded-lg p-3 border border-zinc-700">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-purple-400 to-purple-600 flex items-center justify-center">
-                      <FaLock className="text-white text-xs" />
-                    </div>
-                    <div>
-                      <div className="text-sm font-medium text-amber-400">D.INVEST Staking</div>
-                      <div className="text-xs text-zinc-500">vor 18 Stunden</div>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-sm font-bold text-purple-400">100</div>
-                    <div className="text-xs text-zinc-500">D.INVEST</div>
-                  </div>
-                </div>
-                <div className="text-xs text-zinc-500">
-                  Contract: {STAKING_CONTRACT.address.slice(0, 10)}...
-                </div>
-              </div>
-
-              {/* D.FAITH Empfangen - gestern */}
-              <div className="bg-zinc-800 rounded-lg p-3 border border-zinc-700">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-green-400 to-green-600 flex items-center justify-center">
-                      <FaArrowDown className="text-white text-xs" />
-                    </div>
-                    <div>
-                      <div className="text-sm font-medium text-amber-400">D.FAITH Empfangen</div>
-                      <div className="text-xs text-zinc-500">vor 1 Tag</div>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-sm font-bold text-green-400">+500.0000</div>
-                    <div className="text-xs text-zinc-500">D.FAITH</div>
-                  </div>
-                </div>
-                <div className="text-xs text-zinc-500">
-                  Von: 0x2B4c...E8f1 | Hash: 0xdef0...1234
-                </div>
-              </div>
-
-              {/* POL Swap - vor 2 Tagen */}
-              <div className="bg-zinc-800 rounded-lg p-3 border border-zinc-700">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-orange-400 to-orange-600 flex items-center justify-center">
-                      <FaExchangeAlt className="text-white text-xs" />
-                    </div>
-                    <div>
-                      <div className="text-sm font-medium text-amber-400">POL → D.FAITH Swap</div>
-                      <div className="text-xs text-zinc-500">vor 2 Tagen</div>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-sm font-bold text-orange-400">1.2 POL → 150.0000 D.FAITH</div>
-                    <div className="text-xs text-zinc-500">via Uniswap</div>
-                  </div>
-                </div>
-                <div className="text-xs text-zinc-500">
-                  Hash: 0x9abc...def0
-                </div>
-              </div>
-
-              {/* D.INVEST Reward - vor 3 Tagen */}
-              <div className="bg-zinc-800 rounded-lg p-3 border border-zinc-700">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-yellow-400 to-yellow-600 flex items-center justify-center">
-                      <FaCoins className="text-white text-xs" />
-                    </div>
-                    <div>
-                      <div className="text-sm font-medium text-amber-400">Staking Reward</div>
-                      <div className="text-xs text-zinc-500">vor 3 Tagen</div>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-sm font-bold text-yellow-400">+25</div>
-                    <div className="text-xs text-zinc-500">D.INVEST</div>
-                  </div>
-                </div>
-                <div className="text-xs text-zinc-500">
-                  Staking Reward | Hash: 0x3456...789a
-                </div>
-              </div>
-            </div>
-
-            {/* Load More Button */}
-            <Button className="w-full bg-zinc-700 hover:bg-zinc-600 text-zinc-300 font-medium py-2 mt-4">
-              Weitere laden
-            </Button>
           </div>
-          
-          {/* Schließen-Button */}
           <Button className="mt-4 w-full bg-zinc-800 border border-zinc-700 text-zinc-400 hover:bg-zinc-700" onClick={() => setShowHistory(false)}>
             Schließen
           </Button>
         </Modal>
       </div>
-    </>
-  );
-}
+    );
+  }
