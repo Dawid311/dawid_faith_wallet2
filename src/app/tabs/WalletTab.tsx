@@ -16,26 +16,73 @@ import SendTab from "./wallet/SendTab";
 import HistoryTab from "./wallet/HistoryTab";
 import StakeTab from "./wallet/StakeTab";
 
-// Modal Komponente
+// Mobile-optimierte Modal Komponente mit Touch-Support
 function Modal({ open, onClose, title, children }: { open: boolean, onClose: () => void, title: string, children: React.ReactNode }) {
   if (!open) return null;
   
+  // Touch-Events für mobile Swipe-to-close
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    (e.currentTarget as any).startY = touch.clientY;
+  };
+  
+  const handleTouchMove = (e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    const currentY = touch.clientY;
+    const startY = (e.currentTarget as any).startY;
+    const deltaY = currentY - startY;
+    
+    // Nur nach unten swipen erlauben (positive deltaY)
+    if (deltaY > 0) {
+      const modal = e.currentTarget as HTMLElement;
+      modal.style.transform = `translateY(${Math.min(deltaY, 200)}px)`;
+      modal.style.opacity = `${Math.max(1 - deltaY / 300, 0.3)}`;
+    }
+  };
+  
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    const modal = e.currentTarget as HTMLElement;
+    const transform = modal.style.transform;
+    const translateY = transform ? parseInt(transform.match(/translateY\((\d+)px\)/)?.[1] || '0') : 0;
+    
+    if (translateY > 100) {
+      onClose();
+    } else {
+      // Animation zurück zur ursprünglichen Position
+      modal.style.transform = 'translateY(0)';
+      modal.style.opacity = '1';
+    }
+  };
+  
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="bg-zinc-900 rounded-2xl min-w-[340px] max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto shadow-2xl relative border border-zinc-700">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-zinc-700">
-          <h3 className="font-bold text-xl text-amber-400">{title}</h3>
+    <div 
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div 
+        className="bg-zinc-900 rounded-t-2xl sm:rounded-2xl w-full sm:min-w-[340px] sm:max-w-2xl sm:w-auto sm:mx-4 max-h-[90vh] sm:max-h-[80vh] overflow-y-auto shadow-2xl relative border-t border-zinc-700 sm:border border-zinc-700 transition-all duration-300"
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
+        {/* Mobile Swipe Indicator - oben */}
+        <div className="sm:hidden flex justify-center pt-2 pb-1">
+          <div className="w-12 h-1 bg-zinc-600 rounded-full"></div>
+        </div>
+        
+        {/* Header - Mobile optimiert */}
+        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-zinc-700 sticky top-0 bg-zinc-900 z-10">
+          <h3 className="font-bold text-lg sm:text-xl text-amber-400 truncate pr-4">{title}</h3>
           <button 
-            className="p-2 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 rounded-lg transition-all"
+            className="p-2 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 rounded-lg transition-all flex-shrink-0 touch-manipulation"
             onClick={onClose}
           >
             <FaTimes size={16} />
           </button>
         </div>
         
-        {/* Content */}
-        <div className="p-6">
+        {/* Content - Mobile optimiert */}
+        <div className="p-4 sm:p-6 pb-8">
           {children}
         </div>
       </div>
