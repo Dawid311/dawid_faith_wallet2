@@ -51,7 +51,7 @@ export default function BuyTab() {
         try {
           const response = await fetch(
             `https://api.1inch.dev/swap/v5.2/137/quote?src=0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270&dst=0x67f1439bd51Cfb0A46f739Ec8D5663F41d027bff&amount=1000000000000000000`,
-            { headers: { 'Authorization': 'Bearer 1inch-api-key' } } // ggf. API-Key nötig
+            { headers: { 'Authorization': 'Bearer gkpYwoz5c9Uzh3o01jQXiAd6GwQSzBbo' } }
           );
           if (response.ok) {
             const data = await response.json();
@@ -65,7 +65,25 @@ export default function BuyTab() {
           errorMsg += " | 1inch Fehler";
         }
       }
-      // 3. Uniswap (nur wenn beide fehlschlagen)
+      // 3. OpenOcean (nur wenn beide fehlschlagen)
+      if (!price) {
+        try {
+          const response = await fetch(
+            `https://open-api.openocean.finance/v3/polygon/quote?inTokenAddress=0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270&outTokenAddress=0x67f1439bd51Cfb0A46f739Ec8D5663F41d027bff&amount=1000000000000000000` // 1 POL
+          );
+          if (response.ok) {
+            const data = await response.json();
+            if (data && data.data && data.data.outAmount) {
+              price = Number(data.data.outAmount) / Math.pow(10, 18);
+            }
+          } else {
+            errorMsg += " | OpenOcean: " + response.status;
+          }
+        } catch (e) {
+          errorMsg += " | OpenOcean Fehler";
+        }
+      }
+      // 4. Uniswap (nur wenn alle fehlschlagen)
       if (!price) {
         try {
           const response = await fetch(
