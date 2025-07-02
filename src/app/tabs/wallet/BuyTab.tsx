@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
+import { createRoot } from "react-dom/client";
 import { Button } from "../../../../components/ui/button";
 import { FaCoins, FaLock, FaExchangeAlt } from "react-icons/fa";
 import { useActiveAccount, useSendTransaction } from "thirdweb/react";
@@ -10,6 +11,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 export default function BuyTab() {
   const [modalQueryClient] = useState(() => new QueryClient());
+  const modalContainerRef = useRef<HTMLDivElement | null>(null);
   const [dfaithPrice, setDfaithPrice] = useState<number | null>(null);
   const [isLoadingPrice, setIsLoadingPrice] = useState(true);
   const account = useActiveAccount();
@@ -204,6 +206,46 @@ export default function BuyTab() {
     }
   };
 
+  // PayEmbed Modal in eigenem React-Baum rendern
+  const openPayEmbedModal = () => {
+    // Container für das Modal erstellen
+    const modalContainer = document.createElement('div');
+    document.body.appendChild(modalContainer);
+    
+    const PayEmbedModal = () => (
+      <QueryClientProvider client={modalQueryClient}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="bg-zinc-900 rounded-xl p-6 max-w-xs w-full border border-purple-500 text-center">
+            <div className="mb-4 text-purple-400 text-2xl font-bold">POL kaufen</div>
+            <PayEmbed
+              client={client}
+              chain={polygon}
+              token="0x0000000000000000000000000000000000001010"
+              onClose={() => {
+                document.body.removeChild(modalContainer);
+                setShowPolBuyModal(false);
+              }}
+              modalSize="compact"
+            />
+            <Button
+              className="w-full bg-gradient-to-r from-purple-500 to-purple-700 text-white font-bold py-2 rounded-xl mt-4"
+              onClick={() => {
+                document.body.removeChild(modalContainer);
+                setShowPolBuyModal(false);
+              }}
+            >
+              Schließen
+            </Button>
+          </div>
+        </div>
+      </QueryClientProvider>
+    );
+    
+    // Modal in eigenem React-Baum rendern
+    const root = createRoot(modalContainer);
+    root.render(<PayEmbedModal />);
+  };
+
   return (
     <div className="flex flex-col gap-6 p-6">
       <div className="text-center mb-6">
@@ -242,7 +284,10 @@ export default function BuyTab() {
           
           <Button
             className="w-full mt-4 bg-gradient-to-r from-purple-500 to-purple-700 text-white font-bold py-3 rounded-xl hover:opacity-90 transition-opacity"
-            onClick={() => setShowPolBuyModal(true)}
+            onClick={() => {
+              setShowPolBuyModal(true);
+              openPayEmbedModal();
+            }}
           >
             POL kaufen
           </Button>
@@ -415,30 +460,6 @@ export default function BuyTab() {
               onClick={() => setShowBuyModal(false)}
               autoFocus
               disabled={isSwapPending}
-            >
-              Schließen
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* Thirdweb Buy Modal für POL */}
-      {showPolBuyModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <div className="bg-zinc-900 rounded-xl p-6 max-w-xs w-full border border-purple-500 text-center">
-            <div className="mb-4 text-purple-400 text-2xl font-bold">POL kaufen</div>
-            <QueryClientProvider client={modalQueryClient}>
-              <PayEmbed
-                client={client}
-                chain={polygon}
-                token="0x0000000000000000000000000000000000001010" // POL/MATIC
-                onClose={() => setShowPolBuyModal(false)}
-                modalSize="compact"
-              />
-            </QueryClientProvider>
-            <Button
-              className="w-full bg-gradient-to-r from-purple-500 to-purple-700 text-white font-bold py-2 rounded-xl mt-4"
-              onClick={() => setShowPolBuyModal(false)}
             >
               Schließen
             </Button>
