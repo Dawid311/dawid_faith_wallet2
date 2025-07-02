@@ -28,83 +28,36 @@ export default function BuyTab() {
   const { mutate: sendTransaction, isPending: isSwapPending } = useSendTransaction();
   const [swapStatus, setSwapStatus] = useState<string | null>(null);
 
-  // D.FAITH Preis von mehreren Quellen holen
+  // D.FAITH Preis von OpenOcean holen
   useEffect(() => {
     const fetchDfaithPrice = async () => {
       setIsLoadingPrice(true);
       setPriceError(null);
       let price: number | null = null;
       let errorMsg = "";
-      // 1. Paraswap
       try {
-        const response = await fetch(
-          `https://apiv5.paraswap.io/transactions/1/price?srcToken=0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270&destToken=0x67f1439bd51Cfb0A46f739Ec8D5663F41d027bff&amount=1000000000000000000&srcDecimals=18&destDecimals=18&network=137`
-        );
+        // OpenOcean v3 Quote API
+        const openOceanApi = `https://open-api.openocean.finance/v3/polygon/quote`;
+        const params = {
+          inTokenAddress: POL_TOKEN,
+          outTokenAddress: DFAITH_TOKEN,
+          amount: "1", // 1 POL (ohne Decimals)
+        };
+        const url = openOceanApi + '?' + Object.entries(params).map(([k,v]) => `${k}=${v}`).join('&');
+        const response = await fetch(url);
         if (response.ok) {
           const data = await response.json();
-          if (data && data.priceRoute && data.priceRoute.destAmount) {
-            price = Number(data.priceRoute.destAmount) / Math.pow(10, 18);
+          if (data && data.data && data.data.outAmount) {
+            // outAmount ist in D.FAITH (mit Decimals)
+            price = Number(data.data.outAmount) / Math.pow(10, 18);
+          } else {
+            errorMsg = "OpenOcean: Keine Quote erhalten";
           }
         } else {
-          errorMsg = "Paraswap: " + response.status;
+          errorMsg = "OpenOcean: " + response.status;
         }
       } catch (e) {
-        errorMsg = "Paraswap Fehler";
-      }
-      // 2. 1inch (nur wenn Paraswap fehlschlägt)
-      if (!price) {
-        try {
-          const response = await fetch(
-            `https://api.1inch.dev/swap/v5.2/137/quote?src=0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270&dst=0x67f1439bd51Cfb0A46f739Ec8D5663F41d027bff&amount=1000000000000000000`,
-            { headers: { 'Authorization': 'Bearer gkpYwoz5c9Uzh3o01jQXiAd6GwQSzBbo' } }
-          );
-          if (response.ok) {
-            const data = await response.json();
-            if (data && data.toTokenAmount) {
-              price = Number(data.toTokenAmount) / Math.pow(10, 18);
-            }
-          } else {
-            errorMsg += " | 1inch: " + response.status;
-          }
-        } catch (e) {
-          errorMsg += " | 1inch Fehler";
-        }
-      }
-      // 3. OpenOcean (nur wenn beide fehlschlagen)
-      if (!price) {
-        try {
-          const response = await fetch(
-            `https://open-api.openocean.finance/v3/polygon/quote?inTokenAddress=0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270&outTokenAddress=0x67f1439bd51Cfb0A46f739Ec8D5663F41d027bff&amount=1000000000000000000` // 1 POL
-          );
-          if (response.ok) {
-            const data = await response.json();
-            if (data && data.data && data.data.outAmount) {
-              price = Number(data.data.outAmount) / Math.pow(10, 18);
-            }
-          } else {
-            errorMsg += " | OpenOcean: " + response.status;
-          }
-        } catch (e) {
-          errorMsg += " | OpenOcean Fehler";
-        }
-      }
-      // 4. Uniswap (nur wenn alle fehlschlagen)
-      if (!price) {
-        try {
-          const response = await fetch(
-            `https://api.uniswap.org/v1/quote?protocols=v3&tokenInAddress=0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270&tokenInChainId=137&tokenOutAddress=0x67f1439bd51Cfb0A46f739Ec8D5663F41d027bff&tokenOutChainId=137&amount=1000000000000000000&type=exactIn`
-          );
-          if (response.ok) {
-            const data = await response.json();
-            if (data && data.quote && data.quote.tokenOutAmount) {
-              price = Number(data.quote.tokenOutAmount) / Math.pow(10, 18);
-            }
-          } else {
-            errorMsg += " | Uniswap: " + response.status;
-          }
-        } catch (e) {
-          errorMsg += " | Uniswap Fehler";
-        }
+        errorMsg = "OpenOcean Fehler";
       }
       if (price) {
         setDfaithPrice(price);
@@ -196,44 +149,46 @@ export default function BuyTab() {
     return () => clearInterval(interval);
   }, [account?.address]);
 
-  // D.FAITH Swap Funktion
+  // D.FAITH Swap Funktion mit OpenOcean v3 (Amount ohne Decimals!)
   const handleDfaithSwap = async () => {
     if (!swapAmountPol || parseFloat(swapAmountPol) <= 0 || !account?.address) return;
-    
     setIsSwapping(true);
     setSwapTxStatus("pending");
-    
     try {
-      const amountInWei = (parseFloat(swapAmountPol) * Math.pow(10, 18)).toString();
-      
-      // Router Contract
-      const router = getContract({
-        client,
+      // OpenOcean v3 erwartet amount als Integer (ohne Decimals!)
+      const amountInt = Math.floor(parseFloat(swapAmountPol)).toString();
+      // 1. Hole Swap-Transaktionsdaten von OpenOcean v3
+      const openOceanApi = `https://open-api.openocean.finance/v3/polygon/swap_quote`;
+      const params = {
+        inTokenAddress: POL_TOKEN,
+        outTokenAddress: DFAITH_TOKEN,
+        amount: amountInt, // Amount ohne Decimals!
+        slippage: 1, // 1% Slippage
+        account: account.address,
+        gasPrice: '',
+        referrer: '',
+        disableEstimate: false
+      };
+      const url = openOceanApi + '?' + Object.entries(params).map(([k,v]) => `${k}=${v}`).join('&');
+      console.log("OpenOcean v3 API URL:", url);
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('OpenOcean API Fehler: ' + response.status);
+      const data = await response.json();
+      console.log("OpenOcean v3 API Antwort:", data);
+      if (!data.data || !data.data.tx) throw new Error('OpenOcean: Keine Transaktionsdaten erhalten');
+      const tx = data.data.tx;
+      // 2. Sende die Transaktion (raw tx)
+      await sendTransaction({
+        to: tx.to,
+        data: tx.data,
+        value: BigInt(tx.value || 0),
         chain: polygon,
-        address: UNISWAP_ROUTER
+        client
       });
-      
-      // Für native POL verwenden wir swapExactETHForTokens
-      const deadline = Math.floor(Date.now() / 1000) + 60 * 20; // 20 minutes
-      const swapTx = prepareContractCall({
-        contract: router,
-        method: "function swapExactETHForTokens(uint256 amountOutMin, address[] calldata path, address to, uint256 deadline) external payable returns (uint256[] memory amounts)",
-        params: [
-          BigInt("0"), // amountOutMin (should be calculated properly in production)
-          [POL_TOKEN, DFAITH_TOKEN], // path: WMATIC -> DFAITH
-          account.address, // to
-          BigInt(deadline) // deadline
-        ],
-        value: BigInt(amountInWei) // Native POL amount as value
-      });
-      
-      await sendTransaction(swapTx);
-      
       setSwapTxStatus("success");
       setSwapAmountPol("");
-      
     } catch (error) {
-      console.error("Swap Fehler:", error);
+      console.error("OpenOcean Swap Fehler:", error);
       setSwapTxStatus("error");
     } finally {
       setIsSwapping(false);
