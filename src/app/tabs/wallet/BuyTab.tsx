@@ -1,7 +1,9 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "../../../../components/ui/button";
 import { FaCoins, FaLock, FaExchangeAlt } from "react-icons/fa";
-import { useActiveAccount, useSendTransaction, ConnectButton } from "thirdweb/react";
+import { useActiveAccount, useSendTransaction } from "thirdweb/react";
+// @ts-ignore
+const { BuyDirectWidget } = require("thirdweb/react");
 import { polygon } from "thirdweb/chains";
 import { client } from "../../client";
 
@@ -237,28 +239,27 @@ export default function BuyTab() {
           </div>
           
           <div className="w-full mt-4">
-            <ConnectButton
-              client={client}
-              chain={polygon}
-              connectButton={{
-                label: "POL kaufen",
-                className: "w-full bg-gradient-to-r from-purple-500 to-purple-700 text-white font-bold py-3 rounded-xl hover:opacity-90 transition-opacity"
-              }}
-              detailsButton={{
-                displayBalanceToken: {
-                  [polygon.id]: "0x0000000000000000000000000000000000001010"
-                }
-              }}
-              supportedTokens={{
-                [polygon.id]: [
-                  {
-                    address: "0x0000000000000000000000000000000000001010",
-                    name: "POL",
-                    symbol: "POL",
-                  }
-                ]
-              }}
-            />
+            {showPolBuyModal ? (
+              <div className="bg-zinc-800 rounded-xl p-4 border border-purple-500">
+                <BuyDirectWidget
+                  client={client}
+                  chain={polygon}
+                  tokenAddress="0x0000000000000000000000000000000000001010"
+                  theme="dark"
+                  onPurchaseComplete={() => {
+                    setShowPolBuyModal(false);
+                  }}
+                  onClose={() => setShowPolBuyModal(false)}
+                />
+              </div>
+            ) : (
+              <Button
+                className="w-full bg-gradient-to-r from-purple-500 to-purple-700 text-white font-bold py-3 rounded-xl hover:opacity-90 transition-opacity"
+                onClick={() => setShowPolBuyModal(true)}
+              >
+                POL kaufen
+              </Button>
+            )}
           </div>
         </div>
 
