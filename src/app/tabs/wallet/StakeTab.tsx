@@ -1,18 +1,99 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "../../../../components/ui/button";
 import { FaLock, FaUnlock, FaCoins, FaClock } from "react-icons/fa";
+import { useActiveAccount } from "thirdweb/react";
+import { createThirdwebClient, getContract, prepareContractCall, resolveMethod } from "thirdweb";
+import { polygon } from "thirdweb/chains";
+import { useSendTransaction } from "thirdweb/react";
+
+const STAKING_CONTRACT = "0xe730555afA4DeA022976DdDc0cC7DBba1C98568A";
+const DINVEST_TOKEN = "0x72a428F03d7a301cEAce084366928b99c4d757bD";
+const client = createThirdwebClient({ clientId: process.env.NEXT_PUBLIC_TEMPLATE_CLIENT_ID! });
+
+// Hilfsfunktion für Contract-Reads
+async function contractRead(contract: any, method: string, args: any[] = []) {
+  if (!contract) return undefined;
+  return await contract[method](...args);
+}
 
 export default function StakeTab() {
+  const account = useActiveAccount();
+  const { mutate: sendTransaction, isPending } = useSendTransaction();
   const [stakeAmount, setStakeAmount] = useState("");
   const [unstakeAmount, setUnstakeAmount] = useState("");
   const [activeTab, setActiveTab] = useState("stake");
+  const [available, setAvailable] = useState("0");
+  const [staked, setStaked] = useState("0");
+  const [rewards, setRewards] = useState("0");
+  const [loading, setLoading] = useState(false);
+  const [txStatus, setTxStatus] = useState<string | null>(null);
 
-  const stakingStats = {
-    available: "1250.0000",
-    staked: "0",
-    rewards: "0",
-    apr: "15.5%",
-    lockPeriod: "30 Tage"
+  // Fetch balances
+  useEffect(() => {
+    if (!account?.address) return;
+    setLoading(true);
+    (async () => {
+      try {
+        const dinvest = getContract({ client, chain: polygon, address: DINVEST_TOKEN });
+        const bal = await contractRead(dinvest, "balanceOf", [account.address]);
+        setAvailable((Number(bal) / 1e18).toFixed(4));
+        const staking = getContract({ client, chain: polygon, address: STAKING_CONTRACT });
+        const stakedBal = await contractRead(staking, "balanceOf", [account.address]);
+        setStaked((Number(stakedBal) / 1e18).toFixed(4));
+        const earned = await contractRead(staking, "earned", [account.address]);
+        setRewards((Number(earned) / 1e18).toFixed(4));
+      } catch (e) {
+        setAvailable("0"); setStaked("0"); setRewards("0");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [account?.address, txStatus]);
+
+  // Stake
+  const handleStake = async () => {
+    if (!stakeAmount || parseFloat(stakeAmount) <= 0) return;
+    setTxStatus("pending");
+    try {
+      const staking = getContract({ client, chain: polygon, address: STAKING_CONTRACT });
+      const dinvest = getContract({ client, chain: polygon, address: DINVEST_TOKEN });
+      const amountWei = (parseFloat(stakeAmount) * 1e18).toString();
+      // Approve
+      await sendTransaction(prepareContractCall({ contract: dinvest, method: resolveMethod("approve"), params: [STAKING_CONTRACT, amountWei] }));
+      // Stake
+      await sendTransaction(prepareContractCall({ contract: staking, method: resolveMethod("stake"), params: [amountWei] }));
+      setTxStatus("success");
+      setStakeAmount("");
+    } catch (e) {
+      setTxStatus("error");
+    }
+  };
+
+  // Unstake
+  const handleUnstake = async () => {
+    if (!unstakeAmount || parseFloat(unstakeAmount) <= 0) return;
+    setTxStatus("pending");
+    try {
+      const staking = getContract({ client, chain: polygon, address: STAKING_CONTRACT });
+      const amountWei = (parseFloat(unstakeAmount) * 1e18).toString();
+      await sendTransaction(prepareContractCall({ contract: staking, method: resolveMethod("withdraw"), params: [amountWei] }));
+      setTxStatus("success");
+      setUnstakeAmount("");
+    } catch (e) {
+      setTxStatus("error");
+    }
+  };
+
+  // Claim Rewards
+  const handleClaim = async () => {
+    setTxStatus("pending");
+    try {
+      const staking = getContract({ client, chain: polygon, address: STAKING_CONTRACT });
+      await sendTransaction(prepareContractCall({ contract: staking, method: resolveMethod("getReward"), params: [] }));
+      setTxStatus("success");
+    } catch (e) {
+      setTxStatus("error");
+    }
   };
 
   return (
@@ -29,14 +110,14 @@ export default function StakeTab() {
         <div className="bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl p-4 border border-zinc-700 text-center">
           <div className="text-sm text-zinc-500 mb-1">Verfügbar</div>
           <div className="text-xl font-bold text-amber-400">
-            {stakingStats.available}
+            {available}
           </div>
           <div className="text-xs text-zinc-500">D.INVEST</div>
         </div>
         <div className="bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl p-4 border border-zinc-700 text-center">
           <div className="text-sm text-zinc-500 mb-1">Gestaked</div>
           <div className="text-xl font-bold text-purple-400">
-            {stakingStats.staked}
+            {staked}
           </div>
           <div className="text-xs text-zinc-500">D.INVEST</div>
         </div>
@@ -46,15 +127,15 @@ export default function StakeTab() {
       <div className="bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl p-6 border border-zinc-700">
         <div className="grid grid-cols-3 gap-4 text-center">
           <div>
-            <div className="text-2xl font-bold text-green-400 mb-1">{stakingStats.apr}</div>
+            <div className="text-2xl font-bold text-green-400 mb-1">15.5%</div>
             <div className="text-xs text-zinc-500">Jährlicher Ertrag</div>
           </div>
           <div>
-            <div className="text-2xl font-bold text-blue-400 mb-1">{stakingStats.lockPeriod}</div>
+            <div className="text-2xl font-bold text-blue-400 mb-1">30 Tage</div>
             <div className="text-xs text-zinc-500">Mindest-Lock</div>
           </div>
           <div>
-            <div className="text-2xl font-bold text-amber-400 mb-1">{stakingStats.rewards}</div>
+            <div className="text-2xl font-bold text-amber-400 mb-1">{rewards}</div>
             <div className="text-xs text-zinc-500">Belohnungen</div>
           </div>
         </div>
@@ -93,10 +174,10 @@ export default function StakeTab() {
             <div className="flex justify-between items-center mb-3">
               <label className="text-sm font-medium text-zinc-300">D.INVEST Betrag</label>
               <div className="flex items-center gap-2">
-                <span className="text-xs text-zinc-500">Verfügbar: {stakingStats.available}</span>
+                <span className="text-xs text-zinc-500">Verfügbar: {available}</span>
                 <button 
                   className="text-xs px-2 py-1 bg-amber-500/20 text-amber-400 rounded hover:bg-amber-500/30 transition"
-                  onClick={() => setStakeAmount(stakingStats.available)}
+                  onClick={() => setStakeAmount(available)}
                 >
                   MAX
                 </button>
@@ -139,6 +220,7 @@ export default function StakeTab() {
           <Button
             className="w-full bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-3 rounded-xl hover:opacity-90 transition-opacity"
             disabled={!stakeAmount || parseFloat(stakeAmount) <= 0}
+            onClick={handleStake}
           >
             <FaLock className="inline mr-2" />
             {!stakeAmount || parseFloat(stakeAmount) <= 0 ? "Betrag eingeben" : `${stakeAmount} D.INVEST staken`}
@@ -153,11 +235,11 @@ export default function StakeTab() {
             <div className="flex justify-between items-center mb-3">
               <label className="text-sm font-medium text-zinc-300">D.INVEST Betrag</label>
               <div className="flex items-center gap-2">
-                <span className="text-xs text-zinc-500">Gestaked: {stakingStats.staked}</span>
+                <span className="text-xs text-zinc-500">Gestaked: {staked}</span>
                 <button 
                   className="text-xs px-2 py-1 bg-zinc-700/50 text-zinc-400 rounded hover:bg-zinc-600/50 transition"
-                  onClick={() => setUnstakeAmount(stakingStats.staked)}
-                  disabled={stakingStats.staked === "0"}
+                  onClick={() => setUnstakeAmount(staked)}
+                  disabled={staked === "0"}
                 >
                   MAX
                 </button>
@@ -169,11 +251,11 @@ export default function StakeTab() {
               className="w-full bg-zinc-900/80 border border-zinc-600 rounded-xl py-4 px-4 text-lg font-bold text-zinc-400 focus:border-zinc-500 focus:outline-none"
               value={unstakeAmount}
               onChange={(e) => setUnstakeAmount(e.target.value)}
-              disabled={stakingStats.staked === "0"}
+              disabled={staked === "0"}
             />
           </div>
 
-          {stakingStats.staked === "0" && (
+          {staked === "0" && (
             <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4">
               <div className="flex items-center gap-3">
                 <div className="w-5 h-5 rounded-full bg-blue-500/20 flex items-center justify-center">
@@ -188,10 +270,11 @@ export default function StakeTab() {
 
           <Button 
             className="w-full bg-zinc-700/50 hover:bg-zinc-600/50 text-zinc-300 font-bold py-3 rounded-xl border border-zinc-600 transition-all"
-            disabled={!unstakeAmount || parseFloat(unstakeAmount) <= 0 || stakingStats.staked === "0"}
+            disabled={!unstakeAmount || parseFloat(unstakeAmount) <= 0 || staked === "0"}
+            onClick={handleUnstake}
           >
             <FaUnlock className="inline mr-2" />
-            {stakingStats.staked === "0" ? "Keine Token gestaked" : 
+            {staked === "0" ? "Keine Token gestaked" : 
              !unstakeAmount || parseFloat(unstakeAmount) <= 0 ? "Betrag eingeben" : 
              `${unstakeAmount} D.INVEST unstaken`}
           </Button>
@@ -211,18 +294,28 @@ export default function StakeTab() {
             </div>
           </div>
           <div className="text-right">
-            <div className="text-xl font-bold text-amber-400">{stakingStats.rewards}</div>
+            <div className="text-xl font-bold text-amber-400">{rewards}</div>
             <div className="text-xs text-zinc-500">D.FAITH</div>
           </div>
         </div>
         
         <Button 
-          className="w-full bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-3 rounded-xl opacity-50 cursor-not-allowed"
-          disabled={true}
+          className="w-full bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-3 rounded-xl hover:opacity-90 transition-opacity"
+          disabled={parseFloat(rewards) <= 0 || isPending}
+          onClick={handleClaim}
         >
           <FaCoins className="inline mr-2" />
-          Belohnungen einfordern
+          {isPending ? "Wird ausgeführt..." : "Belohnungen einfordern"}
         </Button>
+        {txStatus === "success" && (
+          <div className="mt-2 text-green-400 text-sm text-center">Transaktion erfolgreich!</div>
+        )}
+        {txStatus === "error" && (
+          <div className="mt-2 text-red-400 text-sm text-center">Transaktion fehlgeschlagen!</div>
+        )}
+        {txStatus === "pending" && (
+          <div className="mt-2 text-yellow-400 text-sm text-center">Transaktion läuft...</div>
+        )}
       </div>
 
       {/* Contract Info */}
