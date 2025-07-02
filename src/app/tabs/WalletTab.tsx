@@ -390,23 +390,23 @@ export default function WalletTab() {
             )}
 
             {/* Modale für die verschiedenen Funktionen */}
-            <Modal open={showBuyModal} onClose={() => setShowBuyModal(false)} title="Token kaufen">
+            <Modal open={showBuyModal} onClose={() => setShowBuyModal(false)} title="Kaufen">
               <BuyTab />
             </Modal>
 
-            <Modal open={showSellModal} onClose={() => setShowSellModal(false)} title="Token verkaufen">
+            <Modal open={showSellModal} onClose={() => setShowSellModal(false)} title="Verkaufen">
               <SellTab />
             </Modal>
 
-            <Modal open={showSendModal} onClose={() => setShowSendModal(false)} title="Token senden">
+            <Modal open={showSendModal} onClose={() => setShowSendModal(false)} title="Senden">
               <SendTab />
             </Modal>
 
-            <Modal open={showHistoryModal} onClose={() => setShowHistoryModal(false)} title="Transaktionshistorie">
+            <Modal open={showHistoryModal} onClose={() => setShowHistoryModal(false)} title="Historie">
               <HistoryTab />
             </Modal>
 
-            <Modal open={showStakeModal} onClose={() => setShowStakeModal(false)} title="Staking & Rewards">
+            <Modal open={showStakeModal} onClose={() => setShowStakeModal(false)} title="Staking">
               <StakeTab />
             </Modal>
           </CardContent>
