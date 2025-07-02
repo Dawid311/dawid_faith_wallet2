@@ -9,8 +9,10 @@ import { balanceOf, approve } from "thirdweb/extensions/erc20";
 
 const DFAITH_TOKEN = "0x67f1439bd51Cfb0A46f739Ec8D5663F41d027bff";
 const DFAITH_ICON = "https://assets.coingecko.com/coins/images/35564/large/dfaith.png";
-const POL_TOKEN = "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270"; // WMATIC/POL
-const UNISWAP_ROUTER = "0xa5E0829CaCEd8fFDD4De3c43696c57F7D7A678ff"; // QuickSwap Router auf Polygon
+const WMATIC_TOKEN = "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270"; // WMATIC (Wrapped POL)
+const QUICKSWAP_ROUTER = "0xa5E0829CaCEd8fFDD4De3c43696c57F7D7A678ff"; // QuickSwap Router auf Polygon
+const SUSHISWAP_ROUTER = "0x1b02dA8Cb0d097eB8D57A175b88c7D8b47997506"; // SushiSwap Router auf Polygon
+const UNISWAP_V3_ROUTER = "0xE592427A0AEce92De3Edee1F18E0157C05861564"; // Uniswap V3 Router auf Polygon
 
 export default function BuyTab() {
   const [dfaithPrice, setDfaithPrice] = useState<number | null>(null);
@@ -206,31 +208,89 @@ export default function BuyTab() {
     try {
       const amountInWei = (parseFloat(swapAmountPol) * Math.pow(10, 18)).toString();
       
-      // Router Contract
-      const router = getContract({
-        client,
-        chain: polygon,
-        address: UNISWAP_ROUTER
-      });
+      // Überprüfe zuerst, ob das Handelspaar existiert
+      const pairInfo = await checkTradingPairExists();
+      if (!pairInfo.exists) {
+        throw new Error("D.FAITH/WMATIC Handelspaar nicht gefunden auf bekannten DEXes");
+      }
       
-      // Für native POL verwenden wir swapExactETHForTokens
-      const deadline = Math.floor(Date.now() / 1000) + 60 * 20; // 20 minutes
-      const swapTx = prepareContractCall({
-        contract: router,
-        method: "function swapExactETHForTokens(uint256 amountOutMin, address[] calldata path, address to, uint256 deadline) external payable returns (uint256[] memory amounts)",
-        params: [
-          BigInt("0"), // amountOutMin (should be calculated properly in production)
-          [POL_TOKEN, DFAITH_TOKEN], // path: WMATIC -> DFAITH
-          account.address, // to
-          BigInt(deadline) // deadline
-        ],
-        value: BigInt(amountInWei) // Native POL amount as value
-      });
+      console.log(`Verwende ${pairInfo.dex} für den Swap (Pair: ${pairInfo.pairAddress})`);
       
-      await sendTransaction(swapTx);
+      // Erst eine Quote abrufen für amountOutMin
+      let amountOutMin = BigInt("0");
+      try {
+        const quoteResponse = await fetch(
+          `https://api.1inch.io/v6.0/137/quote?src=0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270&dst=${DFAITH_TOKEN}&amount=${amountInWei}&includeTokensInfo=false&includeProtocols=false&includeGas=false`
+        );
+        if (quoteResponse.ok) {
+          const quoteData = await quoteResponse.json();
+          if (quoteData && quoteData.toTokenAmount) {
+            // 5% Slippage Toleranz
+            const minOut = BigInt(quoteData.toTokenAmount) * BigInt(95) / BigInt(100);
+            amountOutMin = minOut;
+            console.log("Quote erhalten:", quoteData.toTokenAmount, "Min out:", minOut.toString());
+          }
+        }
+      } catch (quoteError) {
+        console.warn("Quote fehlgeschlagen, verwende Mindestpreis:", quoteError);
+        // Fallback: verwende aktuellen D.FAITH-Preis für Mindestmenge
+        if (dfaithPrice && dfaithPrice > 0) {
+          const expectedOut = parseFloat(swapAmountPol) / dfaithPrice;
+          // 10% Slippage Toleranz als Fallback
+          const minOut = BigInt(Math.floor(expectedOut * 0.9 * Math.pow(10, 18)));
+          amountOutMin = minOut;
+        }
+      }
       
-      setSwapTxStatus("success");
-      setSwapAmountPol("");
+      // Versuche verschiedene Router basierend auf gefundenem Pair
+      const routers = [
+        { name: "QuickSwap", address: QUICKSWAP_ROUTER },
+        { name: "SushiSwap", address: SUSHISWAP_ROUTER }
+      ];
+      
+      for (const routerInfo of routers) {
+        try {
+          console.log(`Versuche ${routerInfo.name} Router:`, routerInfo.address);
+          
+          const router = getContract({
+            client,
+            chain: polygon,
+            address: routerInfo.address
+          });
+          
+          const deadline = Math.floor(Date.now() / 1000) + 60 * 20; // 20 minutes
+          const swapTx = prepareContractCall({
+            contract: router,
+            method: "function swapExactETHForTokens(uint256 amountOutMin, address[] calldata path, address to, uint256 deadline) external payable returns (uint256[] memory amounts)",
+            params: [
+              amountOutMin, // Korrekte Mindestmenge
+              [WMATIC_TOKEN, DFAITH_TOKEN], // path: WMATIC -> DFAITH
+              account.address, // to
+              BigInt(deadline) // deadline
+            ],
+            value: BigInt(amountInWei) // Native POL amount as value
+          });
+          
+          console.log(`${routerInfo.name} Swap Parameter:`, {
+            amountInWei,
+            amountOutMin: amountOutMin.toString(),
+            path: [WMATIC_TOKEN, DFAITH_TOKEN],
+            deadline
+          });
+          
+          await sendTransaction(swapTx);
+          
+          setSwapTxStatus("success");
+          setSwapAmountPol("");
+          return;
+          
+        } catch (routerError) {
+          console.error(`${routerInfo.name} Router Fehler:`, routerError);
+          continue; // Versuche nächsten Router
+        }
+      }
+      
+      throw new Error("Alle Router fehlgeschlagen");
       
     } catch (error) {
       console.error("Swap Fehler:", error);
@@ -238,6 +298,60 @@ export default function BuyTab() {
     } finally {
       setIsSwapping(false);
     }
+  };
+
+  // Funktion zur Überprüfung ob das Handelspaar existiert
+  const checkTradingPairExists = async () => {
+    console.log("Überprüfe Handelspaar-Existenz für D.FAITH/WMATIC...");
+    
+    // Überprüfe QuickSwap Factory
+    try {
+      const quickswapFactory = getContract({
+        client,
+        chain: polygon,
+        address: "0x5757371414417b8C6CAad45bAeF941aBc7d3Ab32" // QuickSwap Factory
+      });
+      
+      const pair = await readContract({
+        contract: quickswapFactory,
+        method: "function getPair(address tokenA, address tokenB) view returns (address)",
+        params: [WMATIC_TOKEN, DFAITH_TOKEN]
+      });
+      
+      console.log("QuickSwap Pair-Adresse:", pair);
+      if (pair && pair !== "0x0000000000000000000000000000000000000000") {
+        console.log("✅ D.FAITH/WMATIC Pair existiert auf QuickSwap");
+        return { exists: true, dex: "QuickSwap", pairAddress: pair };
+      }
+    } catch (error) {
+      console.error("QuickSwap Pair-Check Fehler:", error);
+    }
+    
+    // Überprüfe SushiSwap Factory
+    try {
+      const sushiFactory = getContract({
+        client,
+        chain: polygon,
+        address: "0xc35DADB65012eC5796536bD9864eD8773aBc74C4" // SushiSwap Factory
+      });
+      
+      const pair = await readContract({
+        contract: sushiFactory,
+        method: "function getPair(address tokenA, address tokenB) view returns (address)",
+        params: [WMATIC_TOKEN, DFAITH_TOKEN]
+      });
+      
+      console.log("SushiSwap Pair-Adresse:", pair);
+      if (pair && pair !== "0x0000000000000000000000000000000000000000") {
+        console.log("✅ D.FAITH/WMATIC Pair existiert auf SushiSwap");
+        return { exists: true, dex: "SushiSwap", pairAddress: pair };
+      }
+    } catch (error) {
+      console.error("SushiSwap Pair-Check Fehler:", error);
+    }
+    
+    console.log("❌ Kein D.FAITH/WMATIC Pair gefunden auf bekannten DEXes");
+    return { exists: false, dex: null, pairAddress: null };
   };
 
   return (
@@ -422,9 +536,27 @@ export default function BuyTab() {
                     swapTxStatus === "error" ? "bg-red-500/20 text-red-400" :
                     "bg-yellow-500/20 text-yellow-400"
                   }`}>
-                    {swapTxStatus === "success" && "Swap erfolgreich!"}
-                    {swapTxStatus === "error" && "Swap fehlgeschlagen!"}
-                    {swapTxStatus === "pending" && "Transaktion läuft..."}
+                    {swapTxStatus === "success" && (
+                      <div>
+                        <div className="font-bold">Swap erfolgreich!</div>
+                        <div className="text-sm mt-1">D.FAITH Token wurden zu Ihrer Wallet hinzugefügt</div>
+                      </div>
+                    )}
+                    {swapTxStatus === "error" && (
+                      <div>
+                        <div className="font-bold">Swap fehlgeschlagen!</div>
+                        <div className="text-sm mt-1">
+                          Mögliche Ursachen: Unzureichende Liquidität, falsche Router-Adresse, oder Netzwerkfehler.
+                          Überprüfen Sie die Konsole für Details.
+                        </div>
+                      </div>
+                    )}
+                    {swapTxStatus === "pending" && (
+                      <div>
+                        <div className="font-bold">Transaktion läuft...</div>
+                        <div className="text-sm mt-1">Bitte warten Sie, während der Swap verarbeitet wird</div>
+                      </div>
+                    )}
                   </div>
                 )}
                 
@@ -439,6 +571,17 @@ export default function BuyTab() {
                     {isSwapping ? "Swapping..." : 
                      parseFloat(polBalance) <= 0 ? "Keine POL verfügbar" :
                      `${swapAmountPol || "0"} POL → D.FAITH`}
+                  </Button>
+                  
+                  <Button
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded-xl text-sm"
+                    onClick={async () => {
+                      const result = await checkTradingPairExists();
+                      alert(`Handelspaar-Diagnose:\n${result.exists ? `✅ Gefunden auf ${result.dex}` : '❌ Nicht gefunden'}`);
+                    }}
+                    disabled={isSwapping}
+                  >
+                    🔍 Handelspaar-Diagnose
                   </Button>
                   
                   <Button
