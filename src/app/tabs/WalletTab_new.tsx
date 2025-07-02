@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef } from "react";
 import { createThirdwebClient, getContract, prepareContractCall } from "thirdweb";
 import { useActiveAccount, useActiveWalletConnectionStatus, useSendTransaction } from "thirdweb/react";
 import { ConnectButton } from "thirdweb/react";
@@ -127,7 +127,7 @@ export default function WalletTab() {
   const [needsApproval, setNeedsApproval] = useState(false);
 
   // Fetch Token Balances
-  const fetchBalances = useCallback(async () => {
+  const fetchBalances = async () => {
     if (!account?.address) return;
     
     try {
@@ -158,11 +158,11 @@ export default function WalletTab() {
     } catch (error) {
       console.error("Error fetching balances:", error);
     }
-  }, [account?.address]);
+  };
 
   useEffect(() => {
     fetchBalances();
-  }, [account?.address, fetchBalances]);
+  }, [account?.address]);
 
   // Estimate Output for swap
   useEffect(() => {
@@ -365,13 +365,7 @@ export default function WalletTab() {
             selectedSellToken={selectedSellToken}
             selectedBuyToken={selectedBuyToken}
             estimatedReceiveAmount={estimatedReceiveAmount}
-            onClose={() => {
-              setShowSell(false);
-              setSwapAmount("");
-              setEstimatedReceiveAmount("0");
-              // Refresh balances after closing swap modal
-              fetchBalances();
-            }}
+            onClose={() => setShowSell(false)}
             onAmountChange={setSwapAmount}
             onTokenSwitch={handleTokenSwitch}
           />
