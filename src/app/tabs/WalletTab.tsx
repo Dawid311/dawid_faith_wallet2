@@ -7,7 +7,7 @@ import { polygon } from "thirdweb/chains";
 import { balanceOf, approve, allowance } from "thirdweb/extensions/erc20";
 import { Card, CardContent } from "../../../components/ui/card";
 import { Button } from "../../../components/ui/button";
-import { FaRegCopy, FaCoins, FaArrowDown, FaArrowUp, FaPaperPlane, FaLock, FaHistory } from "react-icons/fa";
+import { FaRegCopy, FaCoins, FaArrowDown, FaArrowUp, FaPaperPlane, FaLock, FaHistory, FaTimes } from "react-icons/fa";
 
 // Import Subtabs
 import BuyTab from "./wallet/BuyTab";
@@ -15,6 +15,33 @@ import SellTab from "./wallet/SellTab";
 import SendTab from "./wallet/SendTab";
 import HistoryTab from "./wallet/HistoryTab";
 import StakeTab from "./wallet/StakeTab";
+
+// Modal Komponente
+function Modal({ open, onClose, title, children }: { open: boolean, onClose: () => void, title: string, children: React.ReactNode }) {
+  if (!open) return null;
+  
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div className="bg-zinc-900 rounded-2xl min-w-[340px] max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto shadow-2xl relative border border-zinc-700">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-zinc-700">
+          <h3 className="font-bold text-xl text-amber-400">{title}</h3>
+          <button 
+            className="p-2 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 rounded-lg transition-all"
+            onClick={onClose}
+          >
+            <FaTimes size={16} />
+          </button>
+        </div>
+        
+        {/* Content */}
+        <div className="p-6">
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const client = createThirdwebClient({
   clientId: process.env.NEXT_PUBLIC_TEMPLATE_CLIENT_ID!,
@@ -38,8 +65,12 @@ export default function WalletTab() {
   const [dfaithBalance, setDfaithBalance] = useState<{ displayValue: string } | null>(null);
   const [dinvestBalance, setDinvestBalance] = useState<{ displayValue: string } | null>(null);
   
-  // Subtab State
-  const [activeSubtab, setActiveSubtab] = useState<string | null>(null);
+  // Modal States
+  const [showBuyModal, setShowBuyModal] = useState(false);
+  const [showSellModal, setShowSellModal] = useState(false);
+  const [showSendModal, setShowSendModal] = useState(false);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [showStakeModal, setShowStakeModal] = useState(false);
   
   // Konstanten für Token mit echten Contract-Adressen
   const DFAITH_TOKEN = {
@@ -240,7 +271,7 @@ export default function WalletTab() {
             <div className="grid grid-cols-4 gap-2 md:gap-3 mb-6">
               <Button
                 className="flex flex-col items-center justify-center gap-1 px-1 py-3 md:py-4 bg-gradient-to-br from-zinc-800/90 to-zinc-900 hover:from-zinc-800 hover:to-zinc-800 shadow-lg shadow-black/20 rounded-xl hover:scale-[1.02] transition-all duration-300 border border-zinc-700/80"
-                onClick={() => setActiveSubtab('buy')}
+                onClick={() => setShowBuyModal(true)}
               >
                 <div className="w-7 h-7 flex items-center justify-center bg-gradient-to-br from-amber-400 to-yellow-500 rounded-full mb-1 shadow-inner">
                   <FaArrowDown className="text-black text-xs" />
@@ -249,7 +280,7 @@ export default function WalletTab() {
               </Button>
               <Button
                 className="flex flex-col items-center justify-center gap-1 px-1 py-3 md:py-4 bg-gradient-to-br from-zinc-800/90 to-zinc-900 hover:from-zinc-800 hover:to-zinc-800 shadow-lg shadow-black/20 rounded-xl hover:scale-[1.02] transition-all duration-300 border border-zinc-700/80"
-                onClick={() => setActiveSubtab('sell')}
+                onClick={() => setShowSellModal(true)}
               >
                 <div className="w-7 h-7 flex items-center justify-center bg-gradient-to-br from-amber-400 to-yellow-500 rounded-full mb-1 shadow-inner">
                   <FaArrowUp className="text-black text-xs" />
@@ -258,7 +289,7 @@ export default function WalletTab() {
               </Button>
               <Button
                 className="flex flex-col items-center justify-center gap-1 px-1 py-3 md:py-4 bg-gradient-to-br from-zinc-800/90 to-zinc-900 hover:from-zinc-800 hover:to-zinc-800 shadow-lg shadow-black/20 rounded-xl hover:scale-[1.02] transition-all duration-300 border border-zinc-700/80"
-                onClick={() => setActiveSubtab('send')}
+                onClick={() => setShowSendModal(true)}
               >
                 <div className="w-7 h-7 flex items-center justify-center bg-gradient-to-br from-amber-400 to-yellow-500 rounded-full mb-1 shadow-inner">
                   <FaPaperPlane className="text-black text-xs" />
@@ -267,7 +298,7 @@ export default function WalletTab() {
               </Button>
               <Button
                 className="flex flex-col items-center justify-center gap-1 px-1 py-3 md:py-4 bg-gradient-to-br from-zinc-800/90 to-zinc-900 hover:from-zinc-800 hover:to-zinc-800 shadow-lg shadow-black/20 rounded-xl hover:scale-[1.02] transition-all duration-300 border border-zinc-700/80"
-                onClick={() => setActiveSubtab('history')}
+                onClick={() => setShowHistoryModal(true)}
               >
                 <div className="w-7 h-7 flex items-center justify-center bg-gradient-to-br from-amber-400 to-yellow-500 rounded-full mb-1 shadow-inner">
                   <FaHistory className="text-black text-xs" />
@@ -296,7 +327,7 @@ export default function WalletTab() {
                   </div>
                   
                   <button 
-                    onClick={() => setActiveSubtab('stake')}
+                    onClick={() => setShowStakeModal(true)}
                     className="flex items-center gap-2 px-4 py-1.5 rounded-lg bg-gradient-to-r from-amber-500/20 to-amber-600/20 text-amber-400 hover:from-amber-500/30 hover:to-amber-600/30 transition-all border border-amber-500/20"
                   >
                     <FaLock size={12} />
@@ -311,38 +342,26 @@ export default function WalletTab() {
               </div>
             )}
 
-            {/* Subtab Navigation & Content */}
-            {activeSubtab && (
-              <div className="mt-6">
-                {/* Navigation Header mit Zurück-Button */}
-                <div className="flex items-center justify-between mb-4 p-3 bg-zinc-800/50 rounded-lg border border-zinc-700">
-                  <button
-                    onClick={() => setActiveSubtab(null)}
-                    className="flex items-center gap-2 text-zinc-400 hover:text-amber-400 transition-colors"
-                  >
-                    <FaArrowDown className="rotate-90" />
-                    <span className="text-sm">Zurück</span>
-                  </button>
-                  <h3 className="text-amber-400 font-medium capitalize">
-                    {activeSubtab === 'buy' && 'Token kaufen'}
-                    {activeSubtab === 'sell' && 'Token verkaufen'}
-                    {activeSubtab === 'send' && 'Token senden'}
-                    {activeSubtab === 'history' && 'Transaktionshistorie'}
-                    {activeSubtab === 'stake' && 'Staking & Rewards'}
-                  </h3>
-                  <div></div> {/* Spacer für zentrierte Überschrift */}
-                </div>
+            {/* Modale für die verschiedenen Funktionen */}
+            <Modal open={showBuyModal} onClose={() => setShowBuyModal(false)} title="Token kaufen">
+              <BuyTab />
+            </Modal>
 
-                {/* Subtab Content */}
-                <div className="bg-zinc-900/50 rounded-lg border border-zinc-700">
-                  {activeSubtab === 'buy' && <BuyTab />}
-                  {activeSubtab === 'sell' && <SellTab />}
-                  {activeSubtab === 'send' && <SendTab />}
-                  {activeSubtab === 'history' && <HistoryTab />}
-                  {activeSubtab === 'stake' && <StakeTab />}
-                </div>
-              </div>
-            )}
+            <Modal open={showSellModal} onClose={() => setShowSellModal(false)} title="Token verkaufen">
+              <SellTab />
+            </Modal>
+
+            <Modal open={showSendModal} onClose={() => setShowSendModal(false)} title="Token senden">
+              <SendTab />
+            </Modal>
+
+            <Modal open={showHistoryModal} onClose={() => setShowHistoryModal(false)} title="Transaktionshistorie">
+              <HistoryTab />
+            </Modal>
+
+            <Modal open={showStakeModal} onClose={() => setShowStakeModal(false)} title="Staking & Rewards">
+              <StakeTab />
+            </Modal>
           </CardContent>
         </Card>
       </div>
