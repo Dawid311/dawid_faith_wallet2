@@ -206,7 +206,7 @@ export default function StakeTab() {
           <div className="text-center">
             <div className="text-sm text-zinc-500 mb-1">Verfügbar</div>
             <div className="text-xl font-bold text-amber-400">
-              {loading ? "Laden..." : available}
+              {loading ? "Laden..." : Math.floor(Number(available))}
             </div>
             <div className="text-xs text-zinc-500">D.INVEST</div>
           </div>
@@ -215,7 +215,7 @@ export default function StakeTab() {
           <div className="text-center">
             <div className="text-sm text-zinc-500 mb-1">Gestaked</div>
             <div className="text-xl font-bold text-purple-400">
-              {loading ? "Laden..." : staked}
+              {loading ? "Laden..." : Math.floor(Number(staked))}
             </div>
             <div className="text-xs text-zinc-500">D.INVEST</div>
           </div>
@@ -289,11 +289,11 @@ export default function StakeTab() {
             <div className="flex justify-between items-center mb-3">
               <label className="text-sm font-medium text-zinc-300">D.INVEST Betrag</label>
               <div className="flex items-center gap-2">
-                <span className="text-xs text-zinc-500">Verfügbar: {loading ? "Laden..." : available}</span>
+                <span className="text-xs text-zinc-500">Verfügbar: {loading ? "Laden..." : Math.floor(Number(available))}</span>
                 <button 
                   className="text-xs px-2 py-1 bg-amber-500/20 text-amber-400 rounded hover:bg-amber-500/30 transition"
-                  onClick={() => setStakeAmount(available)}
-                  disabled={loading || parseFloat(available) <= 0}
+                  onClick={() => setStakeAmount(Math.floor(Number(available)).toString())}
+                  disabled={loading || Math.floor(Number(available)) <= 0}
                 >
                   MAX
                 </button>
@@ -304,7 +304,7 @@ export default function StakeTab() {
               placeholder="0"
               className="w-full bg-zinc-900/80 border border-zinc-600 rounded-xl py-4 px-4 text-lg font-bold text-amber-400 focus:border-amber-500 focus:outline-none"
               value={stakeAmount}
-              onChange={(e) => setStakeAmount(e.target.value)}
+              onChange={(e) => setStakeAmount(Math.floor(Number(e.target.value)).toString())}
             />
           </div>
 
@@ -356,11 +356,11 @@ export default function StakeTab() {
             <div className="flex justify-between items-center mb-3">
               <label className="text-sm font-medium text-zinc-300">D.INVEST Betrag</label>
               <div className="flex items-center gap-2">
-                <span className="text-xs text-zinc-500">Gestaked: {staked}</span>
+                <span className="text-xs text-zinc-500">Gestaked: {Math.floor(Number(staked))}</span>
                 <button 
                   className="text-xs px-2 py-1 bg-zinc-700/50 text-zinc-400 rounded hover:bg-zinc-600/50 transition"
-                  onClick={() => setUnstakeAmount(staked)}
-                  disabled={staked === "0"}
+                  onClick={() => setUnstakeAmount(Math.floor(Number(staked)).toString())}
+                  disabled={Math.floor(Number(staked)) === 0}
                 >
                   MAX
                 </button>
@@ -371,8 +371,8 @@ export default function StakeTab() {
               placeholder="0"
               className="w-full bg-zinc-900/80 border border-zinc-600 rounded-xl py-4 px-4 text-lg font-bold text-zinc-400 focus:border-zinc-500 focus:outline-none"
               value={unstakeAmount}
-              onChange={(e) => setUnstakeAmount(e.target.value)}
-              disabled={staked === "0"}
+              onChange={(e) => setUnstakeAmount(Math.floor(Number(e.target.value)).toString())}
+              disabled={Math.floor(Number(staked)) === 0}
             />
           </div>
 
