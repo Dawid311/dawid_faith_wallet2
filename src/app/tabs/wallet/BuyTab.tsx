@@ -24,6 +24,7 @@ export default function BuyTab() {
   const [swapError, setSwapError] = useState<string | null>(null);
   const { mutate: sendTransaction, isPending: isSwapPending } = useSendTransaction();
   const [swapStatus, setSwapStatus] = useState<string | null>(null);
+  const [dfaithModalError, setDfaithModalError] = useState<string | null>(null);
 
   // D.FAITH Preis von mehreren Quellen holen
   useEffect(() => {
@@ -257,11 +258,26 @@ export default function BuyTab() {
           {/* D.FAITH kaufen Button: Account-Check und Feedback */}
           <Button
             className="w-full mt-4 bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-3 rounded-xl hover:opacity-90 transition-opacity"
-            onClick={() => account?.address ? openDfaithPayModal({ chain: polygon, client }) : alert('Bitte Wallet verbinden!')}
+            onClick={async () => {
+              setDfaithModalError(null);
+              if (!account?.address) {
+                alert('Bitte Wallet verbinden!');
+                return;
+              }
+              try {
+                await openDfaithPayModal({ chain: polygon, client });
+              } catch (err: any) {
+                setDfaithModalError(err?.message || "Unbekannter Fehler beim Öffnen des Modals.");
+                console.error("D.FAITH PayModal Fehler:", err);
+              }
+            }}
             disabled={!account?.address}
           >
             D.FAITH kaufen
           </Button>
+          {dfaithModalError && (
+            <div className="text-red-400 text-xs mt-2 text-center">{dfaithModalError}</div>
+          )}
         </div>
 
         {/* D.INVEST kaufen */}
