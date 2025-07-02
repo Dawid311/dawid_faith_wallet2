@@ -47,7 +47,9 @@ export default function StakeTab() {
           setDinvestDecimals(decimals);
         } catch {}
         // Balance abfragen
+        console.log('DINVEST_TOKEN:', DINVEST_TOKEN, 'Account:', account.address);
         const bal = await contractRead(dinvest, "balanceOf", [account.address]);
+        console.log('Balance Rückgabe:', bal);
         setAvailable((Number(bal) / Math.pow(10, decimals)).toFixed(4));
         const staking = getContract({ client, chain: polygon, address: STAKING_CONTRACT });
         const stakedBal = await contractRead(staking, "balanceOf", [account.address]);
