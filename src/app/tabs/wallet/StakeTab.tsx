@@ -199,6 +199,7 @@ export default function StakeTab() {
                 <button 
                   className="text-xs px-2 py-1 bg-amber-500/20 text-amber-400 rounded hover:bg-amber-500/30 transition"
                   onClick={() => setStakeAmount(available)}
+                  disabled={available === "0"}
                 >
                   MAX
                 </button>
@@ -210,6 +211,10 @@ export default function StakeTab() {
               className="w-full bg-zinc-900/80 border border-zinc-600 rounded-xl py-4 px-4 text-lg font-bold text-amber-400 focus:border-amber-500 focus:outline-none"
               value={stakeAmount}
               onChange={(e) => setStakeAmount(e.target.value)}
+              min="0"
+              max={available}
+              step="any"
+              disabled={available === "0"}
             />
           </div>
 
@@ -240,7 +245,7 @@ export default function StakeTab() {
 
           <Button
             className="w-full bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-3 rounded-xl hover:opacity-90 transition-opacity"
-            disabled={!stakeAmount || parseFloat(stakeAmount) <= 0}
+            disabled={!stakeAmount || parseFloat(stakeAmount) <= 0 || parseFloat(stakeAmount) > parseFloat(available)}
             onClick={handleStake}
           >
             <FaLock className="inline mr-2" />
