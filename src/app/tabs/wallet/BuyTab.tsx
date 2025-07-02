@@ -132,21 +132,8 @@ export default function BuyTab() {
     window.open('https://dein-stripe-link.de', '_blank');
   };
 
-  // useSendTransaction für D.FAITH PayModal
-  const { mutate: openDfaithPayModal } = useSendTransaction({
-    payModal: {
-      supportedTokens: {
-        "137": [
-          {
-            address: DFAITH_TOKEN,
-            name: "D.FAITH",
-            symbol: "DFAITH",
-            icon: DFAITH_ICON,
-          },
-        ],
-      },
-    },
-  });
+  // State für D.FAITH PayModal
+  const [showDfaithBuyModal, setShowDfaithBuyModal] = useState(false);
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -254,14 +241,38 @@ export default function BuyTab() {
             </div>
           </div>
           
-          {/* D.FAITH kaufen Button: Account-Check und Feedback */}
-          <Button
-            className="w-full mt-4 bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-3 rounded-xl hover:opacity-90 transition-opacity"
-            onClick={() => account?.address ? openDfaithPayModal({ chain: polygon, client }) : alert('Bitte Wallet verbinden!')}
-            disabled={!account?.address}
-          >
-            D.FAITH kaufen
-          </Button>
+          {/* D.FAITH kaufen Modal */}
+          {showDfaithBuyModal ? (
+            <div className="fixed inset-0 z-50 flex items-center justify-center min-h-screen bg-black/60">
+              <div className="bg-zinc-900 rounded-xl p-4 max-w-full w-full sm:max-w-xs border border-amber-400 text-center overflow-y-auto h-[90vh] flex flex-col items-center justify-center">
+                <div className="mb-4 text-amber-400 text-2xl font-bold">D.FAITH kaufen</div>
+                <div className="w-full flex-1 flex items-center justify-center">
+                  <BuyWidget
+                    client={client}
+                    tokenAddress={DFAITH_TOKEN}
+                    chain={polygon}
+                    amount="1"
+                    theme="dark"
+                    className="w-full"
+                  />
+                </div>
+                <Button
+                  className="w-full bg-zinc-600 hover:bg-zinc-700 text-white font-bold py-2 rounded-xl mt-4"
+                  onClick={() => setShowDfaithBuyModal(false)}
+                >
+                  Schließen
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <Button
+              className="w-full mt-4 bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-3 rounded-xl hover:opacity-90 transition-opacity"
+              onClick={() => account?.address ? setShowDfaithBuyModal(true) : alert('Bitte Wallet verbinden!')}
+              disabled={!account?.address}
+            >
+              D.FAITH kaufen
+            </Button>
+          )}
         </div>
 
         {/* D.INVEST kaufen */}
