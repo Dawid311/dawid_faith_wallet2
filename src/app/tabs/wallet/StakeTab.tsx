@@ -23,6 +23,8 @@ export default function StakeTab() {
   const [loading, setLoading] = useState(false);
   const [txStatus, setTxStatus] = useState<string | null>(null);
   const [dinvestDecimals, setDinvestDecimals] = useState(18);
+  const [currentRewardStage, setCurrentRewardStage] = useState<{ stage: number; description: string } | null>(null);
+  const [totalStaked, setTotalStaked] = useState("0");
 
   // Fetch balances
   useEffect(() => {
@@ -39,38 +41,64 @@ export default function StakeTab() {
         
         console.log("D.INVEST Balance Raw:", dinvestBalanceResult);
         
-        // Balance formatieren
-        const dinvestFormatted = Number(dinvestBalanceResult) / Math.pow(10, 18);
-        console.log("D.INVEST Balance Formatted:", dinvestFormatted);
-        setAvailable(dinvestFormatted.toFixed(4));
+        // D.INVEST hat 0 Decimals laut Contract!
+        const dinvestFormatted = Number(dinvestBalanceResult);
+        console.log("D.INVEST Balance Formatted (0 decimals):", dinvestFormatted);
+        setAvailable(dinvestFormatted.toString());
         
         // Staking Contract für gestakte Balance und Rewards
         const staking = getContract({ client, chain: polygon, address: STAKING_CONTRACT });
         
-        // Gestakte Balance abrufen
+        // Gestakte Balance abrufen (mit getStakeInfo)
         try {
-          const stakedBal = await readContract({
+          const stakeInfo = await readContract({
             contract: staking,
-            method: "function balanceOf(address) view returns (uint256)",
+            method: "function getStakeInfo(address) view returns (uint256, uint256)",
             params: [account.address]
           });
-          setStaked((Number(stakedBal) / Math.pow(10, 18)).toFixed(4));
+          // stakeInfo[0] ist amount, stakeInfo[1] ist lastClaimed
+          setStaked(stakeInfo[0].toString()); // 0 decimals
         } catch (e) {
           console.error("Fehler beim Abrufen der gestakten Balance:", e);
           setStaked("0");
         }
         
-        // Rewards abrufen
+        // Rewards abrufen (earned function)
         try {
           const earned = await readContract({
             contract: staking,
             method: "function earned(address) view returns (uint256)",
             params: [account.address]
           });
-          setRewards((Number(earned) / Math.pow(10, 18)).toFixed(4));
+          // Rewards sind in rewardToken (D.FAITH) mit 18 decimals
+          const rewardsFormatted = Number(earned) / Math.pow(10, 18);
+          setRewards(rewardsFormatted.toFixed(6));
         } catch (e) {
           console.error("Fehler beim Abrufen der Rewards:", e);
           setRewards("0");
+        }
+        
+        // Total Staked und Current Reward Stage abrufen
+        try {
+          const totalStakedAmount = await readContract({
+            contract: staking,
+            method: "function getTotalStaked() view returns (uint256)",
+            params: []
+          });
+          setTotalStaked(totalStakedAmount.toString());
+          
+          const rewardStage = await readContract({
+            contract: staking,
+            method: "function getCurrentRewardStage() view returns (uint8, string)",
+            params: []
+          });
+          setCurrentRewardStage({
+            stage: Number(rewardStage[0]),
+            description: rewardStage[1]
+          });
+        } catch (e) {
+          console.error("Fehler beim Abrufen der Reward Stage:", e);
+          setCurrentRewardStage(null);
         }
         
       } catch (e) {
@@ -91,14 +119,30 @@ export default function StakeTab() {
     try {
       const staking = getContract({ client, chain: polygon, address: STAKING_CONTRACT });
       const dinvest = getContract({ client, chain: polygon, address: DINVEST_TOKEN });
-      const amountWei = (parseFloat(stakeAmount) * Math.pow(10, 18)).toString();
-      // Approve
-      await sendTransaction(prepareContractCall({ contract: dinvest, method: resolveMethod("approve"), params: [STAKING_CONTRACT, amountWei] }));
-      // Stake
-      await sendTransaction(prepareContractCall({ contract: staking, method: resolveMethod("stake"), params: [amountWei] }));
+      
+      // D.INVEST hat 0 decimals, also direkt den Wert verwenden
+      const amountToStake = parseInt(stakeAmount);
+      
+      // 1. Approve den Staking Contract
+      const approveTx = prepareContractCall({
+        contract: dinvest,
+        method: "function approve(address,uint256) returns (bool)",
+        params: [STAKING_CONTRACT, BigInt(amountToStake)]
+      });
+      await sendTransaction(approveTx);
+      
+      // 2. Stake die Token
+      const stakeTx = prepareContractCall({
+        contract: staking,
+        method: "function stake(uint256)",
+        params: [BigInt(amountToStake)]
+      });
+      await sendTransaction(stakeTx);
+      
       setTxStatus("success");
       setStakeAmount("");
     } catch (e) {
+      console.error("Stake Fehler:", e);
       setTxStatus("error");
     }
   };
@@ -109,11 +153,21 @@ export default function StakeTab() {
     setTxStatus("pending");
     try {
       const staking = getContract({ client, chain: polygon, address: STAKING_CONTRACT });
-      const amountWei = (parseFloat(unstakeAmount) * Math.pow(10, 18)).toString();
-      await sendTransaction(prepareContractCall({ contract: staking, method: resolveMethod("withdraw"), params: [amountWei] }));
+      
+      // D.INVEST hat 0 decimals
+      const amountToUnstake = parseInt(unstakeAmount);
+      
+      const unstakeTx = prepareContractCall({
+        contract: staking,
+        method: "function unstake(uint256)",
+        params: [BigInt(amountToUnstake)]
+      });
+      await sendTransaction(unstakeTx);
+      
       setTxStatus("success");
       setUnstakeAmount("");
     } catch (e) {
+      console.error("Unstake Fehler:", e);
       setTxStatus("error");
     }
   };
@@ -123,9 +177,17 @@ export default function StakeTab() {
     setTxStatus("pending");
     try {
       const staking = getContract({ client, chain: polygon, address: STAKING_CONTRACT });
-      await sendTransaction(prepareContractCall({ contract: staking, method: resolveMethod("getReward"), params: [] }));
+      
+      const claimTx = prepareContractCall({
+        contract: staking,
+        method: "function claimReward()",
+        params: []
+      });
+      await sendTransaction(claimTx);
+      
       setTxStatus("success");
     } catch (e) {
+      console.error("Claim Fehler:", e);
       setTxStatus("error");
     }
   };
@@ -161,20 +223,36 @@ export default function StakeTab() {
         </div>
       </div>
 
+      {/* Current Reward Stage Info */}
+      {currentRewardStage && (
+        <div className="bg-gradient-to-br from-blue-800/30 to-blue-900/30 rounded-xl p-4 border border-blue-700/50">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm font-medium text-blue-400">Aktuelle Reward-Stufe</div>
+              <div className="text-xs text-zinc-500">{currentRewardStage.description}</div>
+            </div>
+            <div className="text-right">
+              <div className="text-lg font-bold text-blue-400">Stufe {currentRewardStage.stage}</div>
+              <div className="text-xs text-zinc-500">Total gestaked: {totalStaked}</div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* APR und Details */}
       <div className="bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl p-6 border border-zinc-700">
         <div className="grid grid-cols-3 gap-4 text-center">
           <div>
-            <div className="text-2xl font-bold text-green-400 mb-1">15.5%</div>
-            <div className="text-xs text-zinc-500">Jährlicher Ertrag</div>
+            <div className="text-2xl font-bold text-green-400 mb-1">Wöchentlich</div>
+            <div className="text-xs text-zinc-500">Reward System</div>
           </div>
           <div>
-            <div className="text-2xl font-bold text-blue-400 mb-1">30 Tage</div>
-            <div className="text-xs text-zinc-500">Mindest-Lock</div>
+            <div className="text-2xl font-bold text-blue-400 mb-1">5 Stufen</div>
+            <div className="text-xs text-zinc-500">Reward Stages</div>
           </div>
           <div>
             <div className="text-2xl font-bold text-amber-400 mb-1">{loading ? "Laden..." : rewards}</div>
-            <div className="text-xs text-zinc-500">Belohnungen</div>
+            <div className="text-xs text-zinc-500">D.FAITH Rewards</div>
           </div>
         </div>
       </div>
@@ -234,24 +312,29 @@ export default function StakeTab() {
           {/* Staking Berechnung */}
           {stakeAmount && parseFloat(stakeAmount) > 0 && (
             <div className="bg-zinc-800/50 rounded-xl p-4 border border-zinc-700 space-y-2">
-              <div className="text-sm text-zinc-400 mb-3">Erwartete Erträge:</div>
+              <div className="text-sm text-zinc-400 mb-3">Reward System (abhängig von Total Staked):</div>
               <div className="flex justify-between text-sm">
-                <span className="text-zinc-500">Täglich:</span>
-                <span className="text-green-400">
-                  ~{((parseFloat(stakeAmount) * 0.155) / 365).toFixed(4)} D.INVEST
-                </span>
+                <span className="text-zinc-500">Stufe 1 (&lt; 10.000):</span>
+                <span className="text-green-400">0.1 D.FAITH pro Woche</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-zinc-500">Monatlich:</span>
-                <span className="text-green-400">
-                  ~{((parseFloat(stakeAmount) * 0.155) / 12).toFixed(2)} D.INVEST
-                </span>
+                <span className="text-zinc-500">Stufe 2 (&lt; 20.000):</span>
+                <span className="text-green-400">0.05 D.FAITH pro Woche</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-zinc-500">Jährlich:</span>
-                <span className="text-green-400">
-                  ~{(parseFloat(stakeAmount) * 0.155).toFixed(2)} D.INVEST
-                </span>
+                <span className="text-zinc-500">Stufe 3 (&lt; 40.000):</span>
+                <span className="text-green-400">0.025 D.FAITH pro Woche</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-zinc-500">Stufe 4 (&lt; 60.000):</span>
+                <span className="text-green-400">0.0125 D.FAITH pro Woche</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-zinc-500">Stufe 5 (&lt; 80.000):</span>
+                <span className="text-green-400">0.00625 D.FAITH pro Woche</span>
+              </div>
+              <div className="text-xs text-zinc-500 mt-2">
+                * Reward pro D.INVEST Token pro Woche, basierend auf total gestakten Token
               </div>
             </div>
           )}
@@ -366,7 +449,9 @@ export default function StakeTab() {
         <div className="text-xs text-zinc-500 space-y-1">
           <div>Contract: 0xe730555afA4DeA022976DdDc0cC7DBba1C98568A</div>
           <div>Network: Polygon (MATIC)</div>
-          <div>Lock Period: Minimum 30 Tage</div>
+          <div>Staking Token: D.INVEST (0 Decimals)</div>
+          <div>Reward Token: D.FAITH (18 Decimals)</div>
+          <div>Reward Calculation: Wöchentlich, stufenbasiert</div>
         </div>
       </div>
     </div>
