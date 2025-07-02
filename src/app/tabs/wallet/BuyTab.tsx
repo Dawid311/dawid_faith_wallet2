@@ -187,9 +187,9 @@ export default function BuyTab() {
           <div className="w-full mt-4">
             {showPolBuyModal ? (
               <div className="fixed inset-0 z-50 flex items-center justify-center min-h-screen bg-black/60">
-                <div className="bg-zinc-900 rounded-xl p-4 max-w-xs w-full border border-purple-500 text-center overflow-auto">
+                <div className="bg-zinc-900 rounded-xl p-4 max-w-full w-full sm:max-w-xs border border-purple-500 text-center overflow-y-auto h-[90vh] flex flex-col items-center justify-center">
                   <div className="mb-4 text-purple-400 text-2xl font-bold">POL kaufen</div>
-                  <div className="w-full max-w-xs mx-auto">
+                  <div className="w-full flex-1 flex items-center justify-center">
                     <BuyWidget
                       client={client}
                       tokenAddress={NATIVE_TOKEN_ADDRESS}
@@ -254,9 +254,11 @@ export default function BuyTab() {
             </div>
           </div>
           
+          {/* D.FAITH kaufen Button: Account-Check und Feedback */}
           <Button
             className="w-full mt-4 bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-3 rounded-xl hover:opacity-90 transition-opacity"
-            onClick={() => openDfaithPayModal({ chain: polygon, client })}
+            onClick={() => account?.address ? openDfaithPayModal({ chain: polygon, client }) : alert('Bitte Wallet verbinden!')}
+            disabled={!account?.address}
           >
             D.FAITH kaufen
           </Button>
