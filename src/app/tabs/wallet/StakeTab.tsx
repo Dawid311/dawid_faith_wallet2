@@ -25,6 +25,12 @@ export default function StakeTab() {
   const [dinvestDecimals, setDinvestDecimals] = useState(18);
   const [currentRewardStage, setCurrentRewardStage] = useState<{ stage: number; description: string } | null>(null);
   const [totalStaked, setTotalStaked] = useState("0");
+  const [poolInfo, setPoolInfo] = useState<{
+    totalStakers: number;
+    rewardRate: string;
+    stakingToken: string;
+    rewardToken: string;
+  } | null>(null);
 
   // Fetch balances
   useEffect(() => {
@@ -41,9 +47,9 @@ export default function StakeTab() {
         
         console.log("D.INVEST Balance Raw:", dinvestBalanceResult);
         
-        // D.INVEST hat 0 Decimals laut Contract!
-        const dinvestFormatted = Number(dinvestBalanceResult);
-        console.log("D.INVEST Balance Formatted (0 decimals):", dinvestFormatted);
+        // D.INVEST hat 18 Decimals im Contract, wird aber nur als ganze Zahlen angezeigt
+        const dinvestFormatted = Math.floor(Number(dinvestBalanceResult) / Math.pow(10, 18));
+        console.log("D.INVEST Balance Formatted (als ganze Zahl):", dinvestFormatted);
         setAvailable(dinvestFormatted.toString());
         
         // Staking Contract für gestakte Balance und Rewards
@@ -57,7 +63,9 @@ export default function StakeTab() {
             params: [account.address]
           });
           // stakeInfo[0] ist amount, stakeInfo[1] ist lastClaimed
-          setStaked(stakeInfo[0].toString()); // 0 decimals
+          // D.INVEST hat 18 decimals im Contract, wird aber als ganze Zahl angezeigt
+          const stakedFormatted = Math.floor(Number(stakeInfo[0]) / Math.pow(10, 18));
+          setStaked(stakedFormatted.toString());
         } catch (e) {
           console.error("Fehler beim Abrufen der gestakten Balance:", e);
           setStaked("0");
@@ -85,7 +93,9 @@ export default function StakeTab() {
             method: "function getTotalStaked() view returns (uint256)",
             params: []
           });
-          setTotalStaked(totalStakedAmount.toString());
+          // Total Staked ebenfalls als ganze Zahl anzeigen
+          const totalStakedFormatted = Math.floor(Number(totalStakedAmount) / Math.pow(10, 18));
+          setTotalStaked(totalStakedFormatted.toString());
           
           const rewardStage = await readContract({
             contract: staking,
@@ -96,6 +106,20 @@ export default function StakeTab() {
             stage: Number(rewardStage[0]),
             description: rewardStage[1]
           });
+          
+          // Pool-Informationen sammeln
+          try {
+            // Versuche weitere Pool-Daten abzurufen (falls verfügbar)
+            setPoolInfo({
+              totalStakers: 0, // Würde eine getTotalStakers() Funktion erfordern
+              rewardRate: "Wöchentlich",
+              stakingToken: "D.INVEST",
+              rewardToken: "D.FAITH"
+            });
+          } catch (poolError) {
+            console.log("Pool-Info nicht verfügbar:", poolError);
+          }
+          
         } catch (e) {
           console.error("Fehler beim Abrufen der Reward Stage:", e);
           setCurrentRewardStage(null);
@@ -120,14 +144,14 @@ export default function StakeTab() {
       const staking = getContract({ client, chain: polygon, address: STAKING_CONTRACT });
       const dinvest = getContract({ client, chain: polygon, address: DINVEST_TOKEN });
       
-      // D.INVEST hat 0 decimals, also direkt den Wert verwenden
-      const amountToStake = parseInt(stakeAmount);
+      // D.INVEST hat 18 decimals im Contract, auch wenn wir sie als ganze Zahlen anzeigen
+      const amountToStake = BigInt(Math.floor(parseFloat(stakeAmount)) * Math.pow(10, 18));
       
       // 1. Approve den Staking Contract
       const approveTx = prepareContractCall({
         contract: dinvest,
         method: "function approve(address,uint256) returns (bool)",
-        params: [STAKING_CONTRACT, BigInt(amountToStake)]
+        params: [STAKING_CONTRACT, amountToStake]
       });
       await sendTransaction(approveTx);
       
@@ -135,7 +159,7 @@ export default function StakeTab() {
       const stakeTx = prepareContractCall({
         contract: staking,
         method: "function stake(uint256)",
-        params: [BigInt(amountToStake)]
+        params: [amountToStake]
       });
       await sendTransaction(stakeTx);
       
@@ -154,13 +178,13 @@ export default function StakeTab() {
     try {
       const staking = getContract({ client, chain: polygon, address: STAKING_CONTRACT });
       
-      // D.INVEST hat 0 decimals
-      const amountToUnstake = parseInt(unstakeAmount);
+      // D.INVEST hat 18 decimals im Contract
+      const amountToUnstake = BigInt(Math.floor(parseFloat(unstakeAmount)) * Math.pow(10, 18));
       
       const unstakeTx = prepareContractCall({
         contract: staking,
         method: "function unstake(uint256)",
-        params: [BigInt(amountToUnstake)]
+        params: [amountToUnstake]
       });
       await sendTransaction(unstakeTx);
       
@@ -202,7 +226,7 @@ export default function StakeTab() {
       </div>
 
       {/* Staking Overview */}
-      <div className="grid grid-cols-2 gap-4 mb-6">
+      <div className="grid grid-cols-3 gap-4 mb-6">
         <div className="bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl p-4 border border-zinc-700 text-center">
           <div className="text-center">
             <div className="text-sm text-zinc-500 mb-1">Verfügbar</div>
@@ -221,38 +245,65 @@ export default function StakeTab() {
             <div className="text-xs text-zinc-500">D.INVEST</div>
           </div>
         </div>
+        <div className="bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl p-4 border border-zinc-700 text-center">
+          <div className="text-center">
+            <div className="text-sm text-zinc-500 mb-1">Pool Total</div>
+            <div className="text-xl font-bold text-blue-400">
+              {loading ? "Laden..." : totalStaked}
+            </div>
+            <div className="text-xs text-zinc-500">D.INVEST</div>
+          </div>
+        </div>
       </div>
 
       {/* Current Reward Stage Info */}
       {currentRewardStage && (
-        <div className="bg-gradient-to-br from-blue-800/30 to-blue-900/30 rounded-xl p-4 border border-blue-700/50">
-          <div className="flex items-center justify-between">
+        <div className="bg-gradient-to-br from-blue-800/30 to-blue-900/30 rounded-xl p-6 border border-blue-700/50">
+          <div className="flex items-center justify-between mb-4">
             <div>
-              <div className="text-sm font-medium text-blue-400">Aktuelle Reward-Stufe</div>
-              <div className="text-xs text-zinc-500">{currentRewardStage.description}</div>
+              <div className="text-lg font-bold text-blue-400 mb-1">Aktuelle Reward-Stufe {currentRewardStage.stage}</div>
+              <div className="text-sm text-zinc-300">{currentRewardStage.description}</div>
             </div>
             <div className="text-right">
-              <div className="text-lg font-bold text-blue-400">Stufe {currentRewardStage.stage}</div>
-              <div className="text-xs text-zinc-500">Total gestaked: {totalStaked}</div>
+              <div className="text-sm text-zinc-400">Pool Status</div>
+              <div className="text-lg font-bold text-blue-400">{totalStaked} Token</div>
+              <div className="text-xs text-zinc-500">gesamt gestaked</div>
+            </div>
+          </div>
+          
+          {/* Pool Statistics */}
+          <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-blue-700/30">
+            <div className="text-center">
+              <div className="text-sm font-semibold text-blue-300">Token</div>
+              <div className="text-xs text-zinc-400">D.INVEST → D.FAITH</div>
+            </div>
+            <div className="text-center">
+              <div className="text-sm font-semibold text-blue-300">Frequenz</div>
+              <div className="text-xs text-zinc-400">Wöchentlich</div>
+            </div>
+            <div className="text-center">
+              <div className="text-sm font-semibold text-blue-300">Meine Rewards</div>
+              <div className="text-xs text-zinc-400">{rewards} D.FAITH</div>
             </div>
           </div>
         </div>
       )}
 
-      {/* APR und Details */}
+      {/* Rewards Overview */}
       <div className="bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl p-6 border border-zinc-700">
-        <div className="grid grid-cols-3 gap-4 text-center">
+        <h3 className="text-lg font-bold text-amber-400 mb-4 text-center">Meine Staking Übersicht</h3>
+        <div className="grid grid-cols-3 gap-6 text-center">
           <div>
             <div className="text-2xl font-bold text-green-400 mb-1">Wöchentlich</div>
-            <div className="text-xs text-zinc-500">Reward System</div>
+            <div className="text-sm text-zinc-400">Reward-Auszahlung</div>
           </div>
           <div>
             <div className="text-2xl font-bold text-blue-400 mb-1">5 Stufen</div>
-            <div className="text-xs text-zinc-500">Reward Stages</div>
+            <div className="text-sm text-zinc-400">Reward-System</div>
           </div>
           <div>
-            <div className="text-2xl font-bold text-amber-400 mb-1">{loading ? "Laden..." : rewards}</div>
-            <div className="text-xs text-zinc-500">D.FAITH Rewards</div>
+            <div className="text-2xl font-bold text-amber-400 mb-1">{loading ? "..." : rewards}</div>
+            <div className="text-sm text-zinc-400">Verfügbare D.FAITH</div>
           </div>
         </div>
       </div>
@@ -311,30 +362,47 @@ export default function StakeTab() {
 
           {/* Staking Berechnung */}
           {stakeAmount && parseFloat(stakeAmount) > 0 && (
-            <div className="bg-zinc-800/50 rounded-xl p-4 border border-zinc-700 space-y-2">
-              <div className="text-sm text-zinc-400 mb-3">Reward System (abhängig von Total Staked):</div>
-              <div className="flex justify-between text-sm">
-                <span className="text-zinc-500">Stufe 1 (&lt; 10.000):</span>
-                <span className="text-green-400">0.1 D.FAITH pro Woche</span>
+            <div className="bg-zinc-800/50 rounded-xl p-6 border border-zinc-700">
+              <div className="text-lg font-semibold text-amber-400 mb-4 text-center">
+                Reward-System Übersicht
               </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-zinc-500">Stufe 2 (&lt; 20.000):</span>
-                <span className="text-green-400">0.05 D.FAITH pro Woche</span>
+              <div className="text-sm text-zinc-300 mb-4 text-center">
+                Rewards pro D.INVEST Token pro Woche (abhängig von Pool-Größe):
               </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-zinc-500">Stufe 3 (&lt; 40.000):</span>
-                <span className="text-green-400">0.025 D.FAITH pro Woche</span>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center p-3 bg-zinc-900/50 rounded-lg">
+                  <span className="text-zinc-300 font-medium">Stufe 1 (Pool kleiner als 10.000)</span>
+                  <span className="text-green-400 font-bold">0.1 D.FAITH/Woche</span>
+                </div>
+                <div className="flex justify-between items-center p-3 bg-zinc-900/50 rounded-lg">
+                  <span className="text-zinc-300 font-medium">Stufe 2 (Pool kleiner als 20.000)</span>
+                  <span className="text-green-400 font-bold">0.05 D.FAITH/Woche</span>
+                </div>
+                <div className="flex justify-between items-center p-3 bg-zinc-900/50 rounded-lg">
+                  <span className="text-zinc-300 font-medium">Stufe 3 (Pool kleiner als 40.000)</span>
+                  <span className="text-green-400 font-bold">0.025 D.FAITH/Woche</span>
+                </div>
+                <div className="flex justify-between items-center p-3 bg-zinc-900/50 rounded-lg">
+                  <span className="text-zinc-300 font-medium">Stufe 4 (Pool kleiner als 60.000)</span>
+                  <span className="text-green-400 font-bold">0.0125 D.FAITH/Woche</span>
+                </div>
+                <div className="flex justify-between items-center p-3 bg-zinc-900/50 rounded-lg">
+                  <span className="text-zinc-300 font-medium">Stufe 5 (Pool kleiner als 80.000)</span>
+                  <span className="text-green-400 font-bold">0.00625 D.FAITH/Woche</span>
+                </div>
               </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-zinc-500">Stufe 4 (&lt; 60.000):</span>
-                <span className="text-green-400">0.0125 D.FAITH pro Woche</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-zinc-500">Stufe 5 (&lt; 80.000):</span>
-                <span className="text-green-400">0.00625 D.FAITH pro Woche</span>
-              </div>
-              <div className="text-xs text-zinc-500 mt-2">
-                * Reward pro D.INVEST Token pro Woche, basierend auf total gestakten Token
+              <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                <div className="text-sm text-blue-300 font-medium">
+                  💡 Ihre geschätzte wöchentliche Reward: 
+                  <span className="text-blue-400 font-bold ml-2">
+                    {currentRewardStage ? 
+                      `≈ ${(parseFloat(stakeAmount) * (currentRewardStage.stage === 1 ? 0.1 : 
+                                                        currentRewardStage.stage === 2 ? 0.05 : 
+                                                        currentRewardStage.stage === 3 ? 0.025 : 
+                                                        currentRewardStage.stage === 4 ? 0.0125 : 0.00625)).toFixed(4)} D.FAITH` 
+                      : "Wird berechnet..."}
+                  </span>
+                </div>
               </div>
             </div>
           )}
