@@ -130,21 +130,53 @@ export default function BuyTab() {
     window.open('https://dein-stripe-link.de', '_blank');
   };
 
-  // Uniswap Quote holen
-  const fetchUniswapQuote = async (amount: string) => {
+  // Swap Quote holen (OpenOcean, Fallback Uniswap)
+  const fetchSwapQuote = async (amount: string) => {
     setSwapLoading(true);
     setSwapError(null);
     setSwapQuote(null);
+    const srcToken = "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270"; // POL/MATIC
+    const destToken = "0x67f1439bd51Cfb0A46f739Ec8D5663F41d027bff"; // D.FAITH
+    const amountWei = (parseFloat(amount) * 1e18).toString();
+    // 1. OpenOcean
     try {
-      // POL (MATIC) -> D.FAITH
-      const srcToken = "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270"; // POL/MATIC
-      const destToken = "0x67f1439bd51Cfb0A46f739Ec8D5663F41d027bff"; // D.FAITH
-      const amountWei = (parseFloat(amount) * 1e18).toString();
+      const url = `https://open-api.openocean.finance/v4/polygon/swap?inTokenAddress=${srcToken}&outTokenAddress=${destToken}&amountDecimals=${amountWei}&slippage=1&account=${account?.address || ""}`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.data && data.data.outAmount && data.data.txData) {
+          setSwapQuote({
+            provider: "OpenOcean",
+            quote: { tokenOutAmount: data.data.outAmount },
+            transaction: {
+              to: data.data.txTo,
+              data: data.data.txData,
+              value: data.data.value,
+            },
+            route: data.data.path || [],
+            slippagePercent: 1,
+          });
+          setSwapLoading(false);
+          return;
+        }
+      }
+      throw new Error("OpenOcean Quote nicht verfügbar");
+    } catch (e) {
+      // Fallback auf Uniswap
+    }
+    // 2. Uniswap
+    try {
       const url = `https://api.uniswap.org/v1/quote?protocols=v3&tokenInAddress=${srcToken}&tokenInChainId=137&tokenOutAddress=${destToken}&tokenOutChainId=137&amount=${amountWei}&type=exactIn`;
       const res = await fetch(url);
       if (!res.ok) throw new Error("Uniswap API Fehler");
       const data = await res.json();
-      setSwapQuote(data);
+      setSwapQuote({
+        provider: "Uniswap",
+        quote: data.quote,
+        transaction: data.transaction,
+        route: data.route,
+        slippagePercent: data.quote?.slippagePercent,
+      });
     } catch (e: any) {
       setSwapError(e.message || "Fehler beim Abrufen der Quote");
     } finally {
@@ -351,7 +383,7 @@ export default function BuyTab() {
               />
               <Button
                 className="w-full bg-gradient-to-r from-purple-500 to-purple-700 text-white font-bold py-2 rounded-xl mt-2"
-                onClick={() => swapAmount && parseFloat(swapAmount) > 0 && fetchUniswapQuote(swapAmount)}
+                onClick={() => swapAmount && parseFloat(swapAmount) > 0 && fetchSwapQuote(swapAmount)}
                 disabled={swapLoading || !swapAmount || parseFloat(swapAmount) <= 0 || isSwapPending}
               >
                 {swapLoading ? "Lade Quote..." : "Quote holen"}
@@ -359,6 +391,7 @@ export default function BuyTab() {
               {swapError && <div className="text-red-400 text-xs mt-2">{swapError}</div>}
               {swapQuote && (
                 <div className="mt-4 text-left text-xs bg-zinc-800 rounded-lg p-3">
+                  <div><b>Provider:</b> {swapQuote.provider}</div>
                   <div><b>Du erhältst:</b> <span className="text-amber-400 font-bold">{(Number(swapQuote.quote.tokenOutAmount) / 1e18).toFixed(4)} D.FAITH</span></div>
                   <div><b>Slippage:</b> {swapQuote.quote.slippagePercent || "-"}%</div>
                   <div><b>Route:</b> {swapQuote.route?.map((r: any) => r.tokenInSymbol + "→" + r.tokenOutSymbol).join(", ")}</div>

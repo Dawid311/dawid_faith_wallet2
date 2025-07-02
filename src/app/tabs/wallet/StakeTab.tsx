@@ -48,10 +48,10 @@ export default function StakeTab() {
         } catch {}
         // Balance abfragen
         const bal = await contractRead(dinvest, "balanceOf", [account.address]);
-        setAvailable((Number(bal) / Math.pow(10, decimals)).toFixed(4));
+        setAvailable((Number(bal) / Math.pow(10, decimals)).toFixed(0));
         const staking = getContract({ client, chain: polygon, address: STAKING_CONTRACT });
         const stakedBal = await contractRead(staking, "balanceOf", [account.address]);
-        setStaked((Number(stakedBal) / Math.pow(10, decimals)).toFixed(4));
+        setStaked((Number(stakedBal) / Math.pow(10, decimals)).toFixed(0));
         const earned = await contractRead(staking, "earned", [account.address]);
         setRewards((Number(earned) / Math.pow(10, decimals)).toFixed(4));
       } catch (e) {
