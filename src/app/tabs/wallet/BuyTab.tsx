@@ -5,7 +5,7 @@ import { useActiveAccount, useSendTransaction, BuyWidget } from "thirdweb/react"
 import { polygon } from "thirdweb/chains";
 import { NATIVE_TOKEN_ADDRESS } from "thirdweb";
 import { client } from "../../client";
-import { getContract, sendAndConfirmTransaction, writeContract } from "thirdweb";
+import { getContract, sendAndConfirmTransaction } from "thirdweb";
 import { JsonRpcProvider, parseUnits, Contract } from "ethers";
 
 // ABIs als const deklarieren
