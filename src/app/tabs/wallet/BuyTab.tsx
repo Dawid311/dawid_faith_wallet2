@@ -7,9 +7,10 @@ import { NATIVE_TOKEN_ADDRESS, getContract, prepareContractCall, sendAndConfirmT
 import { client } from "../../client";
 import { balanceOf, approve } from "thirdweb/extensions/erc20";
 
-const DFAITH_TOKEN = "0x67f1439bd51Cfb0A46f739Ec8D5663F41d027bff";
-const DFAITH_ICON = "https://assets.coingecko.com/coins/images/35564/large/dfaith.png";
-const POL_TOKEN = "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270"; // WMATIC/POL
+const DFAITH_TOKEN = "0xF051E3B0335eB332a7ef0dc308BB4F0c10301060"; // Neue D.FAITH Token-Adresse
+const DFAITH_DECIMALS = 2; // Neue Dezimalstellen
+const POL_TOKEN = "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270"; // POL (WMATIC)
+const POL_DECIMALS = 18;
 const UNISWAP_ROUTER = "0xa5E0829CaCEd8fFDD4De3c43696c57F7D7A678ff"; // QuickSwap Router auf Polygon
 
 export default function BuyTab() {
@@ -53,8 +54,8 @@ export default function BuyTab() {
         if (response.ok) {
           const data = await response.json();
           if (data && data.data && data.data.outAmount) {
-            // outAmount ist in D.FAITH (mit Decimals)
-            price = Number(data.data.outAmount) / Math.pow(10, 18);
+            // outAmount ist in D.FAITH (mit 2 Decimals) - daher durch 10^2 teilen
+            price = Number(data.data.outAmount) / Math.pow(10, DFAITH_DECIMALS);
           } else {
             errorMsg = "OpenOcean: Keine Quote erhalten";
           }
@@ -161,7 +162,9 @@ export default function BuyTab() {
     setSwapTxStatus("pending");
     try {
       // OpenOcean v3 erwartet amount als Integer (ohne Decimals!)
+      // Für native POL: 1 POL = 1 (ohne 18 Decimals)
       const amountInt = Math.floor(parseFloat(swapAmountPol)).toString();
+      
       // 1. Hole Swap-Transaktionsdaten von OpenOcean v3
       const openOceanApi = `https://open-api.openocean.finance/v3/polygon/swap_quote`;
       const params = {
@@ -294,7 +297,7 @@ export default function BuyTab() {
                 ) : priceError ? (
                   <span className="text-red-400">{priceError}</span>
                 ) : dfaithPrice ? (
-                  `1 POL = ${dfaithPrice.toFixed(0)} D.FAITH`
+                  `1 POL = ${dfaithPrice.toFixed(2)} D.FAITH`
                 ) : (
                   "Preis nicht verfügbar"
                 )}
@@ -354,7 +357,7 @@ export default function BuyTab() {
                     <div className="flex justify-between text-sm">
                       <span className="text-zinc-400">Geschätzte D.FAITH:</span>
                       <span className="text-amber-400 font-bold">
-                        ~{(parseFloat(swapAmountPol) * dfaithPrice).toFixed(0)}
+                        ~{(parseFloat(swapAmountPol) * dfaithPrice).toFixed(2)}
                       </span>
                     </div>
                   </div>

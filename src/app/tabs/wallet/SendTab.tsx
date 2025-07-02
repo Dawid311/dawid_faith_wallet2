@@ -8,6 +8,10 @@ export default function SendTab() {
   const [selectedToken, setSelectedToken] = useState("DFAITH");
   const [isSending, setIsSending] = useState(false);
 
+  // Token-Konstanten mit neuen Adressen
+  const DFAITH_TOKEN = "0xF051E3B0335eB332a7ef0dc308BB4F0c10301060"; // Neue D.FAITH Token-Adresse
+  const DFAITH_DECIMALS = 2; // Neue Dezimalstellen
+
   const handleSend = async () => {
     if (!sendAmount || !sendToAddress) return;
     
@@ -51,7 +55,7 @@ export default function SendTab() {
             </div>
             <div className="text-center">
               <div className="text-xs font-medium">D.FAITH</div>
-              <div className="text-[10px] opacity-75">0.0000</div>
+              <div className="text-[10px] opacity-75">0.00</div>
             </div>
           </button>
           
@@ -111,21 +115,23 @@ export default function SendTab() {
             <label className="text-sm font-medium text-zinc-300">Betrag</label>
             <span className="text-xs text-zinc-500">
               Verfügbar: <span className={selectedToken === "POL" ? "text-purple-400" : "text-amber-400"}>
-                0.0000 {selectedToken}
+                0.00 {selectedToken}
               </span>
             </span>
           </div>
           <div className="relative">
             <input 
               type="number"
-              placeholder="0.0"
+              placeholder="0.00"
+              step="0.01"
+              min="0"
               className="w-full bg-zinc-900/80 border border-zinc-600 rounded-xl py-3 px-4 pr-16 text-zinc-300 focus:border-amber-500 focus:outline-none"
               value={sendAmount}
               onChange={(e) => setSendAmount(e.target.value)}
             />
             <button 
               className="absolute right-3 top-1/2 transform -translate-y-1/2 text-xs px-3 py-1 bg-amber-500/20 text-amber-400 rounded-lg hover:bg-amber-500/30 transition"
-              onClick={() => setSendAmount("0")}
+              onClick={() => setSendAmount("0.00")}
             >
               MAX
             </button>
@@ -142,7 +148,7 @@ export default function SendTab() {
             <div className="flex justify-between">
               <span className="text-zinc-400">Gesamtkosten:</span>
               <span className="text-zinc-300">
-                {sendAmount || "0"} {selectedToken} + 0.001 POL
+                {sendAmount || "0.00"} {selectedToken} + 0.001 POL
               </span>
             </div>
             <div className="flex justify-between">

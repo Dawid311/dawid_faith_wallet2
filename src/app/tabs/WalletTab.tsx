@@ -122,14 +122,14 @@ export default function WalletTab() {
   
   // Konstanten für Token mit echten Contract-Adressen
   const DFAITH_TOKEN = {
-    address: "0x67f1439bd51Cfb0A46f739Ec8D5663F41d027bff", // D.FAITH Token-Contract
-    decimals: 18,
+    address: "0xF051E3B0335eB332a7ef0dc308BB4F0c10301060", // Neue D.FAITH Token-Contract-Adresse
+    decimals: 2, // Neue Dezimalstellen
     symbol: "D.FAITH"
   };
 
   const DINVEST_TOKEN = {
-    address: "0x72a428F03d7a301cEAce084366928b99c4d757bD", // D.INVEST Token-Contract
-    decimals: 18,
+    address: "0x90aCC32F7b0B1CACc3958a260c096c10CCfa0383", // Neue D.INVEST Token-Contract-Adresse
+    decimals: 0, // Neue Dezimalstellen (0 statt 18)
     symbol: "D.INVEST"
   };
 
@@ -157,12 +157,12 @@ export default function WalletTab() {
       
       // D.FAITH pro POL von Paraswap holen
       const response = await fetch(
-        `https://apiv5.paraswap.io/prices?srcToken=0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270&destToken=0x67f1439bd51Cfb0A46f739Ec8D5663F41d027bff&amount=1000000000000000000&srcDecimals=18&destDecimals=18&network=137`
+        `https://apiv5.paraswap.io/prices?srcToken=0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270&destToken=0xF051E3B0335eB332a7ef0dc308BB4F0c10301060&amount=1000000000000000000&srcDecimals=18&destDecimals=2&network=137`
       );
       
       if (response.ok) {
         const data = await response.json();
-        const dfaithPerPol = Number(data.priceRoute.destAmount) / Math.pow(10, 18);
+        const dfaithPerPol = Number(data.priceRoute.destAmount) / Math.pow(10, 2);
         const dfaithPriceEur = polPriceEur / dfaithPerPol;
         setDfaithPriceEur(dfaithPriceEur);
       } else {
@@ -218,14 +218,14 @@ export default function WalletTab() {
       
       // Balances formatieren und setzen
       const dfaithFormatted = Number(dfaithBalanceResult) / Math.pow(10, DFAITH_TOKEN.decimals);
-      const dinvestFormatted = Number(dinvestBalanceResult) / Math.pow(10, DINVEST_TOKEN.decimals);
+      const dinvestFormatted = Number(dinvestBalanceResult) / Math.pow(10, DINVEST_TOKEN.decimals); // Math.pow(10, 0) = 1
       
-      setDfaithBalance({ displayValue: dfaithFormatted.toFixed(4) });
-      setDinvestBalance({ displayValue: Math.floor(dinvestFormatted).toString() });
+      setDfaithBalance({ displayValue: dfaithFormatted.toFixed(2) });
+      setDinvestBalance({ displayValue: Math.floor(dinvestFormatted).toString() }); // Bleibt als ganze Zahl
       
     } catch (error) {
       console.error("Fehler beim Abrufen der Balances:", error);
-      setDfaithBalance({ displayValue: "0.0000" });
+      setDfaithBalance({ displayValue: "0.00" });
       setDinvestBalance({ displayValue: "0" });
     }
   };
@@ -332,7 +332,7 @@ export default function WalletTab() {
             <div className="flex flex-col items-center p-4 bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl border border-zinc-700 w-full mb-6">
               <span className="uppercase text-xs tracking-widest text-amber-500/80 mb-2">D.FAITH</span>
               <div className="text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 drop-shadow-sm">
-                {dfaithBalance ? Number(dfaithBalance.displayValue).toFixed(4) : "0.00"}
+                {dfaithBalance ? Number(dfaithBalance.displayValue).toFixed(2) : "0.00"}
               </div>
               
               <div className="w-full h-px bg-gradient-to-r from-transparent via-zinc-700/50 to-transparent my-3"></div>
