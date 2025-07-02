@@ -42,8 +42,7 @@ export default function StakeTab() {
         console.log("D.INVEST Balance Raw:", dinvestBalanceResult);
         
         // D.INVEST hat 0 Decimals laut Contract!
-        const dinvestFormatted = Number(dinvestBalanceResult);
-        console.log("D.INVEST Balance Formatted (0 decimals):", dinvestFormatted);
+        const dinvestFormatted = Math.floor(Number(dinvestBalanceResult));
         setAvailable(dinvestFormatted.toString());
         
         // Staking Contract für gestakte Balance und Rewards
@@ -57,7 +56,7 @@ export default function StakeTab() {
             params: [account.address]
           });
           // stakeInfo[0] ist amount, stakeInfo[1] ist lastClaimed
-          setStaked(stakeInfo[0].toString()); // 0 decimals
+          setStaked(Math.floor(Number(stakeInfo[0])).toString()); // 0 decimals
         } catch (e) {
           console.error("Fehler beim Abrufen der gestakten Balance:", e);
           setStaked("0");
@@ -72,7 +71,7 @@ export default function StakeTab() {
           });
           // Rewards sind in rewardToken (D.FAITH) mit 18 decimals
           const rewardsFormatted = Number(earned) / Math.pow(10, 18);
-          setRewards(rewardsFormatted.toFixed(6));
+          setRewards(rewardsFormatted.toFixed(4));
         } catch (e) {
           console.error("Fehler beim Abrufen der Rewards:", e);
           setRewards("0");
@@ -243,15 +242,15 @@ export default function StakeTab() {
       <div className="bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl p-6 border border-zinc-700">
         <div className="grid grid-cols-3 gap-4 text-center">
           <div>
-            <div className="text-2xl font-bold text-green-400 mb-1">Wöchentlich</div>
+            <div className="text-lg font-bold text-green-400 mb-1 sm:text-2xl">Wöchentlich</div>
             <div className="text-xs text-zinc-500">Reward System</div>
           </div>
           <div>
-            <div className="text-2xl font-bold text-blue-400 mb-1">5 Stufen</div>
+            <div className="text-lg font-bold text-blue-400 mb-1 sm:text-2xl">5 Stufen</div>
             <div className="text-xs text-zinc-500">Reward Stages</div>
           </div>
           <div>
-            <div className="text-2xl font-bold text-amber-400 mb-1">{loading ? "Laden..." : rewards}</div>
+            <div className="text-lg font-bold text-amber-400 mb-1 sm:text-2xl">{loading ? "Laden..." : rewards}</div>
             <div className="text-xs text-zinc-500">D.FAITH Rewards</div>
           </div>
         </div>

@@ -40,7 +40,7 @@ export default function BuyTab() {
         const openOceanApi = `https://open-api.openocean.finance/v3/polygon/quote`;
         const params = {
           chain: "polygon",
-          inTokenAddress: POL_TOKEN,
+          inTokenAddress: "0x0000000000000000000000000000000000001010", // Polygon Native Token (MATIC)
           outTokenAddress: DFAITH_TOKEN,
           amount: "1", // 1 POL (ohne Decimals)
           gasPrice: "50", // Gaspreis in GWEI als String (Pflichtfeld laut OpenOcean)
@@ -166,7 +166,7 @@ export default function BuyTab() {
       const openOceanApi = `https://open-api.openocean.finance/v3/polygon/swap_quote`;
       const params = {
         chain: "polygon",
-        inTokenAddress: POL_TOKEN,
+        inTokenAddress: "0x0000000000000000000000000000000000001010", // Polygon Native Token (MATIC)
         outTokenAddress: DFAITH_TOKEN,
         amount: amountInt, // Amount ohne Decimals!
         slippage: 1, // 1% Slippage

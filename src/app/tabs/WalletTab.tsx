@@ -394,25 +394,18 @@ export default function WalletTab() {
               });
               return dinvestBalance;
             })() && (
-              <div className="flex flex-col p-4 bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl border border-zinc-700 w-full">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="uppercase text-xs tracking-widest text-amber-500/80">D.INVEST</span>
+              <div className="flex flex-col items-center p-4 bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl border border-zinc-700 w-full">
+                <div className="uppercase text-xs tracking-widest text-amber-500/80 mb-2">D.INVEST</div>
+                <div className="text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 mb-2">
+                  {Math.floor(Number(dinvestBalance?.displayValue || 0))}
                 </div>
-                
-                <div className="flex items-center justify-between">
-                  <div className="text-2xl md:text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500">
-                    {Number(dinvestBalance?.displayValue || 0).toFixed(4)}
-                  </div>
-                  
-                  <button 
-                    onClick={() => setShowStakeModal(true)}
-                    className="flex items-center gap-2 px-4 py-1.5 rounded-lg bg-gradient-to-r from-amber-500/20 to-amber-600/20 text-amber-400 hover:from-amber-500/30 hover:to-amber-600/30 transition-all border border-amber-500/20"
-                  >
-                    <FaLock size={12} />
-                    <span className="text-sm font-medium">Staken & Verdienen</span>
-                  </button>
-                </div>
-                
+                <button 
+                  onClick={() => setShowStakeModal(true)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-amber-500/20 to-amber-600/20 text-amber-400 hover:from-amber-500/30 hover:to-amber-600/30 transition-all border border-amber-500/20 mt-2"
+                >
+                  <FaLock size={14} />
+                  <span className="text-sm font-medium">Staken & Verdienen</span>
+                </button>
                 {/* Gestaked Anzeige */}
                 <div className="text-xs text-zinc-500 mt-2">
                   Gestaked: <span className="text-amber-400/80">0</span>
