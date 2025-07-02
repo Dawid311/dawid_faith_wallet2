@@ -39,12 +39,17 @@ export default function BuyTab() {
         // OpenOcean v3 Quote API
         const openOceanApi = `https://open-api.openocean.finance/v3/polygon/quote`;
         const params = {
+          chain: "polygon",
           inTokenAddress: POL_TOKEN,
           outTokenAddress: DFAITH_TOKEN,
           amount: "1", // 1 POL (ohne Decimals)
+          gasPrice: "50", // Gaspreis in GWEI als String (Pflichtfeld laut OpenOcean)
         };
-        const url = openOceanApi + '?' + Object.entries(params).map(([k,v]) => `${k}=${v}`).join('&');
-        const response = await fetch(url);
+        const response = await fetch(openOceanApi, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(params),
+        });
         if (response.ok) {
           const data = await response.json();
           if (data && data.data && data.data.outAmount) {
@@ -160,21 +165,21 @@ export default function BuyTab() {
       // 1. Hole Swap-Transaktionsdaten von OpenOcean v3
       const openOceanApi = `https://open-api.openocean.finance/v3/polygon/swap_quote`;
       const params = {
+        chain: "polygon",
         inTokenAddress: POL_TOKEN,
         outTokenAddress: DFAITH_TOKEN,
         amount: amountInt, // Amount ohne Decimals!
         slippage: 1, // 1% Slippage
         account: account.address,
-        gasPrice: '',
-        referrer: '',
-        disableEstimate: false
+        gasPrice: "50", // Gaspreis in GWEI als String
       };
-      const url = openOceanApi + '?' + Object.entries(params).map(([k,v]) => `${k}=${v}`).join('&');
-      console.log("OpenOcean v3 API URL:", url);
-      const response = await fetch(url);
+      const response = await fetch(openOceanApi, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(params),
+      });
       if (!response.ok) throw new Error('OpenOcean API Fehler: ' + response.status);
       const data = await response.json();
-      console.log("OpenOcean v3 API Antwort:", data);
       if (!data.data || !data.data.tx) throw new Error('OpenOcean: Keine Transaktionsdaten erhalten');
       const tx = data.data.tx;
       // 2. Sende die Transaktion (raw tx)
