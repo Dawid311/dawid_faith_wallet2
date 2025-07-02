@@ -6,6 +6,9 @@ import { polygon } from "thirdweb/chains";
 import { NATIVE_TOKEN_ADDRESS } from "thirdweb";
 import { client } from "../../client";
 
+const DFAITH_TOKEN = "0x67f1439bd51Cfb0A46f739Ec8D5663F41d027bff";
+const DFAITH_ICON = "https://assets.coingecko.com/coins/images/35564/large/dfaith.png"; // Optional, falls vorhanden
+
 export default function BuyTab() {
   const [dfaithPrice, setDfaithPrice] = useState<number | null>(null);
   const [isLoadingPrice, setIsLoadingPrice] = useState(true);
@@ -129,77 +132,21 @@ export default function BuyTab() {
     window.open('https://dein-stripe-link.de', '_blank');
   };
 
-  // Swap Quote holen (OpenOcean, Fallback Uniswap)
-  const fetchSwapQuote = async (amount: string) => {
-    setSwapLoading(true);
-    setSwapError(null);
-    setSwapQuote(null);
-    const srcToken = "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270"; // POL/MATIC
-    const destToken = "0x67f1439bd51Cfb0A46f739Ec8D5663F41d027bff"; // D.FAITH
-    const amountWei = (parseFloat(amount) * 1e18).toString();
-    // 1. OpenOcean
-    try {
-      const url = `https://open-api.openocean.finance/v4/polygon/swap?inTokenAddress=${srcToken}&outTokenAddress=${destToken}&amountDecimals=${amountWei}&slippage=1&account=${account?.address || ""}`;
-      const res = await fetch(url);
-      if (res.ok) {
-        const data = await res.json();
-        if (data && data.data && data.data.outAmount && data.data.txData) {
-          setSwapQuote({
-            provider: "OpenOcean",
-            quote: { tokenOutAmount: data.data.outAmount },
-            transaction: {
-              to: data.data.txTo,
-              data: data.data.txData,
-              value: data.data.value,
-            },
-            route: data.data.path || [],
-            slippagePercent: 1,
-          });
-          setSwapLoading(false);
-          return;
-        }
-      }
-      throw new Error("OpenOcean Quote nicht verfügbar");
-    } catch (e) {
-      // Fallback auf Uniswap
-    }
-    // 2. Uniswap
-    try {
-      const url = `https://api.uniswap.org/v1/quote?protocols=v3&tokenInAddress=${srcToken}&tokenInChainId=137&tokenOutAddress=${destToken}&tokenOutChainId=137&amount=${amountWei}&type=exactIn`;
-      const res = await fetch(url);
-      if (!res.ok) throw new Error("Uniswap API Fehler");
-      const data = await res.json();
-      setSwapQuote({
-        provider: "Uniswap",
-        quote: data.quote,
-        transaction: data.transaction,
-        route: data.route,
-        slippagePercent: data.quote?.slippagePercent,
-      });
-    } catch (e: any) {
-      setSwapError(e.message || "Fehler beim Abrufen der Quote");
-    } finally {
-      setSwapLoading(false);
-    }
-  };
-
-  const handleExecuteSwap = async () => {
-    if (!swapQuote || !swapQuote.transaction || !account?.address) return;
-    setSwapStatus("pending");
-    try {
-      const tx = swapQuote.transaction;
-      await sendTransaction({
-        to: tx.to,
-        data: tx.data,
-        value: tx.value ? BigInt(tx.value) : undefined,
-        chain: polygon,
-        client,
-      });
-      setSwapStatus("success");
-    } catch (e) {
-      setSwapStatus("error");
-    }
-  };
+  // useSendTransaction für D.FAITH PayModal
+  const { mutate: openDfaithPayModal } = useSendTransaction({
+    payModal: {
+      supportedTokens: {
+        "137": [
+          {
+            address: DFAITH_TOKEN,
+            name: "D.FAITH",
+            symbol: "DFAITH",
+            icon: DFAITH_ICON,
+          },
+        ],
+      },
+    },
+  });
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -307,7 +254,7 @@ export default function BuyTab() {
           
           <Button
             className="w-full mt-4 bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-3 rounded-xl hover:opacity-90 transition-opacity"
-            onClick={() => setShowBuyModal(true)}
+            onClick={() => openDfaithPayModal({ chain: polygon, client })}
           >
             D.FAITH kaufen
           </Button>
@@ -383,62 +330,6 @@ export default function BuyTab() {
               className="w-full mt-2 text-zinc-400 text-xs underline"
               onClick={() => setShowInvestModal(false)}
             >Abbrechen</button>
-          </div>
-        </div>
-      )}
-
-      {/* Swap Modal für D.FAITH */}
-      {showBuyModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <div className="bg-zinc-900 rounded-xl p-8 max-w-xs w-full border border-amber-400 text-center">
-            <div className="mb-4 text-amber-400 text-2xl font-bold">D.FAITH Swap</div>
-            <div className="mb-4 text-zinc-300 text-sm">
-              <div className="mb-2">Wie viel <span className="text-purple-400 font-bold">POL</span> möchtest du swappen?</div>
-              <input
-                type="number"
-                min="0"
-                step="0.001"
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-xl py-2 px-3 text-lg font-bold text-purple-400 mb-2"
-                placeholder="0.01 POL"
-                value={swapAmount}
-                onChange={e => setSwapAmount(e.target.value)}
-                disabled={isSwapPending}
-              />
-              <Button
-                className="w-full bg-gradient-to-r from-purple-500 to-purple-700 text-white font-bold py-2 rounded-xl mt-2"
-                onClick={() => swapAmount && parseFloat(swapAmount) > 0 && fetchSwapQuote(swapAmount)}
-                disabled={swapLoading || !swapAmount || parseFloat(swapAmount) <= 0 || isSwapPending}
-              >
-                {swapLoading ? "Lade Quote..." : "Quote holen"}
-              </Button>
-              {swapError && <div className="text-red-400 text-xs mt-2">{swapError}</div>}
-              {swapQuote && (
-                <div className="mt-4 text-left text-xs bg-zinc-800 rounded-lg p-3">
-                  <div><b>Provider:</b> {swapQuote.provider}</div>
-                  <div><b>Du erhältst:</b> <span className="text-amber-400 font-bold">{(Number(swapQuote.quote.tokenOutAmount) / 1e18).toFixed(4)} D.FAITH</span></div>
-                  <div><b>Slippage:</b> {swapQuote.quote.slippagePercent || "-"}%</div>
-                  <div><b>Route:</b> {swapQuote.route?.map((r: any) => r.tokenInSymbol + "→" + r.tokenOutSymbol).join(", ")}</div>
-                  <Button
-                    className="w-full bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-2 rounded-xl mt-4"
-                    onClick={handleExecuteSwap}
-                    disabled={isSwapPending}
-                  >
-                    {isSwapPending ? "Sende Swap..." : "Swap ausführen"}
-                  </Button>
-                  {swapStatus === "success" && <div className="text-green-400 text-xs mt-2">Swap erfolgreich!</div>}
-                  {swapStatus === "error" && <div className="text-red-400 text-xs mt-2">Swap fehlgeschlagen!</div>}
-                  {swapStatus === "pending" && <div className="text-yellow-400 text-xs mt-2">Transaktion läuft...</div>}
-                </div>
-              )}
-            </div>
-            <Button
-              className="w-full bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-2 rounded-xl mt-4"
-              onClick={() => setShowBuyModal(false)}
-              autoFocus
-              disabled={isSwapPending}
-            >
-              Schließen
-            </Button>
           </div>
         </div>
       )}
