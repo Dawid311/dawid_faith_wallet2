@@ -92,7 +92,8 @@ export default function WalletTab() {
   const [slippage, setSlippage] = useState("1"); // Default 1%
   const [needsApproval, setNeedsApproval] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
-  const [swapStep, setSwapStep] = useState<"input" | "approve" | "swap" | "success">("input");
+  const [swapStep, setSwapStep] = useState<"input" | "approve" | "swap" | "success" | "error">("input");
+  const [swapError, setSwapError] = useState<string | null>(null);
   
   // Neue States für das Senden Modal
   const [sendAmount, setSendAmount] = useState("");
@@ -192,7 +193,7 @@ export default function WalletTab() {
 
   const formatAddress = (address: string) => `${address.slice(0, 6)}...${address.slice(-4)}`;
 
-  // Token-Freigabe behandeln
+  // Token-Freigabe behandeln mit echtem Thirdweb approve
   const handleApproval = async () => {
     if (!account?.address || !swapAmount) return;
     
@@ -200,50 +201,101 @@ export default function WalletTab() {
     setIsApproving(true);
     
     try {
-      // Simuliere Token-Freigabe - in Realität würde hier die echte approve Funktion verwendet
-      await new Promise(resolve => setTimeout(resolve, 2000)); // Simuliere Netzwerk-Delay
+      const dfaithContract = getContract({
+        client,
+        chain: polygon,
+        address: DFAITH_TOKEN.address
+      });
       
-      console.log("Token-Freigabe erfolgreich für:", swapAmount + " D.FAITH");
+      // 1inch Router Adresse für Polygon
+      const ONEINCH_ROUTER = "0x111111125421cA6dc452d289314280a0f8842A65";
       
-      setNeedsApproval(false);
-      setSwapStep("input");
+      // Bereite Approval-Transaktion vor
+      const approvalAmount = parseFloat(swapAmount) * Math.pow(10, DFAITH_TOKEN.decimals);
+      
+      const transaction = approve({
+        contract: dfaithContract,
+        spender: ONEINCH_ROUTER,
+        amount: approvalAmount.toString()
+      });
+      
+      // Sende Transaktion über sendTransaction Hook
+      sendTransaction(transaction, {
+        onSuccess: (result) => {
+          console.log("Token-Freigabe erfolgreich:", result);
+          setNeedsApproval(false);
+          setSwapStep("input");
+          setSwapError(null);
+          // Merke erfolgreiche Approval für spätere Checks
+          localStorage.setItem(`approval_${account.address}_dfaith`, "true");
+        },
+        onError: (error) => {
+          console.error("Freigabe fehlgeschlagen:", error);
+          setSwapStep("error");
+          setSwapError(`Freigabe fehlgeschlagen: ${error.message || 'Unbekannter Fehler'}`);
+        }
+      });
       
     } catch (error) {
-      console.error("Freigabe fehlgeschlagen:", error);
+      console.error("Fehler beim Vorbereiten der Freigabe:", error);
       setSwapStep("input");
     } finally {
       setIsApproving(false);
     }
   };
 
-  // Schätzung berechnen
-  const calculateEstimate = () => {
-    if (!swapAmount || parseFloat(swapAmount) <= 0) {
+  // Echte Preisschätzung über 1inch oder andere DEX APIs
+  const calculateEstimate = async () => {
+    if (!swapAmount || parseFloat(swapAmount) <= 0 || !account?.address) {
       setEstimatedOutput("0");
       return;
     }
     
-    const inputAmount = parseFloat(swapAmount);
-    const rate = parseFloat(exchangeRate);
-    const estimated = (inputAmount * rate).toFixed(6);
-    setEstimatedOutput(estimated);
-  };
-
-  // Prüfe ob Token-Freigabe benötigt wird
-  const checkApprovalStatus = async () => {
-    if (!account?.address || !swapAmount || parseFloat(swapAmount) <= 0) {
-      setNeedsApproval(false);
-      return;
+    try {
+      // Verwende 1inch API für echte Preisschätzung auf Polygon
+      const fromTokenAddress = DFAITH_TOKEN.address;
+      const toTokenAddress = POL_TOKEN.address;
+      const amount = BigInt(parseFloat(swapAmount) * Math.pow(10, DFAITH_TOKEN.decimals)).toString();
+      
+      const quoteUrl = `https://api.1inch.dev/swap/v6.0/137/quote?src=${fromTokenAddress}&dst=${toTokenAddress}&amount=${amount}`;
+      
+      const response = await fetch(quoteUrl, {
+        headers: {
+          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_1INCH_API_KEY || ''}`,
+          'accept': 'application/json',
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        const outputAmount = (parseFloat(data.dstAmount) / Math.pow(10, POL_TOKEN.decimals)).toFixed(6);
+        setEstimatedOutput(outputAmount);
+        
+        // Berechne Exchange Rate
+        const rate = (parseFloat(outputAmount) / parseFloat(swapAmount)).toFixed(6);
+        setExchangeRate(rate);
+      } else {
+        // Fallback auf feste Rate
+        const inputAmount = parseFloat(swapAmount);
+        const rate = 0.002; // Fallback Rate
+        const estimated = (inputAmount * rate).toFixed(6);
+        setEstimatedOutput(estimated);
+        setExchangeRate("0.002");
+      }
+      
+    } catch (error) {
+      console.error("Fehler beim Abrufen der Preisschätzung:", error);
+      // Fallback auf feste Rate
+      const inputAmount = parseFloat(swapAmount);
+      const rate = 0.002;
+      const estimated = (inputAmount * rate).toFixed(6);
+      setEstimatedOutput(estimated);
+      setExchangeRate("0.002");
     }
-    
-    // Simuliere Freigabe-Check - normalerweise würde hier die allowance geprüft
-    // Für Demo-Zwecke: Erste Transaktion benötigt immer Freigabe
-    const hasApproval = localStorage.getItem(`approval_${account.address}_dfaith`) === "true";
-    setNeedsApproval(!hasApproval);
   };
 
-  // Überprüfe Approval Status
-  const checkRealApprovalStatus = async () => {
+  // Prüfe ob Token-Freigabe benötigt wird (echte Implementierung)
+  const checkApprovalStatus = async () => {
     if (!account?.address || !swapAmount || parseFloat(swapAmount) <= 0) {
       setNeedsApproval(false);
       return;
@@ -256,13 +308,13 @@ export default function WalletTab() {
         address: DFAITH_TOKEN.address
       });
       
-      // Thirdweb Universal Router Adresse (Beispiel)
-      const thirdwebRouter = "0x1111111254EEB25477B68fb85Ed929f73A960582";
+      // 1inch Router Adresse für Polygon
+      const ONEINCH_ROUTER = "0x111111125421cA6dc452d289314280a0f8842A65";
       
       const currentAllowance = await allowance({
         contract: dfaithContract,
         owner: account.address,
-        spender: thirdwebRouter
+        spender: ONEINCH_ROUTER
       });
       
       const requiredAmount = BigInt(parseFloat(swapAmount) * Math.pow(10, DFAITH_TOKEN.decimals));
@@ -274,7 +326,7 @@ export default function WalletTab() {
     }
   };
 
-  // Swap durchführen
+  // Echter Swap mit 1inch DEX
   const executeThirdwebSwap = async () => {
     if (!account?.address || !swapAmount || parseFloat(swapAmount) <= 0) return;
     
@@ -282,30 +334,68 @@ export default function WalletTab() {
     setSwapStep("swap");
     
     try {
-      // Simuliere Thirdweb Swap - in Realität würde hier die echte Thirdweb DEX API verwendet
-      await new Promise(resolve => setTimeout(resolve, 2000)); // Simuliere Netzwerk-Delay
+      const fromTokenAddress = DFAITH_TOKEN.address;
+      const toTokenAddress = POL_TOKEN.address;
+      const amount = BigInt(parseFloat(swapAmount) * Math.pow(10, DFAITH_TOKEN.decimals)).toString();
+      const fromAddress = account.address;
+      const slippagePercentage = parseFloat(slippage);
       
-      console.log("Thirdweb Swap erfolgreich:", {
-        from: swapAmount + " D.FAITH",
-        to: estimatedOutput + " POL",
-        rate: exchangeRate
+      // 1inch Swap API Aufruf
+      const swapUrl = `https://api.1inch.dev/swap/v6.0/137/swap?src=${fromTokenAddress}&dst=${toTokenAddress}&amount=${amount}&from=${fromAddress}&slippage=${slippagePercentage}`;
+      
+      const response = await fetch(swapUrl, {
+        headers: {
+          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_1INCH_API_KEY || ''}`,
+          'accept': 'application/json',
+        }
       });
       
-      // Simuliere erfolgreichen Swap
-      setSwapStep("success");
-      
-      // Nach 3 Sekunden zurücksetzen
-      setTimeout(() => {
-        setSwapAmount("");
-        setEstimatedOutput("0");
-        setSwapStep("input");
-        setShowSell(false);
-        fetchBalances(); // Balances aktualisieren
-      }, 3000);
+      if (response.ok) {
+        const swapData = await response.json();
+        
+        // Bereite Raw-Transaktion für Thirdweb vor
+        const transaction = {
+          chain: polygon,
+          client,
+          to: swapData.tx.to,
+          data: swapData.tx.data,
+          value: BigInt(swapData.tx.value || "0"),
+        };
+        
+        // Sende Transaktion über Thirdweb
+        sendTransaction(transaction, {
+          onSuccess: (result) => {
+            console.log("Swap erfolgreich:", result);
+            setSwapStep("success");
+            setSwapError(null);
+            
+            // Nach 3 Sekunden zurücksetzen
+            setTimeout(() => {
+              setSwapAmount("");
+              setEstimatedOutput("0");
+              setSwapStep("input");
+              setShowSell(false);
+              fetchBalances(); // Balances aktualisieren
+            }, 3000);
+          },
+          onError: (error) => {
+            console.error("Swap fehlgeschlagen:", error);
+            setSwapStep("error");
+            setSwapError(`Swap fehlgeschlagen: ${error.message || 'Unbekannter Fehler'}`);
+          }
+        });
+        
+      } else {
+        // Fallback: Zeige Fehler, dass 1inch API nicht verfügbar ist
+        console.log("1inch API nicht verfügbar oder fehlgeschlagen");
+        setSwapStep("error");
+        setSwapError("DEX-Service momentan nicht verfügbar. Bitte versuchen Sie es später erneut.");
+      }
       
     } catch (error) {
       console.error("Swap fehlgeschlagen:", error);
-      setSwapStep("input");
+      setSwapStep("error");
+      setSwapError(`Swap fehlgeschlagen: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`);
     } finally {
       setIsLoading(false);
     }
@@ -926,6 +1016,32 @@ export default function WalletTab() {
               </div>
             )}
 
+            {swapStep === "error" && (
+              <div className="flex flex-col items-center justify-center py-6 space-y-3">
+                <div className="w-12 h-12 rounded-full bg-red-500/20 border-2 border-red-500 flex items-center justify-center">
+                  <FaInfoCircle className="text-red-400 text-xl" />
+                </div>
+                <div className="text-center">
+                  <div className="font-bold text-red-400 mb-1">Fehler aufgetreten</div>
+                  <div className="text-sm text-zinc-400 mb-2">
+                    {swapError || "Unbekannter Fehler"}
+                  </div>
+                  <div className="text-xs text-zinc-500">
+                    Bitte versuchen Sie es erneut
+                  </div>
+                </div>
+                <Button
+                  className="bg-amber-500/20 border border-amber-500/30 text-amber-400 hover:bg-amber-500/30 px-4 py-2 text-sm"
+                  onClick={() => {
+                    setSwapStep("input");
+                    setSwapError(null);
+                  }}
+                >
+                  Erneut versuchen
+                </Button>
+              </div>
+            )}
+
             {swapStep === "success" && (
               <div className="flex flex-col items-center justify-center py-6 space-y-3">
                 <div className="w-12 h-12 rounded-full bg-green-500/20 border-2 border-green-500 flex items-center justify-center">
@@ -954,9 +1070,10 @@ export default function WalletTab() {
                 setSwapStep("input");
                 setSwapAmount("");
                 setEstimatedOutput("0");
+                setSwapError(null);
               }}
             >
-              {swapStep === "success" ? "Fertig" : "Abbrechen"}
+              {swapStep === "success" || swapStep === "error" ? "Fertig" : "Abbrechen"}
             </Button>
             {swapStep === "input" && parseFloat(swapAmount) > 0 && (
               <Button 
