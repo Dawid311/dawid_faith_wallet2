@@ -186,17 +186,19 @@ export default function BuyTab() {
           
           <div className="w-full mt-4">
             {showPolBuyModal ? (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-                <div className="bg-zinc-900 rounded-xl p-8 max-w-xs w-full border border-purple-500 text-center">
+              <div className="fixed inset-0 z-50 flex items-center justify-center min-h-screen bg-black/60">
+                <div className="bg-zinc-900 rounded-xl p-4 max-w-xs w-full border border-purple-500 text-center overflow-auto">
                   <div className="mb-4 text-purple-400 text-2xl font-bold">POL kaufen</div>
-                  <BuyWidget
-                    client={client}
-                    tokenAddress={NATIVE_TOKEN_ADDRESS}
-                    chain={polygon}
-                    amount="1"
-                    theme="dark"
-                    className="w-full"
-                  />
+                  <div className="w-full max-w-xs mx-auto">
+                    <BuyWidget
+                      client={client}
+                      tokenAddress={NATIVE_TOKEN_ADDRESS}
+                      chain={polygon}
+                      amount="1"
+                      theme="dark"
+                      className="w-full"
+                    />
+                  </div>
                   <Button
                     className="w-full bg-zinc-600 hover:bg-zinc-700 text-white font-bold py-2 rounded-xl mt-4"
                     onClick={() => setShowPolBuyModal(false)}
@@ -311,7 +313,7 @@ export default function BuyTab() {
 
       {/* Info Modal für D.INVEST */}
       {showInvestModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+        <div className="fixed inset-0 z-50 flex items-center justify-center min-h-screen bg-black/60">
           <div className="bg-zinc-900 rounded-xl p-8 max-w-xs w-full border border-amber-400 text-center">
             <div className="mb-4 text-amber-400 text-2xl font-bold">Wichtiger Hinweis</div>
             <div className="mb-4 text-zinc-300 text-sm">
