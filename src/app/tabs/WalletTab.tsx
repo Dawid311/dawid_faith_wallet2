@@ -7,21 +7,14 @@ import { polygon } from "thirdweb/chains";
 import { balanceOf, approve, allowance } from "thirdweb/extensions/erc20";
 import { Card, CardContent } from "../../../components/ui/card";
 import { Button } from "../../../components/ui/button";
-import { FaRegCopy, FaCoins, FaArrowDown, FaArrowUp, FaPaperPlane, FaLock } from "react-icons/fa";
+import { FaRegCopy, FaCoins, FaArrowDown, FaArrowUp, FaPaperPlane, FaLock, FaHistory } from "react-icons/fa";
 
-// Modal Komponente
-function Modal({ open, onClose, title, children }: { open: boolean, onClose: () => void, title: string, children: React.ReactNode }) {
-  if (!open) return null;
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className="bg-zinc-900 rounded-2xl p-8 min-w-[340px] shadow-2xl relative border border-zinc-700">
-        <button className="absolute top-3 right-4 text-2xl text-zinc-500 hover:text-zinc-300" onClick={onClose}>&times;</button>
-        <h3 className="font-bold mb-6 text-center text-xl text-amber-400">{title}</h3>
-        {children}
-      </div>
-    </div>
-  );
-}
+// Import Subtabs
+import BuyTab from "./wallet/BuyTab";
+import SellTab from "./wallet/SellTab";
+import SendTab from "./wallet/SendTab";
+import HistoryTab from "./wallet/HistoryTab";
+import StakeTab from "./wallet/StakeTab";
 
 const client = createThirdwebClient({
   clientId: process.env.NEXT_PUBLIC_TEMPLATE_CLIENT_ID!,
@@ -45,17 +38,8 @@ export default function WalletTab() {
   const [dfaithBalance, setDfaithBalance] = useState<{ displayValue: string } | null>(null);
   const [dinvestBalance, setDinvestBalance] = useState<{ displayValue: string } | null>(null);
   
-  // Modale State
-  const [showBuy, setShowBuy] = useState(false);
-  const [showSend, setShowSend] = useState(false);
-  const [showStake, setShowStake] = useState(false);
-  const [showHistory, setShowHistory] = useState(false);
-
-  // Sende States
-  const [sendAmount, setSendAmount] = useState("");
-  const [sendToAddress, setSendToAddress] = useState("");
-  const [selectedSendToken, setSelectedSendToken] = useState("DFAITH");
-  const [isSending, setIsSending] = useState(false);
+  // Subtab State
+  const [activeSubtab, setActiveSubtab] = useState<string | null>(null);
   
   // Konstanten für Token mit echten Contract-Adressen
   const DFAITH_TOKEN = {
@@ -137,39 +121,6 @@ export default function WalletTab() {
       console.error("Fehler beim Abrufen der Balances:", error);
       setDfaithBalance({ displayValue: "0.0000" });
       setDinvestBalance({ displayValue: "0" });
-    }
-  };
-
-  // Sende-Funktion (vereinfacht)
-  const executeSend = async () => {
-    if (!account?.address || !sendAmount || parseFloat(sendAmount) <= 0 || !sendToAddress) {
-      return;
-    }
-    
-    setIsSending(true);
-    
-    try {
-      alert(`${sendAmount} ${selectedSendToken} würde an ${sendToAddress} gesendet werden.`);
-      setSendAmount("");
-      setSendToAddress("");
-    } catch (error) {
-      console.error("Fehler beim Senden:", error);
-    } finally {
-      setIsSending(false);
-    }
-  };
-
-  // Verfügbares Guthaben für gewählten Token
-  const getAvailableBalance = () => {
-    switch (selectedSendToken) {
-      case "DFAITH":
-        return dfaithBalance ? Number(dfaithBalance.displayValue) : 0;
-      case "DINVEST":
-        return dinvestBalance ? Number(dinvestBalance.displayValue) : 0;
-      case "POL":
-        return 0;
-      default:
-        return 0;
     }
   };
 
@@ -286,33 +237,42 @@ export default function WalletTab() {
             </div>
 
             {/* Action Buttons */}
-            <div className="grid grid-cols-3 gap-2 md:gap-4 mb-6">
+            <div className="grid grid-cols-4 gap-2 md:gap-3 mb-6">
               <Button
-                className="flex flex-col items-center justify-center gap-1 px-1 py-3.5 md:py-4.5 bg-gradient-to-br from-zinc-800/90 to-zinc-900 hover:from-zinc-800 hover:to-zinc-800 shadow-lg shadow-black/20 rounded-xl hover:scale-[1.02] transition-all duration-300 border border-zinc-700/80"
-                onClick={() => setShowBuy(true)}
+                className="flex flex-col items-center justify-center gap-1 px-1 py-3 md:py-4 bg-gradient-to-br from-zinc-800/90 to-zinc-900 hover:from-zinc-800 hover:to-zinc-800 shadow-lg shadow-black/20 rounded-xl hover:scale-[1.02] transition-all duration-300 border border-zinc-700/80"
+                onClick={() => setActiveSubtab('buy')}
               >
-                <div className="w-8 h-8 flex items-center justify-center bg-gradient-to-br from-amber-400 to-yellow-500 rounded-full mb-1 shadow-inner">
-                  <FaArrowDown className="text-black text-sm" />
+                <div className="w-7 h-7 flex items-center justify-center bg-gradient-to-br from-amber-400 to-yellow-500 rounded-full mb-1 shadow-inner">
+                  <FaArrowDown className="text-black text-xs" />
                 </div>
                 <span className="text-xs bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 bg-clip-text text-transparent font-medium">Kaufen</span>
               </Button>
               <Button
-                className="flex flex-col items-center justify-center gap-1 px-1 py-3.5 md:py-4.5 bg-gradient-to-br from-zinc-800/90 to-zinc-900 hover:from-zinc-800 hover:to-zinc-800 shadow-lg shadow-black/20 rounded-xl hover:scale-[1.02] transition-all duration-300 border border-zinc-700/80"
-                onClick={() => setShowSend(true)}
+                className="flex flex-col items-center justify-center gap-1 px-1 py-3 md:py-4 bg-gradient-to-br from-zinc-800/90 to-zinc-900 hover:from-zinc-800 hover:to-zinc-800 shadow-lg shadow-black/20 rounded-xl hover:scale-[1.02] transition-all duration-300 border border-zinc-700/80"
+                onClick={() => setActiveSubtab('sell')}
               >
-                <div className="w-8 h-8 flex items-center justify-center bg-gradient-to-br from-amber-400 to-yellow-500 rounded-full mb-1 shadow-inner">
-                  <FaPaperPlane className="text-black text-sm" />
+                <div className="w-7 h-7 flex items-center justify-center bg-gradient-to-br from-amber-400 to-yellow-500 rounded-full mb-1 shadow-inner">
+                  <FaArrowUp className="text-black text-xs" />
+                </div>
+                <span className="text-xs bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 bg-clip-text text-transparent font-medium">Verkauf</span>
+              </Button>
+              <Button
+                className="flex flex-col items-center justify-center gap-1 px-1 py-3 md:py-4 bg-gradient-to-br from-zinc-800/90 to-zinc-900 hover:from-zinc-800 hover:to-zinc-800 shadow-lg shadow-black/20 rounded-xl hover:scale-[1.02] transition-all duration-300 border border-zinc-700/80"
+                onClick={() => setActiveSubtab('send')}
+              >
+                <div className="w-7 h-7 flex items-center justify-center bg-gradient-to-br from-amber-400 to-yellow-500 rounded-full mb-1 shadow-inner">
+                  <FaPaperPlane className="text-black text-xs" />
                 </div>
                 <span className="text-xs bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 bg-clip-text text-transparent font-medium">Senden</span>
               </Button>
               <Button
-                className="flex flex-col items-center justify-center gap-1 px-1 py-3.5 md:py-4.5 bg-gradient-to-br from-zinc-800/90 to-zinc-900 hover:from-zinc-800 hover:to-zinc-800 shadow-lg shadow-black/20 rounded-xl hover:scale-[1.02] transition-all duration-300 border border-zinc-700/80"
-                onClick={() => setShowHistory(true)}
+                className="flex flex-col items-center justify-center gap-1 px-1 py-3 md:py-4 bg-gradient-to-br from-zinc-800/90 to-zinc-900 hover:from-zinc-800 hover:to-zinc-800 shadow-lg shadow-black/20 rounded-xl hover:scale-[1.02] transition-all duration-300 border border-zinc-700/80"
+                onClick={() => setActiveSubtab('history')}
               >
-                <div className="w-8 h-8 flex items-center justify-center bg-gradient-to-br from-amber-400 to-yellow-500 rounded-full mb-1 shadow-inner">
-                  <FaCoins className="text-black text-sm" />
+                <div className="w-7 h-7 flex items-center justify-center bg-gradient-to-br from-amber-400 to-yellow-500 rounded-full mb-1 shadow-inner">
+                  <FaHistory className="text-black text-xs" />
                 </div>
-                <span className="text-xs bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 bg-clip-text text-transparent font-medium">History</span>
+                <span className="text-xs bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 bg-clip-text text-transparent font-medium">Historie</span>
               </Button>
             </div>
             
@@ -336,7 +296,7 @@ export default function WalletTab() {
                   </div>
                   
                   <button 
-                    onClick={() => setShowStake(true)}
+                    onClick={() => setActiveSubtab('stake')}
                     className="flex items-center gap-2 px-4 py-1.5 rounded-lg bg-gradient-to-r from-amber-500/20 to-amber-600/20 text-amber-400 hover:from-amber-500/30 hover:to-amber-600/30 transition-all border border-amber-500/20"
                   >
                     <FaLock size={12} />
@@ -350,83 +310,41 @@ export default function WalletTab() {
                 </div>
               </div>
             )}
+
+            {/* Subtab Navigation & Content */}
+            {activeSubtab && (
+              <div className="mt-6">
+                {/* Navigation Header mit Zurück-Button */}
+                <div className="flex items-center justify-between mb-4 p-3 bg-zinc-800/50 rounded-lg border border-zinc-700">
+                  <button
+                    onClick={() => setActiveSubtab(null)}
+                    className="flex items-center gap-2 text-zinc-400 hover:text-amber-400 transition-colors"
+                  >
+                    <FaArrowDown className="rotate-90" />
+                    <span className="text-sm">Zurück</span>
+                  </button>
+                  <h3 className="text-amber-400 font-medium capitalize">
+                    {activeSubtab === 'buy' && 'Token kaufen'}
+                    {activeSubtab === 'sell' && 'Token verkaufen'}
+                    {activeSubtab === 'send' && 'Token senden'}
+                    {activeSubtab === 'history' && 'Transaktionshistorie'}
+                    {activeSubtab === 'stake' && 'Staking & Rewards'}
+                  </h3>
+                  <div></div> {/* Spacer für zentrierte Überschrift */}
+                </div>
+
+                {/* Subtab Content */}
+                <div className="bg-zinc-900/50 rounded-lg border border-zinc-700">
+                  {activeSubtab === 'buy' && <BuyTab />}
+                  {activeSubtab === 'sell' && <SellTab />}
+                  {activeSubtab === 'send' && <SendTab />}
+                  {activeSubtab === 'history' && <HistoryTab />}
+                  {activeSubtab === 'stake' && <StakeTab />}
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
-
-        {/* Kauf-Modal */}
-        <Modal open={showBuy} onClose={() => setShowBuy(false)} title="Token kaufen">
-          <div className="flex flex-col gap-5">
-            <div className="bg-zinc-800 rounded-lg p-4 border border-zinc-700">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <div className="p-1.5 bg-gradient-to-r from-yellow-400 to-amber-600 rounded-full">
-                    <FaCoins className="text-black text-sm" />
-                  </div>
-                  <span className="font-medium text-amber-400">DFAITH</span>
-                </div>
-                <span className="text-xs text-zinc-400">mit POL kaufen</span>
-              </div>
-              <Button className="w-full bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-2">
-                DFAITH kaufen
-              </Button>
-            </div>
-            
-            <div className="bg-zinc-800 rounded-lg p-4 border border-zinc-700">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <div className="p-1.5 bg-gradient-to-r from-yellow-400 to-amber-600 rounded-full">
-                    <FaLock className="text-black text-sm" />
-                  </div>
-                  <span className="font-medium text-amber-400">D.INVEST</span>
-                </div>
-                <span className="text-xs text-zinc-400">mit € kaufen</span>
-              </div>
-              <Button className="w-full bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-2">
-                D.INVEST kaufen
-              </Button>
-            </div>
-          </div>
-          
-          <Button className="mt-5 w-full bg-zinc-800 border border-zinc-700 text-zinc-400 hover:bg-zinc-700" onClick={() => setShowBuy(false)}>
-            Schließen
-          </Button>
-        </Modal>
-
-        {/* Senden Modal */}
-        <Modal open={showSend} onClose={() => setShowSend(false)} title="Token senden">
-          <div className="flex flex-col gap-4">
-            <div className="text-center text-zinc-400">
-              Sende-Funktion wird implementiert
-            </div>
-          </div>
-          <Button className="mt-5 w-full bg-zinc-800 border border-zinc-700 text-zinc-400 hover:bg-zinc-700" onClick={() => setShowSend(false)}>
-            Schließen
-          </Button>
-        </Modal>
-        
-        {/* Staking Modal */}
-        <Modal open={showStake} onClose={() => setShowStake(false)} title="D.INVEST staken">
-          <div className="flex flex-col gap-4">
-            <div className="text-center text-zinc-400">
-              Staking-Funktion wird implementiert
-            </div>
-          </div>
-          <Button className="mt-4 w-full bg-zinc-800 border border-zinc-700 text-zinc-400 hover:bg-zinc-700" onClick={() => setShowStake(false)}>
-            Schließen
-          </Button>
-        </Modal>
-
-        {/* History Modal */}
-        <Modal open={showHistory} onClose={() => setShowHistory(false)} title="Transaktionshistorie">
-          <div className="flex flex-col gap-4">
-            <div className="text-center text-zinc-400">
-              Transaktionshistorie wird implementiert
-            </div>
-          </div>
-          <Button className="mt-4 w-full bg-zinc-800 border border-zinc-700 text-zinc-400 hover:bg-zinc-700" onClick={() => setShowHistory(false)}>
-            Schließen
-          </Button>
-        </Modal>
       </div>
     );
   }
