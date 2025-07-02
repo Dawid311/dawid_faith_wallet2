@@ -30,6 +30,7 @@ export default function StakeTab() {
   const [rewards, setRewards] = useState("0");
   const [loading, setLoading] = useState(false);
   const [txStatus, setTxStatus] = useState<string | null>(null);
+  const [dinvestDecimals, setDinvestDecimals] = useState(18);
 
   // Fetch balances
   useEffect(() => {
@@ -38,13 +39,21 @@ export default function StakeTab() {
     (async () => {
       try {
         const dinvest = getContract({ client, chain: polygon, address: DINVEST_TOKEN });
+        // Decimals dynamisch abfragen
+        let decimals = 18;
+        try {
+          const dec = await contractRead(dinvest, "decimals");
+          if (typeof dec === "number") decimals = dec;
+          setDinvestDecimals(decimals);
+        } catch {}
+        // Balance abfragen
         const bal = await contractRead(dinvest, "balanceOf", [account.address]);
-        setAvailable((Number(bal) / 1e18).toFixed(4));
+        setAvailable((Number(bal) / Math.pow(10, decimals)).toFixed(4));
         const staking = getContract({ client, chain: polygon, address: STAKING_CONTRACT });
         const stakedBal = await contractRead(staking, "balanceOf", [account.address]);
-        setStaked((Number(stakedBal) / 1e18).toFixed(4));
+        setStaked((Number(stakedBal) / Math.pow(10, decimals)).toFixed(4));
         const earned = await contractRead(staking, "earned", [account.address]);
-        setRewards((Number(earned) / 1e18).toFixed(4));
+        setRewards((Number(earned) / Math.pow(10, decimals)).toFixed(4));
       } catch (e) {
         setAvailable("0"); setStaked("0"); setRewards("0");
       } finally {
