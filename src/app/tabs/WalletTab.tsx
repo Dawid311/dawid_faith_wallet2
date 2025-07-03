@@ -551,24 +551,12 @@ export default function WalletTab() {
               <div className="text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 drop-shadow-sm">
                 {isLoadingBalances ? "..." : (dfaithBalance ? dfaithBalance.displayValue : "0.00")}
               </div>
-              
-              <div className="w-full h-px bg-gradient-to-r from-transparent via-zinc-700/50 to-transparent my-3"></div>
-              
-              <div className="text-xs text-zinc-500 space-y-1">
-                <div>≈ {dfaithEurValue} EUR</div>
-                <div className="text-[10px] text-zinc-600">
-                  Preis: {dfaithPriceEur.toFixed(3)}€/D.FAITH
-                  {priceError && (
-                    <span className="text-yellow-400 ml-1">(cached)</span>
-                  )}
+              {/* Nur EUR-Wert anzeigen, wenn Preisquote vorhanden ist */}
+              {dfaithPriceEur > 0 && (
+                <div className="text-xs text-zinc-500 mt-2">
+                  ≈ {dfaithEurValue} EUR
                 </div>
-                <div className="text-[10px] text-zinc-600">
-                  POL: {polPriceEur.toFixed(2)}€
-                  {priceError && (
-                    <span className="text-yellow-400 ml-1">(cached)</span>
-                  )}
-                </div>
-              </div>
+              )}
             </div>
 
             {/* Action Buttons */}

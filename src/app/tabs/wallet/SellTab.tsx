@@ -656,11 +656,10 @@ export default function SellTab() {
                   {isSwapping ? "Lade Quote..." : `Quote für ${sellAmount || "0"} D.FAITH holen`}
                 </Button>
               )}
-              
-              {/* Schritt 2: Approve durchführen (wenn nötig) */}
-              {sellStep === 'quoteFetched' && needsApproval && (
+              {/* Schritt 2: Approve immer durchführen */}
+              {sellStep === 'quoteFetched' && (
                 <Button
-                  className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 rounded-xl mb-2"
+                  className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 rounded-xl mb-2"
                   onClick={handleApprove}
                   disabled={isSwapping}
                 >
@@ -668,9 +667,8 @@ export default function SellTab() {
                   {isSwapping ? "Approval läuft..." : "D.FAITH Token für Verkauf freigeben"}
                 </Button>
               )}
-              
               {/* Schritt 3: Swap durchführen */}
-              {((sellStep === 'quoteFetched' && !needsApproval) || sellStep === 'approved') && (
+              {sellStep === 'approved' && (
                 <Button
                   className="w-full bg-gradient-to-r from-red-500 to-red-600 text-white font-bold py-3 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50"
                   onClick={handleSellSwap}
@@ -680,11 +678,6 @@ export default function SellTab() {
                   {isSwapping ? "Verkaufe..." : `${sellAmount || "0"} D.FAITH jetzt verkaufen`}
                 </Button>
               )}
-              
-              {quoteError && (
-                <div className="text-red-400 text-sm text-center">{quoteError}</div>
-              )}
-              
               {/* "Neuer Verkauf" Button wenn Verkauf abgeschlossen ist */}
               {sellStep === 'completed' && (
                 <Button
@@ -703,7 +696,9 @@ export default function SellTab() {
                   Neuer Verkauf
                 </Button>
               )}
-              
+              {quoteError && (
+                <div className="text-red-400 text-sm text-center">{quoteError}</div>
+              )}
               {/* Schließen Button */}
               <Button
                 className="w-full bg-zinc-600 hover:bg-zinc-700 text-white font-bold py-2 rounded-xl"
