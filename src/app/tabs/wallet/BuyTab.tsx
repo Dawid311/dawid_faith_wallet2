@@ -97,6 +97,7 @@ export default function BuyTab() {
   // State für D.FAITH Swap
   const [showDfaithBuyModal, setShowDfaithBuyModal] = useState(false);
   const [swapAmountPol, setSwapAmountPol] = useState("");
+  const [slippage, setSlippage] = useState("1"); // Slippage State hinzufügen
   const [polBalance, setPolBalance] = useState("0");
   const [isSwapping, setIsSwapping] = useState(false);
   const [swapTxStatus, setSwapTxStatus] = useState<string | null>(null);
@@ -155,35 +156,33 @@ export default function BuyTab() {
     return () => clearInterval(interval);
   }, [account?.address]);
 
-  // D.FAITH Swap Funktion mit OpenOcean v3 (Amount ohne Decimals!)
+  // D.FAITH Swap Funktion mit konfigurierbarer Slippage
   const handleDfaithSwap = async () => {
     if (!swapAmountPol || parseFloat(swapAmountPol) <= 0 || !account?.address) return;
     setIsSwapping(true);
     setSwapTxStatus("pending");
     try {
-      // OpenOcean v3 erwartet amount als String (ohne Decimals!)
-      // Für native POL: 1 POL = "1" (ohne 18 Decimals)
       const amountStr = parseFloat(swapAmountPol).toString();
       
       // Debug: Zeige alle Parameter
       console.log("=== OpenOcean Swap Request ===");
       console.log("Chain:", "polygon");
       console.log("InToken:", "0x0000000000000000000000000000000000001010");
-      console.log("OutToken:", "0xF051E3B0335eB332a7ef0dc308BB4F0c10301060"); // Direkte D.FAITH Adresse
+      console.log("OutToken:", "0xF051E3B0335eB332a7ef0dc308BB4F0c10301060");
       console.log("Amount:", amountStr);
-      console.log("Slippage:", "5");
+      console.log("Slippage:", slippage); // Verwendung der konfigurierbaren Slippage
       console.log("GasPrice:", "50");
       console.log("Account:", account.address);
       
-      // 1. Hole Swap-Transaktionsdaten von OpenOcean v3 - GET Request mit Query Parameters
+      // 1. Hole Swap-Transaktionsdaten von OpenOcean v3
       const params = new URLSearchParams({
         chain: "polygon",
-        inTokenAddress: "0x0000000000000000000000000000000000001010", // Polygon Native Token (MATIC)
-        outTokenAddress: "0xF051E3B0335eB332a7ef0dc308BB4F0c10301060", // D.FAITH Token direkt
-        amount: amountStr, // Amount ohne Decimals als String!
-        slippage: "5", // 5% Slippage als String (erhöht)
-        gasPrice: "50", // 50 GWEI als String (ohne Decimals)
-        account: account.address, // User's address für Transaktion
+        inTokenAddress: "0x0000000000000000000000000000000000001010",
+        outTokenAddress: "0xF051E3B0335eB332a7ef0dc308BB4F0c10301060",
+        amount: amountStr,
+        slippage: slippage, // Verwendung der konfigurierbaren Slippage
+        gasPrice: "50",
+        account: account.address,
       });
       
       const url = `https://open-api.openocean.finance/v3/polygon/swap_quote?${params}`;
@@ -213,12 +212,8 @@ export default function BuyTab() {
         throw new Error('OpenOcean: Keine data in Response');
       }
       
-      if (!data.data.tx) {
-        console.error("Fehlende tx data in response:", data.data);
-        throw new Error('OpenOcean: Keine Transaktionsdaten (tx) erhalten');
-      }
-      
-      const txData = data.data.tx;
+      // OpenOcean gibt die Transaktionsdaten direkt in data.data zurück
+      const txData = data.data;
       console.log("Transaction Data:", txData);
       
       // Validiere tx data
@@ -385,7 +380,7 @@ export default function BuyTab() {
                     />
                     <button
                       className="absolute right-3 top-1/2 transform -translate-y-1/2 text-xs px-2 py-1 bg-purple-500/20 text-purple-400 rounded hover:bg-purple-500/30 transition"
-                      onClick={() => setSwapAmountPol((parseFloat(polBalance) * 0.95).toFixed(4))} // 95% für Gas
+                      onClick={() => setSwapAmountPol((parseFloat(polBalance) * 0.95).toFixed(4))}
                       disabled={isSwapping || parseFloat(polBalance) <= 0}
                     >
                       MAX
@@ -393,6 +388,50 @@ export default function BuyTab() {
                   </div>
                   <div className="text-xs text-zinc-500 mt-1">
                     Native POL wird direkt für den Swap verwendet
+                  </div>
+                </div>
+                
+                {/* Slippage Input */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-zinc-300 mb-2">Slippage Toleranz (%)</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      placeholder="1"
+                      min="0.1"
+                      max="50"
+                      step="0.1"
+                      className="flex-1 bg-zinc-800 border border-zinc-600 rounded-xl py-2 px-3 text-sm text-zinc-300 focus:border-amber-500 focus:outline-none"
+                      value={slippage}
+                      onChange={(e) => setSlippage(e.target.value)}
+                      disabled={isSwapping}
+                    />
+                    <div className="flex gap-1">
+                      <button
+                        className="text-xs px-2 py-1 bg-zinc-700/50 text-zinc-400 rounded hover:bg-zinc-600/50 transition"
+                        onClick={() => setSlippage("0.5")}
+                        disabled={isSwapping}
+                      >
+                        0.5%
+                      </button>
+                      <button
+                        className="text-xs px-2 py-1 bg-zinc-700/50 text-zinc-400 rounded hover:bg-zinc-600/50 transition"
+                        onClick={() => setSlippage("1")}
+                        disabled={isSwapping}
+                      >
+                        1%
+                      </button>
+                      <button
+                        className="text-xs px-2 py-1 bg-zinc-700/50 text-zinc-400 rounded hover:bg-zinc-600/50 transition"
+                        onClick={() => setSlippage("3")}
+                        disabled={isSwapping}
+                      >
+                        3%
+                      </button>
+                    </div>
+                  </div>
+                  <div className="text-xs text-zinc-500 mt-1">
+                    Höhere Slippage = höhere Erfolgswahrscheinlichkeit, aber weniger Token
                   </div>
                 </div>
                 
@@ -404,6 +443,9 @@ export default function BuyTab() {
                       <span className="text-amber-400 font-bold">
                         ~{(parseFloat(swapAmountPol) * dfaithPrice).toFixed(2)}
                       </span>
+                    </div>
+                    <div className="text-xs text-zinc-500 mt-1">
+                      Slippage: {slippage}% | Minimum: ~{(parseFloat(swapAmountPol) * dfaithPrice * (1 - parseFloat(slippage)/100)).toFixed(2)}
                     </div>
                   </div>
                 )}
@@ -446,7 +488,7 @@ export default function BuyTab() {
                     <FaExchangeAlt className="inline mr-2" />
                     {isSwapping ? "Swapping..." : 
                      parseFloat(polBalance) <= 0 ? "Keine POL verfügbar" :
-                     `${swapAmountPol || "0"} POL → D.FAITH`}
+                     `${swapAmountPol || "0"} POL → D.FAITH (${slippage}%)`}
                   </Button>
                   
                   <Button
@@ -454,6 +496,7 @@ export default function BuyTab() {
                     onClick={() => {
                       setShowDfaithBuyModal(false);
                       setSwapAmountPol("");
+                      setSlippage("1"); // Reset Slippage auf 1%
                       setSwapTxStatus(null);
                     }}
                     disabled={isSwapping}
