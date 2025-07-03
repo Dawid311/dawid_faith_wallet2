@@ -200,6 +200,13 @@ export default function StakeTab() {
     return (rate / 100).toFixed(2);
   };
 
+  // Hilfsfunktion für den User-Reward pro Woche
+  const getUserWeeklyReward = () => {
+    // staked ist ein String, currentRewardRate ist z.B. 150 für 1.5%
+    const stakedNum = parseInt(staked) || 0;
+    return ((stakedNum * currentRewardRate) / 100).toFixed(2);
+  };
+
   return (
     <div className="flex flex-col gap-6 p-6">
       <div className="text-center mb-6">
@@ -231,8 +238,26 @@ export default function StakeTab() {
         </div>
       </div>
 
-      {/* Current Reward Stage Info */}
-      <div className="bg-gradient-to-br from-blue-800/30 to-blue-900/30 rounded-xl p-4 border border-blue-700/50">
+      {/* Kompakte Rewards-Übersicht */}
+      <div className="grid grid-cols-2 gap-4 mb-6">
+        <div className="bg-gradient-to-br from-green-900/60 to-green-800/60 rounded-xl p-4 border border-green-700/40 text-center">
+          <div className="text-xs text-zinc-400 mb-1">Ihr aktueller Reward/Woche</div>
+          <div className="text-2xl font-bold text-green-400 mb-1">
+            {getUserWeeklyReward()} D.FAITH
+          </div>
+          <div className="text-xs text-zinc-500">bei {staked} gestaked</div>
+        </div>
+        <div className="bg-gradient-to-br from-amber-900/60 to-amber-800/60 rounded-xl p-4 border border-amber-700/40 text-center">
+          <div className="text-xs text-zinc-400 mb-1">Verfügbare Rewards</div>
+          <div className="text-2xl font-bold text-amber-400 mb-1">
+            {loading ? "Laden..." : claimableRewards} D.FAITH
+          </div>
+          <div className="text-xs text-zinc-500">sofort einforderbar</div>
+        </div>
+      </div>
+
+      {/* Aktuelle Reward-Stufe */}
+      <div className="bg-gradient-to-br from-blue-800/30 to-blue-900/30 rounded-xl p-4 border border-blue-700/50 mb-2">
         <div className="flex items-center justify-between">
           <div>
             <div className="text-sm font-medium text-blue-400">Aktuelle Reward-Stufe</div>
@@ -243,24 +268,6 @@ export default function StakeTab() {
           <div className="text-right">
             <div className="text-lg font-bold text-blue-400">Stufe {currentStage}</div>
             <div className="text-xs text-zinc-500">Total verteilt: {totalRewardsDistributed} D.FAITH</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Staking Stats */}
-      <div className="bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl p-6 border border-zinc-700">
-        <div className="grid grid-cols-3 gap-4 text-center">
-          <div>
-            <div className="text-lg font-bold text-green-400 mb-1 sm:text-2xl">{formatRewardRate(currentRewardRate)}</div>
-            <div className="text-xs text-zinc-500">D.FAITH/Woche</div>
-          </div>
-          <div>
-            <div className="text-lg font-bold text-blue-400 mb-1 sm:text-2xl">{userCount}</div>
-            <div className="text-xs text-zinc-500">Aktive Staker</div>
-          </div>
-          <div>
-            <div className="text-lg font-bold text-amber-400 mb-1 sm:text-2xl">{loading ? "Laden..." : claimableRewards}</div>
-            <div className="text-xs text-zinc-500">Verfügbare Rewards</div>
           </div>
         </div>
       </div>
@@ -319,33 +326,12 @@ export default function StakeTab() {
 
           {/* Reward Stages Erklärung */}
           {stakeAmount && parseInt(stakeAmount) > 0 && (
-            <div className="bg-zinc-800/50 rounded-xl p-4 border border-zinc-700 space-y-2">
-              <div className="text-sm text-zinc-400 mb-3">Reward Stufen (basierend auf total verteilte D.FAITH):</div>
-              <div className="flex justify-between text-sm">
-                <span className="text-zinc-500">Stufe 1 (&lt; 10.000 D.FAITH):</span>
-                <span className="text-green-400">0.10 D.FAITH/Woche</span>
+            <div className="bg-zinc-800/50 rounded-xl p-4 border border-zinc-700">
+              <div className="text-xs text-zinc-400 mb-1">
+                Ihr wöchentlicher Reward (Stufe {currentStage}):
               </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-zinc-500">Stufe 2 (&lt; 20.000 D.FAITH):</span>
-                <span className="text-green-400">0.05 D.FAITH/Woche</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-zinc-500">Stufe 3 (&lt; 40.000 D.FAITH):</span>
-                <span className="text-green-400">0.03 D.FAITH/Woche</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-zinc-500">Stufe 4 (&lt; 60.000 D.FAITH):</span>
-                <span className="text-green-400">0.02 D.FAITH/Woche</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-zinc-500">Stufe 5+ (&lt; 80.000 D.FAITH):</span>
-                <span className="text-green-400">0.01 D.FAITH/Woche</span>
-              </div>
-              <div className="text-xs text-zinc-500 mt-2">
-                * Reward pro D.INVEST Token pro Woche
-              </div>
-              <div className="text-xs text-amber-400 mt-2">
-                Ihr wöchentlicher Reward: {parseInt(stakeAmount) * (currentRewardRate / 100)} D.FAITH
+              <div className="text-lg font-bold text-amber-400">
+                {parseInt(stakeAmount) * (currentRewardRate / 100)} D.FAITH
               </div>
             </div>
           )}

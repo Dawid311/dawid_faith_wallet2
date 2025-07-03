@@ -145,9 +145,23 @@ export default function WalletTab() {
     symbol: "POL"
   };
 
+  // EIN useEffect für alles:
   useEffect(() => {
-    fetchBalances();
-    fetchDfaithPrice();
+    let isMounted = true; // Flag, um nur das aktuellste Ergebnis zu setzen
+
+    const load = async () => {
+      await fetchBalances();
+      await fetchDfaithPrice();
+    };
+
+    load();
+
+    const interval = setInterval(load, 30000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, [account?.address]);
 
   // D.FAITH EUR-Preis holen (basierend auf POL-Preis)

@@ -69,6 +69,7 @@ export default function HistoryTab() {
     if (activeFilter === "all") return true;
     if (activeFilter === "dfaith") return tx.token.includes("D.FAITH");
     if (activeFilter === "dinvest") return tx.token.includes("D.INVEST");
+    if (activeFilter === "pol") return tx.token.includes("POL");
     return true;
   });
 
@@ -112,6 +113,16 @@ export default function HistoryTab() {
           onClick={() => setActiveFilter("dinvest")}
         >
           D.INVEST
+        </button>
+        <button 
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+            activeFilter === "pol" 
+              ? "bg-amber-500/20 text-amber-400 border border-amber-500/30" 
+              : "bg-zinc-700/50 text-zinc-400 border border-zinc-600 hover:bg-zinc-600/50"
+          }`}
+          onClick={() => setActiveFilter("pol")}
+        >
+          POL
         </button>
       </div>
 
