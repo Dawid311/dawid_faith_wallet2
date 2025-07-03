@@ -45,15 +45,7 @@ function Modal({ open, onClose, title, children }: { open: boolean, onClose: () 
           {children}
         </div>
         
-        {/* Footer mit Schließen-Button */}
-        <div className="p-4 border-t border-zinc-700 sticky bottom-0 bg-zinc-900 z-10">
-          <Button
-            className="w-full bg-zinc-700 hover:bg-zinc-600 text-zinc-200"
-            onClick={onClose}
-          >
-            Schließen
-          </Button>
-        </div>
+        {/* Footer mit Schließen-Button entfernt */}
       </div>
     </div>
   );
@@ -119,7 +111,7 @@ export default function WalletTab() {
     symbol: "POL"
   };
 
-  // Neue Funktion zur direkten Abfrage der Token-Balance über ThirdWeb's Contract Read
+  // Verbesserte Token-Balance-Abfrage mit 5-facher Verifizierung
   const fetchTokenBalanceViaContract = async (
     tokenAddress: string,
     tokenDecimals: number,
@@ -128,19 +120,68 @@ export default function WalletTab() {
     if (!accountAddress) return "0";
 
     try {
-      const contract = getContract({
-        client,
-        chain: polygon,
-        address: tokenAddress,
+      // 5 parallele Anfragen durchführen
+      const balancePromises = Array(5).fill(0).map(async () => {
+        try {
+          const contract = getContract({
+            client,
+            chain: polygon,
+            address: tokenAddress,
+          });
+
+          const balanceResult = await balanceOf({
+            contract,
+            address: accountAddress
+          });
+
+          // Balance in lesbare Form umrechnen
+          return (Number(balanceResult) / Math.pow(10, tokenDecimals)).toString();
+        } catch (error) {
+          console.error(`Einzelne Balance-Abfrage fehlgeschlagen:`, error);
+          return "error"; // Markierung für fehlgeschlagene Abfragen
+        }
       });
 
-      const balanceResult = await balanceOf({
-        contract,
-        address: accountAddress
+      // Alle Ergebnisse sammeln
+      const balanceResults = await Promise.all(balancePromises);
+      
+      console.log(`Balance-Abfragen für ${tokenAddress}:`, balanceResults);
+      
+      // Fehlerhafte Abfragen entfernen
+      const validResults = balanceResults.filter(result => result !== "error")
+                                         .map(result => Number(result));
+      
+      if (validResults.length === 0) {
+        console.error("Alle Balance-Abfragen fehlgeschlagen");
+        return "0";
+      }
+      
+      // Häufigkeitsanalyse durchführen
+      const frequencyMap: {[key: string]: number} = {};
+      let maxFrequency = 0;
+      let mostFrequentValue = "0";
+      
+      validResults.forEach(value => {
+        const valueStr = value.toString();
+        frequencyMap[valueStr] = (frequencyMap[valueStr] || 0) + 1;
+        
+        if (frequencyMap[valueStr] > maxFrequency) {
+          maxFrequency = frequencyMap[valueStr];
+          mostFrequentValue = valueStr;
+        }
       });
-
-      // Balance in lesbare Form umrechnen
-      return (Number(balanceResult) / Math.pow(10, tokenDecimals)).toString();
+      
+      // Wenn es keinen eindeutigen Mehrheitswert gibt, nehmen wir den Median
+      if (maxFrequency === 1 && validResults.length > 1) {
+        // Sortieren für Median-Berechnung
+        validResults.sort((a, b) => a - b);
+        
+        const medianIndex = Math.floor(validResults.length / 2);
+        return validResults[medianIndex].toString();
+      }
+      
+      console.log(`Häufigster Balance-Wert für ${tokenAddress}: ${mostFrequentValue} (${maxFrequency}x)`);
+      return mostFrequentValue;
     } catch (error) {
       console.error(`Fehler beim Abrufen der Balance für ${tokenAddress}:`, error);
       return "0";
