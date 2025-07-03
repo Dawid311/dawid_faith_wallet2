@@ -165,35 +165,68 @@ export default function BuyTab() {
       // Für native POL: 1 POL = "1" (ohne 18 Decimals)
       const amountStr = parseFloat(swapAmountPol).toString();
       
+      // Debug: Zeige alle Parameter
+      console.log("=== OpenOcean Swap Request ===");
+      console.log("Chain:", "polygon");
+      console.log("InToken:", "0x0000000000000000000000000000000000001010");
+      console.log("OutToken:", "0xF051E3B0335eB332a7ef0dc308BB4F0c10301060"); // Direkte D.FAITH Adresse
+      console.log("Amount:", amountStr);
+      console.log("Slippage:", "5");
+      console.log("GasPrice:", "50");
+      console.log("Account:", account.address);
+      
       // 1. Hole Swap-Transaktionsdaten von OpenOcean v3 - GET Request mit Query Parameters
       const params = new URLSearchParams({
         chain: "polygon",
         inTokenAddress: "0x0000000000000000000000000000000000001010", // Polygon Native Token (MATIC)
-        outTokenAddress: DFAITH_TOKEN,
+        outTokenAddress: "0xF051E3B0335eB332a7ef0dc308BB4F0c10301060", // D.FAITH Token direkt
         amount: amountStr, // Amount ohne Decimals als String!
-        slippage: "1", // 1% Slippage als String
+        slippage: "5", // 5% Slippage als String (erhöht)
         gasPrice: "50", // 50 GWEI als String (ohne Decimals)
         account: account.address, // User's address für Transaktion
       });
       
-      const response = await fetch(`https://open-api.openocean.finance/v3/polygon/swap_quote?${params}`);
+      const url = `https://open-api.openocean.finance/v3/polygon/swap_quote?${params}`;
+      console.log("Full URL:", url);
+      
+      const response = await fetch(url);
+      console.log("Response Status:", response.status);
       
       if (!response.ok) {
         throw new Error(`OpenOcean API Fehler: ${response.status}`);
       }
       
       const data = await response.json();
-      console.log("OpenOcean Swap Response:", data); // Debug
+      console.log("=== OpenOcean Swap Response ===");
+      console.log("Full Response:", JSON.stringify(data, null, 2));
       
-      if (!data || !data.data || !data.data.tx) {
-        throw new Error('OpenOcean: Keine Transaktionsdaten erhalten');
+      // Prüfe die vollständige Response-Struktur
+      if (!data) {
+        throw new Error('OpenOcean: Keine Response erhalten');
+      }
+      
+      if (data.code !== 200) {
+        throw new Error(`OpenOcean: API Error Code ${data.code} - ${JSON.stringify(data)}`);
+      }
+      
+      if (!data.data) {
+        throw new Error('OpenOcean: Keine data in Response');
+      }
+      
+      if (!data.data.tx) {
+        console.error("Fehlende tx data in response:", data.data);
+        throw new Error('OpenOcean: Keine Transaktionsdaten (tx) erhalten');
       }
       
       const txData = data.data.tx;
+      console.log("Transaction Data:", txData);
+      
+      // Validiere tx data
+      if (!txData.to || !txData.data) {
+        throw new Error('OpenOcean: Unvollständige Transaktionsdaten');
+      }
       
       // 2. Sende die Transaktion mit thirdweb
-      // Use prepareTransaction for raw transaction data
-      // Import at top: import { prepareTransaction } from "thirdweb";
       const { prepareTransaction } = await import("thirdweb");
       const tx = prepareTransaction({
         to: txData.to,
