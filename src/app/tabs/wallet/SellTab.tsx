@@ -207,57 +207,73 @@ export default function SellTab() {
     if (allowanceResponse.ok) {
       const allowanceData = await allowanceResponse.json();
       console.log("Allowance Response:", allowanceData);
-      
-      if (allowanceData && allowanceData.data) {
-        // Robust extrahieren, egal ob String oder Objekt
-        let allowanceValue = allowanceData.data;
-        if (typeof allowanceValue === "object" && allowanceValue !== null) {
-          // z.B. { allowance: "12345" }
-          allowanceValue = allowanceValue.allowance ?? "0";
-        }
-        const currentAllowance = BigInt(allowanceValue.toString());
-        const requiredAmount = BigInt(amountInWei);
 
-        console.log("Current Allowance:", currentAllowance.toString());
-        console.log("Required Amount:", requiredAmount.toString());
-        
-        // Wenn Allowance nicht ausreicht, Approve-Transaktion senden
-        if (currentAllowance < requiredAmount) {
-          console.log("Insufficient allowance, requesting approval...");
-          setSwapTxStatus("approving");
-          
-          const contract = getContract({
-            client,
-            chain: polygon,
-            address: DFAITH_TOKEN
-          });
-          
-          // Sehr hohe Allowance setzen
-          const maxAllowance = BigInt("115792089237316195423570985008687907853269984665640564039457584007913129639935");
-          
-          const approveTransaction = prepareContractCall({
-            contract,
-            method: "function approve(address spender, uint256 amount) returns (bool)",
-            params: [txData.to, maxAllowance]
-          });
-
-          const approveResult = await sendTransaction(approveTransaction);
-          console.log("Approval sent:", approveResult);
-          
-          // Länger warten bis Approval bestätigt ist
-          await new Promise(resolve => setTimeout(resolve, 5000));
-          
-          // Allowance erneut prüfen
-          const newAllowanceResponse = await fetch(allowanceUrl);
-          if (newAllowanceResponse.ok) {
-            const newAllowanceData = await newAllowanceResponse.json();
-            const newAllowance = BigInt(newAllowanceData.data || "0");
-            
-            console.log("New Allowance:", newAllowance.toString());
-            
-            if (newAllowance < requiredAmount) {
-              throw new Error('Approval fehlgeschlagen oder noch nicht bestätigt');
+      let allowanceValue = "0";
+      if (allowanceData && allowanceData.data !== undefined && allowanceData.data !== null) {
+        if (typeof allowanceData.data === "object") {
+          // z.B. { allowance: "12345" } oder { "0x...": "12345" }
+          if ("allowance" in allowanceData.data) {
+            allowanceValue = allowanceData.data.allowance?.toString() ?? "0";
+          } else {
+            // Falls das Objekt nur einen Key hat, nimm dessen Wert
+            const values = Object.values(allowanceData.data);
+            if (values.length > 0) {
+              allowanceValue = values[0]?.toString() ?? "0";
             }
+          }
+        } else {
+          // String oder Zahl direkt
+          allowanceValue = allowanceData.data.toString();
+        }
+      }
+      let currentAllowance: bigint;
+      try {
+        currentAllowance = BigInt(allowanceValue);
+      } catch (e) {
+        console.error("Fehler beim Parsen der Allowance als BigInt:", allowanceValue, e);
+        currentAllowance = BigInt(0);
+      }
+      const requiredAmount = BigInt(amountInWei);
+
+      console.log("Current Allowance:", currentAllowance.toString());
+      console.log("Required Amount:", requiredAmount.toString());
+      
+      // Wenn Allowance nicht ausreicht, Approve-Transaktion senden
+      if (currentAllowance < requiredAmount) {
+        console.log("Insufficient allowance, requesting approval...");
+        setSwapTxStatus("approving");
+        
+        const contract = getContract({
+          client,
+          chain: polygon,
+          address: DFAITH_TOKEN
+        });
+        
+        // Sehr hohe Allowance setzen
+        const maxAllowance = BigInt("115792089237316195423570985008687907853269984665640564039457584007913129639935");
+        
+        const approveTransaction = prepareContractCall({
+          contract,
+          method: "function approve(address spender, uint256 amount) returns (bool)",
+          params: [txData.to, maxAllowance]
+        });
+
+        const approveResult = await sendTransaction(approveTransaction);
+        console.log("Approval sent:", approveResult);
+        
+        // Länger warten bis Approval bestätigt ist
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        
+        // Allowance erneut prüfen
+        const newAllowanceResponse = await fetch(allowanceUrl);
+        if (newAllowanceResponse.ok) {
+          const newAllowanceData = await newAllowanceResponse.json();
+          const newAllowance = BigInt(newAllowanceData.data || "0");
+          
+          console.log("New Allowance:", newAllowance.toString());
+          
+          if (newAllowance < requiredAmount) {
+            throw new Error('Approval fehlgeschlagen oder noch nicht bestätigt');
           }
         }
       }
