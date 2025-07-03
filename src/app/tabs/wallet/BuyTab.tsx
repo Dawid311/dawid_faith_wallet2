@@ -100,13 +100,13 @@ export default function BuyTab() {
     return () => clearInterval(interval);
   }, []);
 
+  // D.INVEST kaufen Modal öffnen
   const handleInvestBuy = async () => {
     if (account?.address) {
       await navigator.clipboard.writeText(account.address);
       setCopied(true);
     }
-    // Scroll to top when modal opens
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: 'smooth' }); // <-- Scroll to top
     setShowInvestModal(true);
   };
 
@@ -541,8 +541,7 @@ export default function BuyTab() {
               className="w-full mt-4 bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-3 rounded-xl hover:opacity-90 transition-opacity"
               onClick={() => {
                 if (account?.address) {
-                  // Scroll to top when modal opens
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                  window.scrollTo({ top: 0, behavior: 'smooth' }); // <-- Scroll to top
                   setShowDfaithBuyModal(true);
                 } else {
                   alert('Bitte Wallet verbinden!');
@@ -644,8 +643,7 @@ export default function BuyTab() {
               <Button
                 className="w-full bg-gradient-to-r from-purple-500 to-purple-700 text-white font-bold py-3 rounded-xl hover:opacity-90 transition-opacity"
                 onClick={() => {
-                  // Scroll to top when modal opens
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                  window.scrollTo({ top: 0, behavior: 'smooth' }); // <-- Scroll to top
                   setShowPolBuyModal(true);
                 }}
               >

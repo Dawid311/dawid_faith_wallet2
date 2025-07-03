@@ -209,9 +209,15 @@ export default function SellTab() {
       console.log("Allowance Response:", allowanceData);
       
       if (allowanceData && allowanceData.data) {
-        const currentAllowance = BigInt(allowanceData.data);
+        // Robust extrahieren, egal ob String oder Objekt
+        let allowanceValue = allowanceData.data;
+        if (typeof allowanceValue === "object" && allowanceValue !== null) {
+          // z.B. { allowance: "12345" }
+          allowanceValue = allowanceValue.allowance ?? "0";
+        }
+        const currentAllowance = BigInt(allowanceValue.toString());
         const requiredAmount = BigInt(amountInWei);
-        
+
         console.log("Current Allowance:", currentAllowance.toString());
         console.log("Required Amount:", requiredAmount.toString());
         
