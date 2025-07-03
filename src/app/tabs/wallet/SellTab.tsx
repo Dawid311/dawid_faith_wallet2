@@ -347,7 +347,7 @@ export default function SellTab() {
       // Aktuelle Nonce explizit abrufen
       const { getRpcClient } = await import("thirdweb");
       const rpc = getRpcClient({ client, chain: polygon });
-      const nonce = await rpc.request({
+      const nonce = await rpc({
         method: "eth_getTransactionCount",
         params: [account.address, "pending"]
     });
