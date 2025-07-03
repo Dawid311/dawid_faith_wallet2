@@ -105,6 +105,8 @@ export default function BuyTab() {
       await navigator.clipboard.writeText(account.address);
       setCopied(true);
     }
+    // Scroll to top when modal opens
+    window.scrollTo({ top: 0, behavior: 'smooth' });
     setShowInvestModal(true);
   };
 
@@ -348,8 +350,8 @@ export default function BuyTab() {
           
           {/* D.FAITH kaufen Modal */}
           {showDfaithBuyModal ? (
-            <div className="fixed inset-0 z-50 flex items-center justify-center min-h-screen bg-black/60">
-              <div className="bg-zinc-900 rounded-xl p-6 max-w-md w-full mx-4 border border-amber-400">
+            <div className="fixed inset-0 z-50 flex items-center justify-center min-h-screen bg-black/60 overflow-y-auto">
+              <div className="bg-zinc-900 rounded-xl p-6 max-w-md w-full mx-4 border border-amber-400 my-8">
                 <div className="mb-6 text-amber-400 text-2xl font-bold text-center">D.FAITH kaufen</div>
                 
                 {/* POL Balance */}
@@ -537,7 +539,15 @@ export default function BuyTab() {
           ) : (
             <Button
               className="w-full mt-4 bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-3 rounded-xl hover:opacity-90 transition-opacity"
-              onClick={() => account?.address ? setShowDfaithBuyModal(true) : alert('Bitte Wallet verbinden!')}
+              onClick={() => {
+                if (account?.address) {
+                  // Scroll to top when modal opens
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                  setShowDfaithBuyModal(true);
+                } else {
+                  alert('Bitte Wallet verbinden!');
+                }
+              }}
               disabled={!account?.address}
             >
               D.FAITH kaufen
@@ -609,8 +619,8 @@ export default function BuyTab() {
           
           <div className="w-full mt-4">
             {showPolBuyModal ? (
-              <div className="fixed inset-0 z-50 flex items-center justify-center min-h-screen bg-black/60">
-                <div className="bg-zinc-900 rounded-xl p-4 max-w-full w-full sm:max-w-xs border border-purple-500 text-center overflow-y-auto h-[90vh] flex flex-col items-center justify-center">
+              <div className="fixed inset-0 z-50 flex items-center justify-center min-h-screen bg-black/60 overflow-y-auto">
+                <div className="bg-zinc-900 rounded-xl p-4 max-w-full w-full sm:max-w-xs border border-purple-500 text-center my-8 min-h-[90vh] flex flex-col items-center justify-center">
                   <div className="mb-4 text-purple-400 text-2xl font-bold">POL kaufen</div>
                   <div className="w-full flex-1 flex items-center justify-center">
                     <BuyWidget
@@ -633,7 +643,11 @@ export default function BuyTab() {
             ) : (
               <Button
                 className="w-full bg-gradient-to-r from-purple-500 to-purple-700 text-white font-bold py-3 rounded-xl hover:opacity-90 transition-opacity"
-                onClick={() => setShowPolBuyModal(true)}
+                onClick={() => {
+                  // Scroll to top when modal opens
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                  setShowPolBuyModal(true);
+                }}
               >
                 POL kaufen
               </Button>
@@ -658,8 +672,8 @@ export default function BuyTab() {
 
       {/* Info Modal für D.INVEST */}
       {showInvestModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center min-h-screen bg-black/60">
-          <div className="bg-zinc-900 rounded-xl p-8 w-full max-w-xs border border-amber-400 text-center flex flex-col items-center justify-center">
+        <div className="fixed inset-0 z-50 flex items-center justify-center min-h-screen bg-black/60 overflow-y-auto">
+          <div className="bg-zinc-900 rounded-xl p-8 w-full max-w-xs border border-amber-400 text-center flex flex-col items-center justify-center my-8">
             <div className="mb-4 text-amber-400 text-2xl font-bold">Wichtiger Hinweis</div>
             <div className="mb-4 text-zinc-300 text-sm">
               {copied
