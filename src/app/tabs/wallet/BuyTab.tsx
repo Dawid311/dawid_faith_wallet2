@@ -42,7 +42,7 @@ export default function BuyTab() {
           chain: "polygon",
           inTokenAddress: "0x0000000000000000000000000000000000001010", // Polygon Native Token (MATIC)
           outTokenAddress: DFAITH_TOKEN,
-          amount: "1", // 1 POL (ohne Decimals)
+          amount: "1", // 1 POL (OHNE Decimals!) - das war das Problem!
           gasPrice: "50", // 50 GWEI (ohne Decimals)
         });
         
@@ -51,11 +51,11 @@ export default function BuyTab() {
         if (response.ok) {
           const data = await response.json();
           console.log("OpenOcean Response:", data); // Debug
-          if (data && data.data && data.data.outAmount) {
+          if (data && data.data && data.data.outAmount && data.data.outAmount !== "0") {
             // outAmount ist in D.FAITH (mit 2 Decimals) - daher durch 10^2 teilen
             price = Number(data.data.outAmount) / Math.pow(10, DFAITH_DECIMALS);
           } else {
-            errorMsg = "OpenOcean: Keine Quote erhalten";
+            errorMsg = "OpenOcean: Keine Liquidität verfügbar (outAmount = 0)";
           }
         } else {
           errorMsg = `OpenOcean: ${response.status}`;
