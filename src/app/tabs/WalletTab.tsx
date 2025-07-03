@@ -113,6 +113,8 @@ export default function WalletTab() {
   const [dinvestBalance, setDinvestBalance] = useState<{ displayValue: string } | null>(null);
   const [dfaithEurValue, setDfaithEurValue] = useState<string>("0.00");
   const [dfaithPriceEur, setDfaithPriceEur] = useState<number>(0.001);
+  // Tracking für die aktuellste Anfrage als State hinzufügen
+  const [latestRequest, setLatestRequest] = useState(0);
 
   // Modal States
   const [showBuyModal, setShowBuyModal] = useState(false);
@@ -145,28 +147,37 @@ export default function WalletTab() {
     symbol: "POL"
   };
 
-  // latestRequest muss außerhalb von useEffect liegen, damit fetchBalances darauf zugreifen kann
-  let latestRequest = 0;
-
   // EIN useEffect für alles:
   useEffect(() => {
     let isMounted = true;
 
     const load = async () => {
-      const requestId = ++latestRequest;
-      await fetchBalances(requestId);
-      await fetchDfaithPrice();
+      // Generiere eine neue Request-ID und speichere sie im State
+      const newRequestId = latestRequest + 1;
+      setLatestRequest(newRequestId);
+      
+      if (isMounted) {
+        await fetchBalances(newRequestId);
+        await fetchDfaithPrice();
+      }
     };
 
+    // Initial laden
     load();
 
+    // Intervall-Updates
     const interval = setInterval(load, 30000);
+
+    // Manuelle Aktualisierung bei jedem Wallet-Wechsel
+    if (account?.address) {
+      load();
+    }
 
     return () => {
       isMounted = false;
       clearInterval(interval);
     };
-  }, [account?.address]);
+  }, [account?.address, latestRequest]);
 
   // D.FAITH EUR-Preis holen (basierend auf POL-Preis)
   const fetchDfaithPrice = async () => {
@@ -242,24 +253,20 @@ export default function WalletTab() {
 
       // Nur übernehmen, wenn dies der letzte gestartete Request ist:
       if (typeof requestId === "undefined" || requestId === latestRequest) {
+        console.log(`Aktualisiere Balance mit Request ID ${requestId}, DFAITH: ${dfaithFormatted.toFixed(2)}`);
         setDfaithBalance({ displayValue: dfaithFormatted.toFixed(2) });
         setDinvestBalance({ displayValue: Math.floor(dinvestFormatted).toString() });
         await fetchDfaithEurValue(dfaithFormatted.toFixed(2));
+      } else {
+        console.log(`Ignoriere veraltete Balance von Request ID ${requestId}, aktuelle ID: ${latestRequest}`);
       }
     } catch (error) {
+      console.error("Fehler beim Abrufen der Balances:", error);
       setDfaithBalance({ displayValue: "0.00" });
       setDinvestBalance({ displayValue: "0" });
       setDfaithEurValue("0.00");
     }
   };
-
-  // useEffect jetzt OHNE dfaithBalance als Dependency
-  useEffect(() => {
-    fetchBalances();
-    fetchDfaithPrice();
-    const interval = setInterval(fetchBalances, 30000);
-    return () => clearInterval(interval);
-  }, [account?.address]);
 
   // Funktion: D.FAITH Wert in EUR live berechnen
   const fetchDfaithEurValue = async (balance: string) => {

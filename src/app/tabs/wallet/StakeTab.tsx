@@ -217,7 +217,7 @@ export default function StakeTab() {
       </div>
 
       {/* Staking Overview: Verfügbar, Gestaked, Reward */}
-      <div className="grid grid-cols-3 gap-4 mb-6"> {/* <-- immer 3 Spalten, auch mobil */}
+      <div className="grid grid-cols-3 gap-4 mb-6">
         <div className="bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl p-4 border border-zinc-700 text-center">
           <div className="text-sm text-zinc-500 mb-1">Verfügbar</div>
           <div className="text-xl font-bold text-amber-400">
@@ -232,12 +232,12 @@ export default function StakeTab() {
           </div>
           <div className="text-xs text-zinc-500">D.INVEST</div>
         </div>
-        <div className="bg-gradient-to-br from-green-900/60 to-green-800/60 rounded-xl p-4 border border-green-700/40 text-center">
-          <div className="text-xs text-zinc-400 mb-1">Ihr aktueller Reward/Woche</div>
-          <div className="text-xl font-bold text-green-400 mb-1">
-            {getUserWeeklyReward()} D.FAITH
+        <div className="bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl p-4 border border-zinc-700 text-center">
+          <div className="text-sm text-zinc-500 mb-1">Reward/Woche</div>
+          <div className="text-xl font-bold text-green-400">
+            {getUserWeeklyReward()}
           </div>
-          <div className="text-xs text-zinc-500">bei {staked} gestaked</div>
+          <div className="text-xs text-zinc-500">D.FAITH</div>
         </div>
       </div>
 
