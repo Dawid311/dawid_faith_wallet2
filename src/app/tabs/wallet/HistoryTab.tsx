@@ -30,51 +30,103 @@ export default function HistoryTab() {
     const fetchTx = async () => {
       try {
         const apiKey = "V6Q5223DMWPP3HQJE9IJ8UIHSP3NUHID5K";
-        const url = `https://api.polygonscan.com/api?module=account&action=txlist&address=${userAddress}&startblock=0&endblock=99999999&sort=desc&apikey=${apiKey}`;
-        const res = await fetch(url);
-        const data = await res.json();
+        // Alle Transaktionen (MATIC + ERC20)
+        const urlNormal = `https://api.polygonscan.com/api?module=account&action=txlist&address=${userAddress}&startblock=0&endblock=99999999&sort=desc&apikey=${apiKey}`;
+        const urlErc20 = `https://api.polygonscan.com/api?module=account&action=tokentx&address=${userAddress}&startblock=0&endblock=99999999&sort=desc&apikey=${apiKey}`;
 
-        if (data.status !== "1" || !Array.isArray(data.result)) {
-          setTransactions([]);
-          return;
+        const [resNormal, resErc20] = await Promise.all([fetch(urlNormal), fetch(urlErc20)]);
+        const dataNormal = await resNormal.json();
+        const dataErc20 = await resErc20.json();
+
+        let txs: any[] = [];
+        if (dataNormal.status === "1" && Array.isArray(dataNormal.result)) {
+          txs = txs.concat(
+            dataNormal.result.map((tx: any) => ({
+              ...tx,
+              _type: "native",
+            }))
+          );
+        }
+        if (dataErc20.status === "1" && Array.isArray(dataErc20.result)) {
+          txs = txs.concat(
+            dataErc20.result.map((tx: any) => ({
+              ...tx,
+              _type: "erc20",
+            }))
+          );
         }
 
+        // Sortieren nach Zeitstempel (absteigend)
+        txs.sort((a, b) => Number(b.timeStamp) - Number(a.timeStamp));
+
         // Mapping auf unser Transaction-Format
-        const mapped: Transaction[] = data.result.slice(0, 50).map((tx: any) => {
-          // Typ bestimmen
+        const mapped: Transaction[] = txs.map((tx: any) => {
           let type = "send";
-          if (
-            typeof tx.to === "string" &&
-            typeof userAddress === "string" &&
-            !!tx.to &&
-            !!userAddress &&
-            (tx.to as string).toLowerCase() === (userAddress as string).toLowerCase()
-          )
-            type = "receive";
-          // Swap, Stake, Reward etc. können nur mit zusätzlicher Logik erkannt werden
-
-          // Token-Name (hier nur MATIC, für ERC20 müsste ein weiterer API-Call gemacht werden)
-          const token = "POL";
-
-          // Amount
-          const value = Number(tx.value) / 1e18;
-          const amount = (type === "send" ? "-" : "+") + value.toFixed(4);
-
-          // Status
+          let token = "POL";
+          let amount = "";
+          let address = "";
+          let hash = tx.hash;
           let status = "pending";
-          if (tx.isError === "0" && tx.confirmations > 0) status = "success";
-          if (tx.isError === "1") status = "failed";
+          let decimals = 18;
 
           // Zeit
           const time = new Date(Number(tx.timeStamp) * 1000).toLocaleString();
 
+          if (tx._type === "erc20") {
+            // ERC20-Transfer
+            token = tx.tokenSymbol || "TOKEN";
+            decimals = Number(tx.tokenDecimal) || 18;
+            const toAddr: string = tx.to ? String(tx.to) : "";
+            const userAddr: string = userAddress ? String(userAddress) : "";
+            if (
+              toAddr &&
+              userAddr &&
+              typeof toAddr === "string" &&
+              typeof userAddr === "string" &&
+              toAddr.toLowerCase?.() === userAddr.toLowerCase?.()
+            ) {
+              type = "receive";
+              amount = "+" + (Number(tx.value) / Math.pow(10, decimals)).toFixed(4);
+              address = tx.from;
+            } else {
+              type = "send";
+              amount = "-" + (Number(tx.value) / Math.pow(10, decimals)).toFixed(4);
+              address = tx.to;
+            }
+          } else {
+            // Native MATIC
+            token = "POL";
+            decimals = 18;
+            const toAddr = tx.to ? String(tx.to) : "";
+            const userAddr = userAddress ? String(userAddress) : "";
+            if (
+              toAddr &&
+              userAddr &&
+              typeof toAddr === "string" &&
+              typeof userAddr === "string" &&
+              toAddr.toLowerCase?.() === userAddr.toLowerCase?.()
+            ) {
+              type = "receive";
+              amount = "+" + (Number(tx.value) / Math.pow(10, decimals)).toFixed(4);
+              address = tx.from;
+            } else {
+              type = "send";
+              amount = "-" + (Number(tx.value) / Math.pow(10, decimals)).toFixed(4);
+              address = tx.to;
+            }
+          }
+
+          // Status
+          if (tx.isError === "0" && Number(tx.confirmations) > 0) status = "success";
+          if (tx.isError === "1") status = "failed";
+
           return {
-            id: tx.hash,
+            id: hash,
             type,
             token,
             amount,
-            address: type === "send" ? tx.to : tx.from,
-            hash: tx.hash,
+            address,
+            hash,
             time,
             status,
           };
@@ -291,6 +343,10 @@ function saveTransaction(tx: Transaction) {
 //   token: "D.FAITH",
 //   amount: "-250.0000",
 //   address: "0x8A7b...C4d9",
+//   hash: "0xa1b2...c3d4",
+//   time: "gerade eben",
+//   status: "success"
+// });
 //   hash: "0xa1b2...c3d4",
 //   time: "gerade eben",
 //   status: "success"
