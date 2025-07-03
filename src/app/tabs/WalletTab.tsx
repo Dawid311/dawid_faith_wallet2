@@ -189,9 +189,10 @@ export default function WalletTab() {
     if (!account?.address) {
       setDfaithBalance(null);
       setDinvestBalance(null);
+      setDfaithEurValue("0.00");
       return;
     }
-    
+
     try {
       // D.FAITH Balance abrufen
       const dfaithContract = getContract({
@@ -199,37 +200,48 @@ export default function WalletTab() {
         chain: polygon,
         address: DFAITH_TOKEN.address
       });
-      
+
       const dfaithBalanceResult = await balanceOf({
         contract: dfaithContract,
         address: account.address
       });
-      
+
       // D.INVEST Balance abrufen
       const dinvestContract = getContract({
         client,
         chain: polygon,
         address: DINVEST_TOKEN.address
       });
-      
+
       const dinvestBalanceResult = await balanceOf({
         contract: dinvestContract,
         address: account.address
       });
-      
+
       // Balances formatieren und setzen
       const dfaithFormatted = Number(dfaithBalanceResult) / Math.pow(10, DFAITH_TOKEN.decimals);
-      const dinvestFormatted = Number(dinvestBalanceResult) / Math.pow(10, DINVEST_TOKEN.decimals); // Math.pow(10, 0) = 1
-      
+      const dinvestFormatted = Number(dinvestBalanceResult) / Math.pow(10, DINVEST_TOKEN.decimals);
+
       setDfaithBalance({ displayValue: dfaithFormatted.toFixed(2) });
-      setDinvestBalance({ displayValue: Math.floor(dinvestFormatted).toString() }); // Bleibt als ganze Zahl
-      
+      setDinvestBalance({ displayValue: Math.floor(dinvestFormatted).toString() });
+
+      // **Jetzt erst den EUR-Wert mit dem NEUEN Wert berechnen**
+      await fetchDfaithEurValue(dfaithFormatted.toFixed(2));
     } catch (error) {
       console.error("Fehler beim Abrufen der Balances:", error);
       setDfaithBalance({ displayValue: "0.00" });
       setDinvestBalance({ displayValue: "0" });
+      setDfaithEurValue("0.00");
     }
   };
+
+  // useEffect jetzt OHNE dfaithBalance als Dependency
+  useEffect(() => {
+    fetchBalances();
+    fetchDfaithPrice();
+    const interval = setInterval(fetchBalances, 30000);
+    return () => clearInterval(interval);
+  }, [account?.address]);
 
   // Funktion: D.FAITH Wert in EUR live berechnen
   const fetchDfaithEurValue = async (balance: string) => {
@@ -258,19 +270,6 @@ export default function WalletTab() {
       setDfaithEurValue("0.00");
     }
   };
-
-  // Balance und EUR-Wert regelmäßig aktualisieren
-  useEffect(() => {
-    const update = async () => {
-      await fetchBalances();
-      if (dfaithBalance) {
-        await fetchDfaithEurValue(dfaithBalance.displayValue);
-      }
-    };
-    update();
-    const interval = setInterval(update, 30000);
-    return () => clearInterval(interval);
-  }, [account?.address, dfaithBalance?.displayValue]);
 
   if (status !== "connected" || !account?.address) {
     return (

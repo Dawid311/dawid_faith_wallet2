@@ -95,28 +95,41 @@ export default function SendTab() {
     else if (selectedToken === "POL") setSendAmount(polBalance);
   };
 
+  const tokenOptions = [
+    { key: "DFAITH", label: "D.FAITH", balance: dfaithBalance },
+    { key: "DINVEST", label: "D.INVEST", balance: dinvestBalance },
+    { key: "POL", label: "POL", balance: polBalance },
+  ];
+
   return (
-    <div className="flex flex-col gap-6 p-6 max-w-md mx-auto">
+    <div className="flex flex-col gap-5 p-4 max-w-md mx-auto">
       <h2 className="text-xl font-bold text-center bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 bg-clip-text text-transparent mb-2">
         Token senden
       </h2>
 
-      {/* Kompakte Token-Auswahl */}
-      <div className="flex items-center gap-2">
-        <label className="text-sm text-zinc-400">Token:</label>
-        <select
-          className="bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-zinc-200"
-          value={selectedToken}
-          onChange={e => setSelectedToken(e.target.value)}
-        >
-          <option value="DFAITH">D.FAITH ({dfaithBalance})</option>
-          <option value="DINVEST">D.INVEST ({dinvestBalance})</option>
-          <option value="POL">POL ({polBalance})</option>
-        </select>
+      {/* Token-Auswahl als Buttons */}
+      <div className="flex gap-2 justify-center mb-2">
+        {tokenOptions.map((t) => (
+          <button
+            key={t.key}
+            className={`flex-1 px-2 py-2 rounded-lg font-semibold text-sm transition border
+              ${selectedToken === t.key
+                ? "bg-amber-500/20 text-amber-400 border-amber-400"
+                : "bg-zinc-800 text-zinc-300 border-zinc-700 hover:bg-zinc-700/60"}
+            `}
+            onClick={() => setSelectedToken(t.key)}
+            type="button"
+          >
+            {t.label}
+            <span className="block text-xs font-normal text-zinc-400">
+              {t.balance}
+            </span>
+          </button>
+        ))}
       </div>
 
-      {/* Betrag & Empfänger in einer Zeile */}
-      <div className="flex gap-2">
+      {/* Betrag */}
+      <div className="flex gap-2 items-center">
         <input
           type="number"
           placeholder="Betrag"
@@ -133,14 +146,18 @@ export default function SendTab() {
         >
           MAX
         </button>
-        <input
-          type="text"
-          placeholder="Empfänger (0x...)"
-          className="flex-[2] bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-zinc-200"
-          value={sendToAddress}
-          onChange={e => setSendToAddress(e.target.value)}
-        />
       </div>
+
+      {/* Empfängerfeld */}
+      <input
+        type="text"
+        placeholder="Empfänger (0x...)"
+        className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-zinc-200"
+        value={sendToAddress}
+        onChange={e => setSendToAddress(e.target.value)}
+        autoComplete="off"
+        inputMode="text"
+      />
 
       {/* Kompakte Transaktionsdetails */}
       <div className="text-xs text-zinc-400 flex flex-wrap gap-x-4 gap-y-1 justify-between px-1">
