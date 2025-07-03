@@ -21,6 +21,7 @@ export default function SellTab() {
   const [swapTxStatus, setSwapTxStatus] = useState<string | null>(null);
   const [isLoadingPrice, setIsLoadingPrice] = useState(true);
   const [priceError, setPriceError] = useState<string | null>(null);
+  const [needsApproval, setNeedsApproval] = useState(false);
   
   const account = useActiveAccount();
   const { mutateAsync: sendTransaction } = useSendTransaction();
@@ -253,6 +254,7 @@ export default function SellTab() {
         // Wenn Allowance nicht ausreicht, Approve-Transaktion senden
         if (currentAllowance < requiredAmount) {
           console.log("Insufficient allowance, requesting approval...");
+          setNeedsApproval(true);
           setSwapTxStatus("approving");
 
           const contract = getContract({
@@ -319,6 +321,7 @@ export default function SellTab() {
           }
         } else {
           console.log("Sufficient allowance, proceeding with swap...");
+          setNeedsApproval(false);
         }
       } else {
         console.warn("Allowance check failed, proceeding anyway");
@@ -570,6 +573,86 @@ export default function SellTab() {
 
             {/* Buttons */}
             <div className="space-y-3">
+              {needsApproval && (
+                <Button
+                  className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 rounded-xl mb-2"
+                  onClick={async () => {
+                    // Nur Approve ausführen, Swap erst nach Bestätigung möglich
+                    setSwapTxStatus("approving");
+
+                    try {
+                      // Hole spenderAddress aus aktuellem Swap-Quote
+                      const params = new URLSearchParams({
+                        chain: "polygon",
+                        inTokenAddress: DFAITH_TOKEN,
+                        outTokenAddress: "0x0000000000000000000000000000000000001010",
+                        amount: sellAmount,
+                        slippage: slippage,
+                        gasPrice: "50",
+                        account: account?.address || "",
+                      });
+                      const url = `https://open-api.openocean.finance/v3/polygon/swap_quote?${params}`;
+                      const response = await fetch(url);
+                      if (!response.ok) throw new Error("OpenOcean API Fehler beim Approve");
+                      const data = await response.json();
+                      if (!data || !data.data) throw new Error("OpenOcean Approve: Keine Daten erhalten");
+                      const txData = data.data;
+                      const spenderAddress = txData.spender || txData.approveTarget;
+                      if (!spenderAddress) throw new Error("OpenOcean Approve: Keine Spenderadresse erhalten");
+
+                      const contract = getContract({
+                        client,
+                        chain: polygon,
+                        address: DFAITH_TOKEN
+                      });
+
+                      // amountInWei berechnen (wie im Swap-Handler)
+                      const amountInWei = (parseFloat(sellAmount) * Math.pow(10, DFAITH_DECIMALS)).toFixed(0);
+
+                      // Statt einer sehr hohen Allowance, verwende genau den Betrag, den du tatsächlich verkaufen willst
+                      // plus etwas Puffer für Slippage (z.B. +10%)
+                      const requiredAmountWithBuffer = BigInt(Math.floor(Number(amountInWei) * 1.1).toString());
+
+                      // === KORREKTUR: Approve an spenderAddress (OpenOcean Router) ===
+                      const approveTransaction = prepareContractCall({
+                        contract,
+                        method: "function approve(address spender, uint256 amount) returns (bool)",
+                        params: [spenderAddress, requiredAmountWithBuffer]
+                      });
+
+                      // Approve senden
+                      const approveResult = await sendTransaction(approveTransaction);
+                      console.log("Approval sent:", approveResult);
+
+                      // Warten bis Approve-Transaktion bestätigt ist
+                      setSwapTxStatus("waiting_approval");
+                      try {
+                        // Warte auf Bestätigung statt einfach Zeit verstreichen zu lassen
+                        const { waitForReceipt } = await import("thirdweb");
+                        await waitForReceipt(approveResult);
+                        console.log("Approval confirmed in blockchain");
+                      } catch (error) {
+                        console.error("Error waiting for approval confirmation:", error);
+                        throw new Error("Approval-Transaktion wurde nicht bestätigt");
+                      }
+
+                      setNeedsApproval(false);
+                      setSwapTxStatus(null);
+                    } catch (error) {
+                      console.error("Approve Error:", error);
+                      setSwapTxStatus("error");
+                      setTimeout(() => {
+                        setSwapTxStatus(null);
+                      }, 5000);
+                    }
+                  }}
+                  disabled={isSwapping}
+                >
+                  <FaArrowDown className="inline mr-2" />
+                  D.FAITH Token für Verkauf freigeben (Approve)
+                </Button>
+              )}
+              
               <Button
                 className="w-full bg-gradient-to-r from-red-500 to-red-600 text-white font-bold py-3 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50"
                 onClick={handleSellSwap}

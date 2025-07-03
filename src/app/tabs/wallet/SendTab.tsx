@@ -1,16 +1,75 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "../../../../components/ui/button";
 import { FaPaperPlane, FaLock } from "react-icons/fa";
+import { useActiveAccount, useSendTransaction } from "thirdweb/react";
+import { polygon } from "thirdweb/chains";
+import { getContract, prepareContractCall } from "thirdweb";
+import { client } from "../../client";
+import { balanceOf } from "thirdweb/extensions/erc20";
 
 export default function SendTab() {
   const [sendAmount, setSendAmount] = useState("");
   const [sendToAddress, setSendToAddress] = useState("");
   const [selectedToken, setSelectedToken] = useState("DFAITH");
   const [isSending, setIsSending] = useState(false);
+  const account = useActiveAccount();
+  const { mutateAsync: sendTransaction } = useSendTransaction();
 
   // Token-Konstanten mit neuen Adressen
-  const DFAITH_TOKEN = "0xF051E3B0335eB332a7ef0dc308BB4F0c10301060"; // Neue D.FAITH Token-Adresse
-  const DFAITH_DECIMALS = 2; // Neue Dezimalstellen
+  const DFAITH_TOKEN = "0xF051E3B0335eB332a7ef0dc308BB4F0c10301060";
+  const DFAITH_DECIMALS = 2;
+  const DINVEST_TOKEN = "0x0000000000000000000000000000000000000000"; // Ersetze ggf. durch echte Adresse
+  const DINVEST_DECIMALS = 4;
+  const POL_TOKEN = "0x0000000000000000000000000000000000001010";
+  const POL_DECIMALS = 18;
+
+  // Balances
+  const [dfaithBalance, setDfaithBalance] = useState("0.00");
+  const [dinvestBalance, setDinvestBalance] = useState("0.0000");
+  const [polBalance, setPolBalance] = useState("0.0000");
+
+  // Balances laden
+  useEffect(() => {
+    if (!account?.address) {
+      setDfaithBalance("0.00");
+      setDinvestBalance("0.0000");
+      setPolBalance("0.0000");
+      return;
+    }
+    // D.FAITH
+    (async () => {
+      try {
+        const contract = getContract({ client, chain: polygon, address: DFAITH_TOKEN });
+        const bal = await balanceOf({ contract, address: account.address });
+        setDfaithBalance((Number(bal) / Math.pow(10, DFAITH_DECIMALS)).toFixed(2));
+      } catch { setDfaithBalance("0.00"); }
+    })();
+    // D.INVEST
+    (async () => {
+      try {
+        const contract = getContract({ client, chain: polygon, address: DINVEST_TOKEN });
+        const bal = await balanceOf({ contract, address: account.address });
+        setDinvestBalance((Number(bal) / Math.pow(10, DINVEST_DECIMALS)).toFixed(4));
+      } catch { setDinvestBalance("0.0000"); }
+    })();
+    // POL (native)
+    (async () => {
+      try {
+        const response = await fetch(polygon.rpc, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            method: 'eth_getBalance',
+            params: [account.address, 'latest'],
+            id: 1
+          })
+        });
+        const data = await response.json();
+        setPolBalance((Number(BigInt(data.result)) / Math.pow(10, POL_DECIMALS)).toFixed(4));
+      } catch { setPolBalance("0.0000"); }
+    })();
+  }, [account?.address, isSending]);
 
   const handleSend = async () => {
     if (!sendAmount || !sendToAddress) return;
@@ -27,6 +86,13 @@ export default function SendTab() {
     } finally {
       setIsSending(false);
     }
+  };
+
+  // MAX-Button Logik
+  const handleMax = () => {
+    if (selectedToken === "DFAITH") setSendAmount(dfaithBalance);
+    else if (selectedToken === "DINVEST") setSendAmount(dinvestBalance);
+    else if (selectedToken === "POL") setSendAmount(polBalance);
   };
 
   return (
@@ -55,7 +121,7 @@ export default function SendTab() {
             </div>
             <div className="text-center">
               <div className="text-xs font-medium">D.FAITH</div>
-              <div className="text-[10px] opacity-75">0.00</div>
+              <div className="text-[10px] opacity-75">{dfaithBalance}</div>
             </div>
           </button>
           
@@ -72,7 +138,7 @@ export default function SendTab() {
             </div>
             <div className="text-center">
               <div className="text-xs font-medium">D.INVEST</div>
-              <div className="text-[10px] opacity-75">0.0000</div>
+              <div className="text-[10px] opacity-75">{dinvestBalance}</div>
             </div>
           </button>
           
@@ -89,7 +155,7 @@ export default function SendTab() {
             </div>
             <div className="text-center">
               <div className="text-xs font-medium">POL</div>
-              <div className="text-[10px] opacity-75">0.0000</div>
+              <div className="text-[10px] opacity-75">{polBalance}</div>
             </div>
           </button>
         </div>
@@ -115,7 +181,7 @@ export default function SendTab() {
             <label className="text-sm font-medium text-zinc-300">Betrag</label>
             <span className="text-xs text-zinc-500">
               Verfügbar: <span className={selectedToken === "POL" ? "text-purple-400" : "text-amber-400"}>
-                0.00 {selectedToken}
+                {selectedToken === "DFAITH" ? dfaithBalance : selectedToken === "DINVEST" ? dinvestBalance : polBalance} {selectedToken}
               </span>
             </span>
           </div>
@@ -131,7 +197,8 @@ export default function SendTab() {
             />
             <button 
               className="absolute right-3 top-1/2 transform -translate-y-1/2 text-xs px-3 py-1 bg-amber-500/20 text-amber-400 rounded-lg hover:bg-amber-500/30 transition"
-              onClick={() => setSendAmount("0.00")}
+              onClick={handleMax}
+              type="button"
             >
               MAX
             </button>
