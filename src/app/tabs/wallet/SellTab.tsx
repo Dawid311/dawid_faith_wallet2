@@ -485,13 +485,13 @@ export default function SellTab() {
             {/* Prozessschritte anzeigen */}
             <div className="mb-4 flex justify-between">
               <div className={`text-xs ${sellStep !== 'initial' ? 'text-green-400' : 'text-zinc-500'}`}>
-                1. Quote ✓
+                1. Quote {sellStep !== 'initial' ? '✓' : ''}
               </div>
-              <div className={`text-xs ${needsApproval === false ? 'text-green-400' : sellStep === 'approved' ? 'text-green-400' : 'text-zinc-500'}`}>
-                2. {needsApproval === false ? 'Approve ✓' : 'Approve'}
+              <div className={`text-xs ${sellStep === 'approved' || sellStep === 'completed' ? 'text-green-400' : 'text-zinc-500'}`}>
+                2. Approve {sellStep === 'approved' || sellStep === 'completed' ? '✓' : ''}
               </div>
               <div className={`text-xs ${sellStep === 'completed' ? 'text-green-400' : 'text-zinc-500'}`}>
-                3. Swap
+                3. Swap {sellStep === 'completed' ? '✓' : ''}
               </div>
             </div>
             
