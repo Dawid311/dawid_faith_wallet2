@@ -350,7 +350,7 @@ export default function BuyTab() {
           {/* D.FAITH kaufen Modal */}
           {showDfaithBuyModal ? (
             <div className="fixed inset-0 z-50 flex items-start justify-center min-h-screen bg-black/60 overflow-y-auto">
-              <div className="bg-zinc-900 rounded-xl p-6 max-w-md w-full mx-4 border border-amber-400 my-8 mt-12">
+              <div className="bg-zinc-900 rounded-xl p-6 max-w-md w-full mx-4 border border-amber-400 my-8 mt-12 flex flex-col items-center justify-center">
                 <div className="mb-6 text-amber-400 text-2xl font-bold text-center">D.FAITH kaufen</div>
                 
                 {/* POL Balance */}

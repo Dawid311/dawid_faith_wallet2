@@ -203,23 +203,25 @@ export default function SellTab() {
     console.log("Checking allowance:", allowanceUrl);
     
     const allowanceResponse = await fetch(allowanceUrl);
-    
+
+    let allowanceValue = "0";
     if (allowanceResponse.ok) {
       const allowanceData = await allowanceResponse.json();
       console.log("Allowance Response:", allowanceData);
 
-      let allowanceValue = "0";
       if (allowanceData && allowanceData.data !== undefined && allowanceData.data !== null) {
         if (typeof allowanceData.data === "object") {
-          // z.B. { allowance: "12345" } oder { "0x...": "12345" }
-          if ("allowance" in allowanceData.data) {
-            allowanceValue = allowanceData.data.allowance?.toString() ?? "0";
-          } else {
-            // Falls das Objekt nur einen Key hat, nimm dessen Wert
-            const values = Object.values(allowanceData.data);
-            if (values.length > 0) {
-              allowanceValue = values[0]?.toString() ?? "0";
+          if (Array.isArray(allowanceData.data)) {
+            // Falls Array, nimm das erste Element
+            const first = allowanceData.data[0];
+            if (typeof first === "object" && first !== null) {
+              const values = Object.values(first);
+              if (values.length > 0) allowanceValue = values[0]?.toString() ?? "0";
             }
+          } else {
+            // Objekt: nimm den ersten Wert
+            const values = Object.values(allowanceData.data);
+            if (values.length > 0) allowanceValue = values[0]?.toString() ?? "0";
           }
         } else {
           // String oder Zahl direkt
@@ -266,12 +268,29 @@ export default function SellTab() {
         
         // Allowance erneut prüfen
         const newAllowanceResponse = await fetch(allowanceUrl);
+        let newAllowanceValue = "0";
         if (newAllowanceResponse.ok) {
           const newAllowanceData = await newAllowanceResponse.json();
-          const newAllowance = BigInt(newAllowanceData.data || "0");
-          
+          if (newAllowanceData && newAllowanceData.data !== undefined && newAllowanceData.data !== null) {
+            if (typeof newAllowanceData.data === "object") {
+              if (Array.isArray(newAllowanceData.data)) {
+                const first = newAllowanceData.data[0];
+                if (typeof first === "object" && first !== null) {
+                  const values = Object.values(first);
+                  if (values.length > 0) newAllowanceValue = values[0]?.toString() ?? "0";
+                }
+              } else {
+                const values = Object.values(newAllowanceData.data);
+                if (values.length > 0) newAllowanceValue = values[0]?.toString() ?? "0";
+              }
+            } else {
+              newAllowanceValue = newAllowanceData.data.toString();
+            }
+          }
+          const newAllowance = BigInt(newAllowanceValue);
+
           console.log("New Allowance:", newAllowance.toString());
-          
+
           if (newAllowance < requiredAmount) {
             throw new Error('Approval fehlgeschlagen oder noch nicht bestätigt');
           }
