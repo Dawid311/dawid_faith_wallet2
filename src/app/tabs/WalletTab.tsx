@@ -486,6 +486,16 @@ export default function WalletTab() {
     );
   };
 
+  // Hilfsfunktion für den Gesamtwert mit Fallback
+  const getTotalDfaithValue = () => {
+    const balance = dfaithBalance ? parseFloat(dfaithBalance.displayValue) : 0;
+    // Nutze aktuellen Preis, sonst Fallback auf letzten bekannten Preis
+    const price = dfaithPriceEur || lastKnownPrices.dfaithEur || 0;
+    const value = balance * price;
+    // Zeige immer zwei Nachkommastellen
+    return value.toFixed(2);
+  };
+
   return (
     <div className="flex justify-center min-h-[70vh] items-center py-8 bg-black">
         <Card className="w-full max-w-xl bg-gradient-to-br from-zinc-900 to-black rounded-3xl shadow-2xl border border-zinc-700 relative overflow-hidden">
@@ -545,11 +555,11 @@ export default function WalletTab() {
               </div>
             </div>
 
-            {/* DFAITH Token-Karte - jetzt mit D.FAITH */}
+            {/* DFAITH Token-Karte - jetzt nur noch Gesamtwert */}
             <div className="flex flex-col items-center p-4 bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl border border-zinc-700 w-full mb-6">
               <span className="uppercase text-xs tracking-widest text-amber-500/80 mb-2">D.FAITH</span>
               <div className="text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 drop-shadow-sm">
-                {isLoadingBalances ? "..." : (dfaithBalance ? dfaithBalance.displayValue : "0.00")}
+                {isLoadingBalances ? "..." : `${getTotalDfaithValue()} EUR`}
               </div>
               
               <div className="w-full h-px bg-gradient-to-r from-transparent via-zinc-700/50 to-transparent my-3"></div>

@@ -317,7 +317,7 @@ export default function SellTab() {
       console.log("Approve bestätigt:", receipt);
       
       setNeedsApproval(false);
-      setSellStep('approved');
+      setSellStep('approved'); // <--- Das ist wichtig!
       setSwapTxStatus(null);
     } catch (e) {
       console.error("Approve Fehler:", e);
@@ -669,8 +669,8 @@ export default function SellTab() {
                 </Button>
               )}
               
-              {/* Schritt 3: Swap durchführen */}
-              {((sellStep === 'quoteFetched' && !needsApproval) || sellStep === 'approved') && (
+              {/* Schritt 3: Swap durchführen (nur nach Approve oder wenn kein Approve nötig) */}
+              {((sellStep === 'approved') || (sellStep === 'quoteFetched' && !needsApproval)) && (
                 <Button
                   className="w-full bg-gradient-to-r from-red-500 to-red-600 text-white font-bold py-3 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50"
                   onClick={handleSellSwap}
