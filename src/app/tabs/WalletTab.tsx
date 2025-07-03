@@ -111,7 +111,7 @@ export default function WalletTab() {
     symbol: "POL"
   };
 
-  // Verbesserte Token-Balance-Abfrage mit 5-facher Verifizierung
+  // Vereinfachte Token-Balance-Abfrage ohne 5-fache Verifizierung
   const fetchTokenBalanceViaContract = async (
     tokenAddress: string,
     tokenDecimals: number,
@@ -120,76 +120,23 @@ export default function WalletTab() {
     if (!accountAddress) return "0";
 
     try {
-      // 5 parallele Anfragen durchführen
-      const balancePromises = Array(5).fill(0).map(async (_, index) => {
-        try {
-          // Kleine Verzögerung zwischen den Anfragen (0-200ms)
-          await new Promise(resolve => setTimeout(resolve, index * 50));
-          
-          const contract = getContract({
-            client,
-            chain: polygon,
-            address: tokenAddress,
-          });
-
-          const balanceResult = await balanceOf({
-            contract,
-            address: accountAddress
-          });
-
-          // Balance in lesbare Form umrechnen
-          const balance = (Number(balanceResult) / Math.pow(10, tokenDecimals)).toString();
-          console.log(`Balance-Abfrage ${index + 1} für ${tokenAddress}:`, balance);
-          return balance;
-        } catch (error) {
-          console.error(`Balance-Abfrage ${index + 1} fehlgeschlagen:`, error);
-          return "error"; // Markierung für fehlgeschlagene Abfragen
-        }
+      const contract = getContract({
+        client,
+        chain: polygon,
+        address: tokenAddress,
       });
 
-      // Alle Ergebnisse sammeln
-      const balanceResults = await Promise.all(balancePromises);
-      
-      console.log(`Alle Balance-Abfragen für ${tokenAddress}:`, balanceResults);
-      
-      // Fehlerhafte Abfragen entfernen
-      const validResults = balanceResults.filter(result => result !== "error");
-      
-      if (validResults.length === 0) {
-        console.error("Alle Balance-Abfragen fehlgeschlagen");
-        return "0";
-      }
-      
-      // Häufigkeitsanalyse durchführen
-      const frequencyMap: {[key: string]: number} = {};
-      let maxFrequency = 0;
-      let mostFrequentValue = "0";
-      
-      validResults.forEach(value => {
-        // Werte auf 6 Dezimalstellen runden für bessere Vergleichbarkeit
-        const roundedValue = Number(value).toFixed(6);
-        frequencyMap[roundedValue] = (frequencyMap[roundedValue] || 0) + 1;
-        
-        if (frequencyMap[roundedValue] > maxFrequency) {
-          maxFrequency = frequencyMap[roundedValue];
-          mostFrequentValue = roundedValue;
-        }
+      const balanceResult = await balanceOf({
+        contract,
+        address: accountAddress
       });
-      
-      // Wenn es keinen eindeutigen Mehrheitswert gibt, nehmen wir den Median
-      if (maxFrequency === 1 && validResults.length > 2) {
-        // Sortieren für Median-Berechnung
-        const sortedResults = validResults.map(Number).sort((a, b) => a - b);
-        const medianIndex = Math.floor(sortedResults.length / 2);
-        const medianValue = sortedResults[medianIndex].toString();
-        console.log(`Median-Wert für ${tokenAddress}: ${medianValue}`);
-        return medianValue;
-      }
-      
-      console.log(`Häufigster Balance-Wert für ${tokenAddress}: ${mostFrequentValue} (${maxFrequency}/${validResults.length} Stimmen)`);
-      return mostFrequentValue;
+
+      // Balance in lesbare Form umrechnen
+      const balance = (Number(balanceResult) / Math.pow(10, tokenDecimals)).toString();
+      console.log(`Balance für ${tokenAddress}:`, balance);
+      return balance;
     } catch (error) {
-      console.error(`Fehler beim Abrufen der Balance für ${tokenAddress}:`, error);
+      console.error(`Balance-Abfrage fehlgeschlagen für ${tokenAddress}:`, error);
       return "0";
     }
   };
@@ -250,7 +197,7 @@ export default function WalletTab() {
     }
   };
 
-  // UseEffect für initiales Laden und periodische Aktualisierung (alle 10 Sekunden)
+  // UseEffect für initiales Laden und periodische Aktualisierung (alle 15 Sekunden)
   useEffect(() => {
     let isMounted = true;
     let intervalId: NodeJS.Timeout | null = null;
@@ -266,13 +213,13 @@ export default function WalletTab() {
     // Initiales Laden
     loadData();
     
-    // Regelmäßige Aktualisierung alle 10 Sekunden
+    // Regelmäßige Aktualisierung alle 15 Sekunden (weniger aggressiv)
     intervalId = setInterval(() => {
       if (isMounted && account?.address) {
-        console.log("⏰ 10-Sekunden-Intervall: Lade Balances neu...");
+        console.log("⏰ 15-Sekunden-Intervall: Lade Balances neu...");
         loadData();
       }
-    }, 10000); // 10 Sekunden
+    }, 15000); // 15 Sekunden statt 10
     
     return () => {
       isMounted = false;
@@ -346,41 +293,6 @@ export default function WalletTab() {
       const totalEur = Number(balance) * dfaithPriceEur;
       setDfaithEurValue(totalEur.toFixed(2));
     }
-  };
-
-  // Analyse-Funktion für Balance-Schwankungen (für Debugging)
-  const analyzeBalanceIssue = async () => {
-    if (!account?.address) return;
-    
-    console.log("===== BALANCE ANALYSE =====");
-    console.log("D.FAITH Balance:", dfaithBalance);
-    console.log("D.INVEST Balance:", dinvestBalance);
-    
-    try {
-      // Direkter Test mit den Contracts
-      console.log("Direkter Contract-Test:");
-      const dfaithValue = await fetchTokenBalanceViaContract(
-        DFAITH_TOKEN.address, 
-        DFAITH_TOKEN.decimals, 
-        account.address
-      );
-      console.log("D.FAITH direkt:", dfaithValue);
-      
-      const dinvestValue = await fetchTokenBalanceViaContract(
-        DINVEST_TOKEN.address, 
-        DINVEST_TOKEN.decimals, 
-        account.address
-      );
-      console.log("D.INVEST direkt:", dinvestValue);
-      
-    } catch (e) {
-      console.error("Fehler bei der direkten Balance-Abfrage:", e);
-    }
-    
-    console.log("===== ANALYSE BEENDET =====");
-    
-    // Balances neu laden
-    await fetchTokenBalances();
   };
 
   if (status !== "connected" || !account?.address) {
