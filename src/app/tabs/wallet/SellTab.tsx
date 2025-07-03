@@ -253,21 +253,33 @@ export default function SellTab() {
           address: DFAITH_TOKEN
         });
         
-        // Sehr hohe Allowance setzen
-        const maxAllowance = BigInt("115792089237316195423570985008687907853269984665640564039457584007913129639935");
-        
+        // Statt einer sehr hohen Allowance, verwende genau den Betrag, den du tatsächlich verkaufen willst
+        // plus etwas Puffer für Slippage (z.B. +10%)
+        const amountInWei = (parseFloat(sellAmount) * Math.pow(10, DFAITH_DECIMALS)).toString();
+        const requiredAmountWithBuffer = BigInt(Math.floor(parseFloat(amountInWei) * 1.1).toString());
+
         const approveTransaction = prepareContractCall({
           contract,
           method: "function approve(address spender, uint256 amount) returns (bool)",
-          params: [txData.to, maxAllowance]
+          params: [txData.to, requiredAmountWithBuffer]
         });
 
+        // Approve senden
         const approveResult = await sendTransaction(approveTransaction);
         console.log("Approval sent:", approveResult);
-        
-        // Länger warten bis Approval bestätigt ist
-        await new Promise(resolve => setTimeout(resolve, 5000));
-        
+
+        // Warten bis Approve-Transaktion bestätigt ist
+        setSwapTxStatus("waiting_approval");
+        try {
+          // Warte auf Bestätigung statt einfach Zeit verstreichen zu lassen
+          const { waitForReceipt } = await import("thirdweb");
+          await waitForReceipt(approveResult);
+          console.log("Approval confirmed in blockchain");
+        } catch (error) {
+          console.error("Error waiting for approval confirmation:", error);
+          throw new Error("Approval-Transaktion wurde nicht bestätigt");
+        }
+
         // Allowance erneut prüfen
         const newAllowanceResponse = await fetch(allowanceUrl);
         let newAllowanceValue = "0";
@@ -297,6 +309,8 @@ export default function SellTab() {
             throw new Error('Approval fehlgeschlagen oder noch nicht bestätigt');
           }
         }
+      } else {
+        console.log("Sufficient allowance, proceeding with swap...");
       }
     } else {
       console.warn("Allowance check failed, proceeding anyway");

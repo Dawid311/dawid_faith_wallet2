@@ -616,8 +616,8 @@ export default function BuyTab() {
           
           <div className="w-full mt-4">
             {showPolBuyModal ? (
-              <div className="fixed inset-0 z-50 flex items-start justify-center pt-16 min-h-screen bg-black/60 overflow-y-auto">
-                <div className="bg-zinc-900 rounded-xl p-4 max-w-full w-full sm:max-w-xs border border-purple-500 text-center flex flex-col items-center justify-center my-8">
+              <div className="fixed inset-0 z-50 flex items-center justify-center min-h-screen bg-black/60 overflow-y-auto">
+                <div className="bg-zinc-900 rounded-xl p-4 max-w-full w-full sm:max-w-xs border border-purple-500 text-center flex flex-col items-center justify-center my-4">
                   <div className="mb-4 text-purple-400 text-2xl font-bold">POL kaufen</div>
                   <div className="w-full flex-1 flex items-center justify-center">
                     <BuyWidget
