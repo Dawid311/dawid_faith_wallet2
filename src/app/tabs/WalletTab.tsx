@@ -119,8 +119,18 @@ export default function WalletTab() {
   ): Promise<string> => {
     if (!accountAddress) return "0";
     try {
+      const params = new URLSearchParams({
+        chain_id: "137",
+        token_address: tokenAddress,
+        owner_address: accountAddress,
+        include_native: "true",
+        resolve_metadata_links: "true",
+        include_spam: "false",
+        limit: "50",
+        metadata: "false",
+      });
       const res = await fetch(
-        `https://insight.thirdweb.com/v1/tokens?chain_id=137&token_address=${tokenAddress}&owner_address=${accountAddress}`
+        `https://insight.thirdweb.com/v1/tokens?${params.toString()}`
       );
       if (!res.ok) throw new Error("API Error");
       const data = await res.json();
