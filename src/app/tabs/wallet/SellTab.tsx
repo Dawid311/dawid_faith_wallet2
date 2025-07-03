@@ -275,6 +275,55 @@ export default function SellTab() {
     }
   };
 
+  // Automatisch Quote holen, wenn sellAmount oder slippage sich ändern
+  useEffect(() => {
+    if (
+      showSellModal &&
+      sellAmount &&
+      parseFloat(sellAmount) > 0 &&
+      parseFloat(sellAmount) <= parseFloat(dfaithBalance)
+    ) {
+      handleGetQuote();
+    } else {
+      setQuoteTxData(null);
+      setNeedsApproval(false);
+      setSpenderAddress(null);
+      setQuoteError(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sellAmount, slippage, showSellModal]);
+
+  // Automatisch Swap ausführen, wenn Quote da und keine Freigabe nötig
+  useEffect(() => {
+    if (
+      showSellModal &&
+      quoteTxData &&
+      !needsApproval &&
+      !isSwapping &&
+      sellAmount &&
+      parseFloat(sellAmount) > 0
+    ) {
+      handleSellSwap();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quoteTxData, needsApproval]);
+
+  // Nach Approve automatisch Swap starten
+  useEffect(() => {
+    if (
+      showSellModal &&
+      quoteTxData &&
+      !needsApproval &&
+      swapTxStatus === null &&
+      !isSwapping &&
+      sellAmount &&
+      parseFloat(sellAmount) > 0
+    ) {
+      handleSellSwap();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [needsApproval, swapTxStatus]);
+
   return (
     <div className="flex flex-col gap-6 p-6">
       <div className="text-center mb-6">
@@ -455,20 +504,7 @@ export default function SellTab() {
 
             {/* Buttons */}
             <div className="space-y-3">
-              {!quoteTxData && (
-                <Button
-                  className="w-full bg-gradient-to-r from-red-500 to-red-600 text-white font-bold py-3 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50"
-                  onClick={handleGetQuote}
-                  disabled={!sellAmount || parseFloat(sellAmount) <= 0 || isSwapping || parseFloat(sellAmount) > parseFloat(dfaithBalance)}
-                >
-                  <FaExchangeAlt className="inline mr-2" />
-                  {isSwapping ? "Lade Quote..." : `${sellAmount || "0"} D.FAITH verkaufen`}
-                </Button>
-              )}
-              {quoteError && (
-                <div className="text-red-400 text-sm text-center">{quoteError}</div>
-              )}
-              {quoteTxData && needsApproval && (
+              {needsApproval && (
                 <Button
                   className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 rounded-xl mb-2"
                   onClick={handleApprove}
@@ -478,16 +514,29 @@ export default function SellTab() {
                   D.FAITH Token für Verkauf freigeben (Approve)
                 </Button>
               )}
-              {quoteTxData && !needsApproval && (
-                <Button
-                  className="w-full bg-gradient-to-r from-red-500 to-red-600 text-white font-bold py-3 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50"
-                  onClick={handleSellSwap}
-                  disabled={isSwapping}
-                >
-                  <FaExchangeAlt className="inline mr-2" />
-                  {isSwapping ? "Verkaufe..." : `${sellAmount || "0"} D.FAITH verkaufen`}
-                </Button>
-              )}
+              <Button
+                className="w-full bg-gradient-to-r from-red-500 to-red-600 text-white font-bold py-3 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50"
+                onClick={() => {
+                  if (!needsApproval) {
+                    handleSellSwap();
+                  } else {
+                    handleApprove();
+                  }
+                }}
+                disabled={
+                  isSwapping ||
+                  !sellAmount ||
+                  parseFloat(sellAmount) <= 0 ||
+                  parseFloat(sellAmount) > parseFloat(dfaithBalance)
+                }
+              >
+                <FaExchangeAlt className="inline mr-2" />
+                {isSwapping
+                  ? "Verkaufe..."
+                  : needsApproval
+                  ? "Freigeben & verkaufen"
+                  : `${sellAmount || "0"} D.FAITH verkaufen`}
+              </Button>
               <Button
                 className="w-full bg-zinc-600 hover:bg-zinc-700 text-white font-bold py-2 rounded-xl"
                 onClick={() => {

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Button } from "../../../../components/ui/button";
-import { FaPaperPlane, FaLock } from "react-icons/fa";
+import { FaPaperPlane } from "react-icons/fa";
 import { useActiveAccount, useSendTransaction } from "thirdweb/react";
 import { polygon } from "thirdweb/chains";
 import { getContract, prepareContractCall } from "thirdweb";
@@ -15,10 +15,10 @@ export default function SendTab() {
   const account = useActiveAccount();
   const { mutateAsync: sendTransaction } = useSendTransaction();
 
-  // Token-Konstanten mit neuen Adressen
+  // Token-Konstanten
   const DFAITH_TOKEN = "0xF051E3B0335eB332a7ef0dc308BB4F0c10301060";
   const DFAITH_DECIMALS = 2;
-  const DINVEST_TOKEN = "0x0000000000000000000000000000000000000000"; // Ersetze ggf. durch echte Adresse
+  const DINVEST_TOKEN = "0x0000000000000000000000000000000000000000";
   const DINVEST_DECIMALS = 4;
   const POL_TOKEN = "0x0000000000000000000000000000000000001010";
   const POL_DECIMALS = 18;
@@ -73,7 +73,6 @@ export default function SendTab() {
 
   const handleSend = async () => {
     if (!sendAmount || !sendToAddress) return;
-    
     setIsSending(true);
     try {
       // Simuliere Transaktion
@@ -95,8 +94,30 @@ export default function SendTab() {
     else if (selectedToken === "POL") setSendAmount(polBalance);
   };
 
+  // Token-Infos für Dropdown
+  const tokenOptions = [
+    {
+      key: "DFAITH",
+      label: "D.FAITH",
+      balance: dfaithBalance,
+      symbol: "DF"
+    },
+    {
+      key: "DINVEST",
+      label: "D.INVEST",
+      balance: dinvestBalance,
+      symbol: "DI"
+    },
+    {
+      key: "POL",
+      label: "POL",
+      balance: polBalance,
+      symbol: "P"
+    }
+  ];
+
   return (
-    <div className="flex flex-col gap-8 p-6">
+    <div className="flex flex-col gap-8 p-6 max-w-lg mx-auto">
       <div className="text-center mb-4">
         <h2 className="text-3xl font-extrabold bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 bg-clip-text text-transparent mb-2 tracking-tight drop-shadow">
           Token senden
@@ -104,63 +125,23 @@ export default function SendTab() {
         <p className="text-zinc-400 text-base">Senden Sie Token an andere Wallets</p>
       </div>
 
-      {/* Token Auswahl */}
-      <div className="flex flex-col gap-2">
-        <label className="text-sm font-semibold text-zinc-300 mb-1">Token auswählen</label>
-        <div className="flex gap-4 justify-center">
-          <button 
-            className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 shadow transition-all duration-150 ${
-              selectedToken === "DFAITH" 
-                ? "bg-gradient-to-br from-amber-400/60 to-yellow-500/80 text-amber-900 border-amber-400 scale-105"
-                : "bg-zinc-900/80 text-zinc-400 border-zinc-700 hover:bg-zinc-800/80"
-            }`}
-            onClick={() => setSelectedToken("DFAITH")}
-          >
-            <div className="w-12 h-12 rounded-full bg-gradient-to-r from-amber-400 to-yellow-500 flex items-center justify-center shadow">
-              <span className="text-lg font-bold text-black">DF</span>
-            </div>
-            <div className="text-center">
-              <div className="text-xs font-bold">D.FAITH</div>
-              <div className="text-[11px] opacity-80">{dfaithBalance}</div>
-            </div>
-          </button>
-          <button 
-            className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 shadow transition-all duration-150 ${
-              selectedToken === "DINVEST" 
-                ? "bg-gradient-to-br from-amber-400/60 to-yellow-500/80 text-amber-900 border-amber-400 scale-105"
-                : "bg-zinc-900/80 text-zinc-400 border-zinc-700 hover:bg-zinc-800/80"
-            }`}
-            onClick={() => setSelectedToken("DINVEST")}
-          >
-            <div className="w-12 h-12 rounded-full bg-gradient-to-r from-amber-400 to-yellow-500 flex items-center justify-center shadow">
-              <FaLock className="text-black text-lg" />
-            </div>
-            <div className="text-center">
-              <div className="text-xs font-bold">D.INVEST</div>
-              <div className="text-[11px] opacity-80">{dinvestBalance}</div>
-            </div>
-          </button>
-          <button 
-            className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 shadow transition-all duration-150 ${
-              selectedToken === "POL" 
-                ? "bg-gradient-to-br from-purple-400/60 to-purple-600/80 text-purple-900 border-purple-400 scale-105"
-                : "bg-zinc-900/80 text-zinc-400 border-zinc-700 hover:bg-zinc-800/80"
-            }`}
-            onClick={() => setSelectedToken("POL")}
-          >
-            <div className="w-12 h-12 rounded-full bg-gradient-to-r from-purple-400 to-purple-600 flex items-center justify-center shadow">
-              <span className="text-lg font-bold text-white">P</span>
-            </div>
-            <div className="text-center">
-              <div className="text-xs font-bold">POL</div>
-              <div className="text-[11px] opacity-80">{polBalance}</div>
-            </div>
-          </button>
-        </div>
-      </div>
-
-      {/* Sende-Interface */}
       <div className="bg-gradient-to-br from-zinc-900/90 to-zinc-950/90 rounded-3xl p-8 border-2 border-zinc-800 shadow-xl space-y-8">
+        {/* Token Dropdown */}
+        <div>
+          <label className="text-sm font-semibold text-zinc-300 mb-2 block">Token auswählen</label>
+          <select
+            className="w-full bg-zinc-950 border border-zinc-700 rounded-xl py-3 px-4 text-zinc-200 text-lg font-bold focus:border-amber-500 focus:outline-none transition"
+            value={selectedToken}
+            onChange={e => setSelectedToken(e.target.value)}
+          >
+            {tokenOptions.map(token => (
+              <option key={token.key} value={token.key}>
+                {token.label} (Verfügbar: {token.balance})
+              </option>
+            ))}
+          </select>
+        </div>
+
         {/* Empfänger Adresse */}
         <div>
           <label className="text-sm font-semibold text-zinc-300 mb-2 block">Empfänger Adresse</label>
@@ -179,8 +160,10 @@ export default function SendTab() {
           <div className="flex justify-between items-center mb-2">
             <label className="text-sm font-semibold text-zinc-300">Betrag</label>
             <span className="text-xs text-zinc-500">
-              Verfügbar: <span className={selectedToken === "POL" ? "text-purple-400" : "text-amber-400"}>
-                {selectedToken === "DFAITH" ? dfaithBalance : selectedToken === "DINVEST" ? dinvestBalance : polBalance} {selectedToken}
+              Verfügbar: <span className={
+                selectedToken === "POL" ? "text-purple-400" : "text-amber-400"
+              }>
+                {tokenOptions.find(t => t.key === selectedToken)?.balance} {selectedToken}
               </span>
             </span>
           </div>
