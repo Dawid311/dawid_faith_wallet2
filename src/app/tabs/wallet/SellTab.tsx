@@ -339,165 +339,161 @@ export default function SellTab() {
     const initialBalance = parseFloat(dfaithBalance);
     
     try {
-      console.log("4. Swap Transaktion starten - aktualisiere Quote...");
-      
-      // Quote vor Swap aktualisieren (für frische Daten)
-      const params = new URLSearchParams({
-        chain: "polygon",
-        inTokenAddress: DFAITH_TOKEN,
-        outTokenAddress: "0x0000000000000000000000000000000000001010",
-        amount: sellAmount,
-        slippage: slippage,
-        gasPrice: "50",
-        account: account.address,
-      });
-      
-      const response = await fetch(`https://open-api.openocean.finance/v3/polygon/swap_quote?${params}`);
-      if (!response.ok) throw new Error(`Quote refresh failed: ${response.status}`);
-      
-      const data = await response.json();
-      const freshTxData = data.data;
-      
-      console.log("Frische Quote-Daten:", freshTxData);
+      console.log("4. Swap Transaktion starten");
+      console.log("Verwende ursprüngliche Quote-Daten:", quoteTxData);
       
       const { prepareTransaction } = await import("thirdweb");
-      const tx = prepareTransaction({
-        to: freshTxData.to,
-        data: freshTxData.data,
-        value: BigInt(freshTxData.value || "0"),
-        chain: polygon,
-        client
+      
+      // Aktuelle Nonce explizit abrufen
+      const { getRpcClient } = await import("thirdweb");
+      const rpc = getRpcClient({ client, chain: polygon });
+      const nonce = await rpc.request({
+        method: "eth_getTransactionCount",
+        params: [account.address, "pending"]
+    });
+    
+    console.log("Aktuelle Nonce:", nonce);
+    
+    const tx = prepareTransaction({
+      to: quoteTxData.to,
+      data: quoteTxData.data,
+      value: BigInt(quoteTxData.value || "0"),
+      chain: polygon,
+      client,
+      nonce: parseInt(nonce, 16), // Explizite Nonce setzen
+      gas: BigInt(quoteTxData.gasLimit || "300000"), // Gas-Limit aus Quote verwenden
+      gasPrice: BigInt(quoteTxData.gasPrice || "50000000000") // Gas-Preis aus Quote verwenden
+    });
+    
+    console.log("Sending swap transaction mit Nonce:", parseInt(nonce, 16));
+    const swapResult = await sendTransaction(tx);
+    console.log("Swap TX gesendet:", swapResult);
+    
+    setSwapTxStatus("confirming");
+    
+    // Warte auf Transaktionsbestätigung
+    const { waitForReceipt } = await import("thirdweb");
+    console.log("Warte auf Transaktionsbestätigung...");
+    const receipt = await waitForReceipt(swapResult);
+    console.log("Transaktion bestätigt:", receipt);
+    
+    // Prüfe ob Transaktion erfolgreich war
+    if (receipt.status !== "success") {
+      console.error("Transaktion Details:", {
+        status: receipt.status,
+        gasUsed: receipt.gasUsed?.toString(),
+        logs: receipt.logs,
+        transactionHash: receipt.transactionHash
       });
+      throw new Error(`Transaktion fehlgeschlagen - Status: ${receipt.status}. Hash: ${receipt.transactionHash}`);
+    }
+    
+    setSwapTxStatus("verifying");
+    console.log("5. Verifiziere Balance-Änderung...");
+    
+    // Mehrfache Versuche zur Balance-Verifizierung
+    let balanceVerified = false;
+    let attempts = 0;
+    const maxAttempts = 5;
+    
+    while (!balanceVerified && attempts < maxAttempts) {
+      attempts++;
+      console.log(`Balance-Verifizierung Versuch ${attempts}/${maxAttempts}`);
       
-      console.log("Sending swap transaction mit frischen Daten...");
-      const swapResult = await sendTransaction(tx);
-      console.log("Swap TX gesendet:", swapResult);
-      
-      setSwapTxStatus("confirming");
-      
-      // Warte auf Transaktionsbestätigung
-      const { waitForReceipt } = await import("thirdweb");
-      console.log("Warte auf Transaktionsbestätigung...");
-      const receipt = await waitForReceipt(swapResult);
-      console.log("Transaktion bestätigt:", receipt);
-      
-      // Prüfe ob Transaktion erfolgreich war
-      if (receipt.status !== "success") {
-        console.error("Transaktion Details:", {
-          status: receipt.status,
-          gasUsed: receipt.gasUsed?.toString(),
-          logs: receipt.logs,
-          transactionHash: receipt.transactionHash
-        });
-        throw new Error(`Transaktion fehlgeschlagen - Status: ${receipt.status}. Hash: ${receipt.transactionHash}`);
-      }
-      
-      setSwapTxStatus("verifying");
-      console.log("5. Verifiziere Balance-Änderung...");
-      
-      // Mehrfache Versuche zur Balance-Verifizierung
-      let balanceVerified = false;
-      let attempts = 0;
-      const maxAttempts = 5;
-      
-      while (!balanceVerified && attempts < maxAttempts) {
-        attempts++;
-        console.log(`Balance-Verifizierung Versuch ${attempts}/${maxAttempts}`);
-        
-        try {
-          // Warte zwischen Versuchen
-          if (attempts > 1) {
-            await new Promise(resolve => setTimeout(resolve, 3000));
-          }
-          
-          const dfaithValue = await fetchTokenBalanceViaInsightApi(DFAITH_TOKEN, account.address);
-          const dfaithRaw = Number(dfaithValue);
-          const currentBalance = dfaithRaw / Math.pow(10, DFAITH_DECIMALS);
-          
-          console.log(`Initiale Balance: ${initialBalance}, Aktuelle Balance: ${currentBalance}`);
-          
-          // Prüfe ob sich die Balance um mindestens den Verkaufsbetrag verringert hat
-          const expectedDecrease = parseFloat(sellAmount);
-          const actualDecrease = initialBalance - currentBalance;
-          
-          console.log(`Erwartete Verringerung: ${expectedDecrease}, Tatsächliche Verringerung: ${actualDecrease}`);
-          
-          if (actualDecrease >= (expectedDecrease * 0.95)) { // 5% Toleranz für Rundungsfehler
-            console.log("✅ Balance-Änderung verifiziert - Swap erfolgreich!");
-            setDfaithBalance(currentBalance.toFixed(DFAITH_DECIMALS));
-            balanceVerified = true;
-            setSellStep('completed');
-            setSwapTxStatus("success");
-            setSellAmount("");
-            setQuoteTxData(null);
-            setSpenderAddress(null);
-            setTimeout(() => setSwapTxStatus(null), 5000);
-          } else if (attempts === maxAttempts) {
-            console.log("⚠️ Balance-Änderung konnte nicht verifiziert werden");
-            setDfaithBalance(currentBalance.toFixed(DFAITH_DECIMALS));
-            throw new Error("Swap-Verifizierung fehlgeschlagen - Balance nicht wie erwartet geändert");
-          }
-        } catch (balanceError) {
-          console.error(`Balance-Verifizierung Versuch ${attempts} fehlgeschlagen:`, balanceError);
-          if (attempts === maxAttempts) {
-            throw new Error("Balance-Verifizierung nach mehreren Versuchen fehlgeschlagen");
-          }
-        }
-      }
-      
-    } catch (error) {
-      console.error("Swap Fehler:", error);
-      setSwapTxStatus("error");
-      
-      // Versuche trotzdem die Balance zu aktualisieren
       try {
+        // Warte zwischen Versuchen
+        if (attempts > 1) {
+          await new Promise(resolve => setTimeout(resolve, 3000));
+        }
+        
         const dfaithValue = await fetchTokenBalanceViaInsightApi(DFAITH_TOKEN, account.address);
         const dfaithRaw = Number(dfaithValue);
-        const currentBalance = (dfaithRaw / Math.pow(10, DFAITH_DECIMALS)).toFixed(DFAITH_DECIMALS);
-        setDfaithBalance(currentBalance);
+        const currentBalance = dfaithRaw / Math.pow(10, DFAITH_DECIMALS);
+        
+        console.log(`Initiale Balance: ${initialBalance}, Aktuelle Balance: ${currentBalance}`);
+        
+        // Prüfe ob sich die Balance um mindestens den Verkaufsbetrag verringert hat
+        const expectedDecrease = parseFloat(sellAmount);
+        const actualDecrease = initialBalance - currentBalance;
+        
+        console.log(`Erwartete Verringerung: ${expectedDecrease}, Tatsächliche Verringerung: ${actualDecrease}`);
+        
+        if (actualDecrease >= (expectedDecrease * 0.95)) { // 5% Toleranz für Rundungsfehler
+          console.log("✅ Balance-Änderung verifiziert - Swap erfolgreich!");
+          setDfaithBalance(currentBalance.toFixed(DFAITH_DECIMALS));
+          balanceVerified = true;
+          setSellStep('completed');
+          setSwapTxStatus("success");
+          setSellAmount("");
+          setQuoteTxData(null);
+          setSpenderAddress(null);
+          setTimeout(() => setSwapTxStatus(null), 5000);
+        } else if (attempts === maxAttempts) {
+          console.log("⚠️ Balance-Änderung konnte nicht verifiziert werden");
+          setDfaithBalance(currentBalance.toFixed(DFAITH_DECIMALS));
+          throw new Error("Swap-Verifizierung fehlgeschlagen - Balance nicht wie erwartet geändert");
+        }
       } catch (balanceError) {
-        console.error("Fehler beim Aktualisieren der Balance nach Swap-Fehler:", balanceError);
+        console.error(`Balance-Verifizierung Versuch ${attempts} fehlgeschlagen:`, balanceError);
+        if (attempts === maxAttempts) {
+          throw new Error("Balance-Verifizierung nach mehreren Versuchen fehlgeschlagen");
+        }
       }
-      
-      setTimeout(() => setSwapTxStatus(null), 5000);
-    } finally {
-      setIsSwapping(false);
     }
-  };
-
-  // Alle Schritte in einer Funktion
-  const handleSellAllInOne = async () => {
-    if (!sellAmount || parseFloat(sellAmount) <= 0 || isSwapping || parseFloat(sellAmount) > parseFloat(dfaithBalance)) return;
     
+  } catch (error) {
+    console.error("Swap Fehler:", error);
+    setSwapTxStatus("error");
+    
+    // Versuche trotzdem die Balance zu aktualisieren
     try {
-      // Erster Schritt
-      console.log("Start des Verkaufsprozesses");
-      
-      // Nur weitere Schritte ausführen, wenn Quote erfolgreich war
-      if (sellStep === 'initial') {
-        setIsSwapping(true);
-        await handleGetQuote();
-      }
-      
-      // Nur Approve ausführen, wenn nötig
-      if (sellStep === 'quoteFetched' && needsApproval) {
-        await handleApprove();
-      }
-      
-      // Swap ausführen wenn Quote vorhanden und Approve erledigt/nicht nötig
-      if ((sellStep === 'quoteFetched' && !needsApproval) || sellStep === 'approved') {
-        await handleSellSwap();
-      }
-      
-    } catch (e: any) {
-      console.error("Verkaufsprozess Fehler:", e);
-      setQuoteError(e.message || "Fehler beim Verkauf");
-      setSwapTxStatus("error");
-      setTimeout(() => setSwapTxStatus(null), 4000);
-    } finally {
-      setIsSwapping(false);
+      const dfaithValue = await fetchTokenBalanceViaInsightApi(DFAITH_TOKEN, account.address);
+      const dfaithRaw = Number(dfaithValue);
+      const currentBalance = (dfaithRaw / Math.pow(10, DFAITH_DECIMALS)).toFixed(DFAITH_DECIMALS);
+      setDfaithBalance(currentBalance);
+    } catch (balanceError) {
+      console.error("Fehler beim Aktualisieren der Balance nach Swap-Fehler:", balanceError);
     }
-  };
+    
+    setTimeout(() => setSwapTxStatus(null), 5000);
+  } finally {
+    setIsSwapping(false);
+  }
+};
+
+// Alle Schritte in einer Funktion
+const handleSellAllInOne = async () => {
+  if (!sellAmount || parseFloat(sellAmount) <= 0 || isSwapping || parseFloat(sellAmount) > parseFloat(dfaithBalance)) return;
+  
+  try {
+    // Erster Schritt
+    console.log("Start des Verkaufsprozesses");
+    
+    // Nur weitere Schritte ausführen, wenn Quote erfolgreich war
+    if (sellStep === 'initial') {
+      setIsSwapping(true);
+      await handleGetQuote();
+    }
+    
+    // Nur Approve ausführen, wenn nötig
+    if (sellStep === 'quoteFetched' && needsApproval) {
+      await handleApprove();
+    }
+    
+    // Swap ausführen wenn Quote vorhanden und Approve erledigt/nicht nötig
+    if ((sellStep === 'quoteFetched' && !needsApproval) || sellStep === 'approved') {
+      await handleSellSwap();
+    }
+    
+  } catch (e: any) {
+    console.error("Verkaufsprozess Fehler:", e);
+    setQuoteError(e.message || "Fehler beim Verkauf");
+    setSwapTxStatus("error");
+    setTimeout(() => setSwapTxStatus(null), 4000);
+  } finally {
+    setIsSwapping(false);
+  }
+};
 
   return (
     <div className="flex flex-col gap-6 p-6">
