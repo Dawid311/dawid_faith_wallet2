@@ -96,7 +96,11 @@ export default function BuyTab() {
     };
 
     fetchDfaithPrice();
-    const interval = setInterval(fetchDfaithPrice, 30000);
+    // Preis nur alle 60 Sekunden (1 Minute) aktualisieren statt alle 30 Sekunden
+    // Für noch weniger API-Calls (alle 2 Minuten):
+    const interval = setInterval(fetchDfaithPrice, 120000);
+    // Oder alle 5 Minuten für sehr seltene Updates:
+    // const interval = setInterval(fetchDfaithPrice, 300000);
     return () => clearInterval(interval);
   }, []);
 
@@ -180,14 +184,15 @@ export default function BuyTab() {
     setIsSwapping(true);
     setSwapTxStatus("pending");
     try {
-      // POL hat 18 Dezimalstellen - wir müssen den Betrag entsprechend anpassen
-      const amountInWei = (parseFloat(swapAmountPol) * Math.pow(10, 18)).toString();
-      
+      // WICHTIG: OpenOcean erwartet amount OHNE Dezimalstellen!
+      // Nicht in Wei konvertieren, sondern den rohen Betrag verwenden
+      const amountToSend = swapAmountPol; // z.B. "1.5" für 1.5 POL
+    
       console.log("=== OpenOcean Swap Request ===");
       console.log("Chain:", "polygon");
       console.log("InToken:", "0x0000000000000000000000000000000000001010");
       console.log("OutToken:", "0xF051E3B0335eB332a7ef0dc308BB4F0c10301060");
-      console.log("Amount (in Wei):", amountInWei);
+      console.log("Amount (RAW):", amountToSend); // Zeigt z.B. "1.5"
       console.log("Slippage:", slippage);
       console.log("GasPrice:", "50");
       console.log("Account:", account.address);
@@ -196,7 +201,7 @@ export default function BuyTab() {
         chain: "polygon",
         inTokenAddress: "0x0000000000000000000000000000000000001010",
         outTokenAddress: "0xF051E3B0335eB332a7ef0dc308BB4F0c10301060",
-        amount: amountInWei, // Hier ist die Änderung: Betrag in Wei
+        amount: amountToSend, // Hier ist die Änderung: RAW amount ohne Dezimalkonvertierung
         slippage: slippage,
         gasPrice: "50",
         account: account.address,
@@ -405,14 +410,14 @@ export default function BuyTab() {
             <span className="text-xs text-zinc-400 bg-zinc-700/50 px-2 py-1 rounded">mit POL kaufen</span>
           </div>
           
-          <div className="space-y-3">
-            <div className="flex justify-between text-sm">
-              <span className="text-zinc-400">Aktueller Preis:</span>
-              <span className="text-amber-400">
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
+              <span className="text-sm text-zinc-400">Aktueller Preis:</span>
+              <span className="text-sm text-amber-400 font-medium">
                 {isLoadingPrice ? (
                   <span className="animate-pulse">Laden...</span>
                 ) : priceError ? (
-                  <span className="text-red-400">{priceError}</span>
+                  <span className="text-red-400 text-xs">{priceError}</span>
                 ) : dfaithPriceEur ? (
                   `${dfaithPriceEur.toFixed(3)}€ pro D.FAITH`
                 ) : (
@@ -420,15 +425,17 @@ export default function BuyTab() {
                 )}
               </span>
             </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-zinc-400">Wechselkurs:</span>
-              <span className="text-zinc-300">
+            
+            <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
+              <span className="text-sm text-zinc-400">Wechselkurs:</span>
+              <span className="text-sm text-zinc-300 font-medium">
                 {dfaithPrice ? `1 POL = ${dfaithPrice.toFixed(2)} D.FAITH` : "Wird geladen..."}
               </span>
             </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-zinc-400">Minimum:</span>
-              <span className="text-zinc-300">0.001 POL</span>
+            
+            <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
+              <span className="text-sm text-zinc-400">Minimum:</span>
+              <span className="text-sm text-zinc-300 font-medium">0.001 POL</span>
             </div>
           </div>
           
@@ -524,19 +531,19 @@ export default function BuyTab() {
                 {/* Estimated Output */}
                 {swapAmountPol && parseFloat(swapAmountPol) > 0 && dfaithPrice && dfaithPriceEur && (
                   <div className="mb-4 p-3 bg-zinc-800/50 rounded-lg">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-zinc-400">Geschätzte D.FAITH:</span>
-                      <span className="text-amber-400 font-bold">
+                    <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0 mb-2">
+                      <span className="text-sm text-zinc-400">Geschätzte D.FAITH:</span>
+                      <span className="text-sm text-amber-400 font-bold">
                         ~{(parseFloat(swapAmountPol) * dfaithPrice).toFixed(2)}
                       </span>
                     </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-zinc-400">Geschätzter Wert:</span>
-                      <span className="text-green-400 font-bold">
+                    <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0 mb-2">
+                      <span className="text-sm text-zinc-400">Geschätzter Wert:</span>
+                      <span className="text-sm text-green-400 font-bold">
                         ~{(parseFloat(swapAmountPol) * dfaithPrice * dfaithPriceEur).toFixed(3)}€
                       </span>
                     </div>
-                    <div className="text-xs text-zinc-500 mt-1">
+                    <div className="text-xs text-zinc-500 mt-2 pt-2 border-t border-zinc-700/50">
                       Slippage: {slippage}% | Minimum: ~{(parseFloat(swapAmountPol) * dfaithPrice * (1 - parseFloat(slippage)/100)).toFixed(2)}
                     </div>
                   </div>
@@ -655,14 +662,14 @@ export default function BuyTab() {
             <span className="text-xs text-zinc-400 bg-zinc-700/50 px-2 py-1 rounded">mit EUR kaufen</span>
           </div>
           
-          <div className="space-y-3">
-            <div className="flex justify-between text-sm">
-              <span className="text-zinc-400">Aktueller Preis:</span>
-              <span className="text-amber-400">5€ pro D.INVEST</span>
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
+              <span className="text-sm text-zinc-400">Aktueller Preis:</span>
+              <span className="text-sm text-amber-400 font-medium">5€ pro D.INVEST</span>
             </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-zinc-400">Minimum:</span>
-              <span className="text-zinc-300">5 EUR</span>
+            <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
+              <span className="text-sm text-zinc-400">Minimum:</span>
+              <span className="text-sm text-zinc-300 font-medium">5 EUR</span>
             </div>
           </div>
           
@@ -689,16 +696,16 @@ export default function BuyTab() {
             <span className="text-xs text-zinc-400 bg-zinc-700/50 px-2 py-1 rounded">mit EUR kaufen</span>
           </div>
           
-          <div className="space-y-3">
-            <div className="flex justify-between text-sm">
-              <span className="text-zinc-400">Aktueller Preis:</span>
-              <span className="text-purple-400 font-bold">
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
+              <span className="text-sm text-zinc-400">Aktueller Preis:</span>
+              <span className="text-sm text-purple-400 font-bold">
                 {polPriceEur ? `${polPriceEur.toFixed(3)}€ pro POL` : "~0.500€ pro POL"}
               </span>
             </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-zinc-400">Minimum:</span>
-              <span className="text-zinc-300">1 EUR</span>
+            <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
+              <span className="text-sm text-zinc-400">Minimum:</span>
+              <span className="text-sm text-zinc-300 font-medium">1 EUR</span>
             </div>
           </div>
           
