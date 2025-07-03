@@ -22,7 +22,10 @@ export default function SellTab() {
   const [isLoadingPrice, setIsLoadingPrice] = useState(true);
   const [priceError, setPriceError] = useState<string | null>(null);
   const [needsApproval, setNeedsApproval] = useState(false);
-  
+  const [quoteTxData, setQuoteTxData] = useState<any>(null);
+  const [spenderAddress, setSpenderAddress] = useState<string | null>(null);
+  const [quoteError, setQuoteError] = useState<string | null>(null);
+
   const account = useActiveAccount();
   const { mutateAsync: sendTransaction } = useSendTransaction();
 
@@ -33,28 +36,23 @@ export default function SellTab() {
         setDfaithBalance("0");
         return;
       }
-      
       try {
         const contract = getContract({
           client,
           chain: polygon,
           address: DFAITH_TOKEN
         });
-        
         const balance = await balanceOf({
           contract,
           address: account.address
         });
-        
         const balanceFormatted = Number(balance) / Math.pow(10, DFAITH_DECIMALS);
         setDfaithBalance(balanceFormatted.toFixed(2));
-        
       } catch (error) {
         console.error("Fehler beim Laden der D.FAITH Balance:", error);
         setDfaithBalance("0");
       }
     };
-    
     fetchDfaithBalance();
     const interval = setInterval(fetchDfaithBalance, 10000);
     return () => clearInterval(interval);
@@ -65,26 +63,20 @@ export default function SellTab() {
     const fetchPrice = async () => {
       setIsLoadingPrice(true);
       setPriceError(null);
-      
       try {
-        // 1. POL/EUR Preis holen
         const polResponse = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=polygon-ecosystem-token&vs_currencies=eur');
         if (polResponse.ok) {
           const polData = await polResponse.json();
           setPolPriceEur(polData['polygon-ecosystem-token']?.eur || 0.50);
         }
-        
-        // 2. D.FAITH zu POL Preis holen (umgekehrte Richtung)
         const params = new URLSearchParams({
           chain: "polygon",
-          inTokenAddress: DFAITH_TOKEN, // D.FAITH als Input
-          outTokenAddress: "0x0000000000000000000000000000000000001010", // POL als Output
-          amount: "1", // 1 D.FAITH
+          inTokenAddress: DFAITH_TOKEN,
+          outTokenAddress: "0x0000000000000000000000000000000000001010",
+          amount: "1",
           gasPrice: "50",
         });
-        
         const response = await fetch(`https://open-api.openocean.finance/v3/polygon/quote?${params}`);
-        
         if (response.ok) {
           const data = await response.json();
           if (data && data.data && data.data.outAmount && data.data.outAmount !== "0") {
@@ -100,10 +92,8 @@ export default function SellTab() {
         console.error("Price fetch error:", error);
         setPriceError("Preis-API Fehler");
       }
-      
       setIsLoadingPrice(false);
     };
-
     fetchPrice();
     const interval = setInterval(fetchPrice, 30000);
     return () => clearInterval(interval);
@@ -120,277 +110,169 @@ export default function SellTab() {
     }
     window.scrollTo({ top: 0, behavior: 'smooth' });
     setShowSellModal(true);
+    setQuoteTxData(null);
+    setSpenderAddress(null);
+    setNeedsApproval(false);
+    setQuoteError(null);
+    setSwapTxStatus(null);
   };
 
-  const handleSellSwap = async () => {
-    if (!sellAmount || parseFloat(sellAmount) <= 0 || !account?.address) return;
-    
-    setIsSwapping(true);
+  const handleGetQuote = async () => {
     setSwapTxStatus("pending");
-    
+    setQuoteError(null);
+    setQuoteTxData(null);
+    setSpenderAddress(null);
+    setNeedsApproval(false);
+
     try {
-      // Betrag OHNE Dezimalumrechnung verwenden (OpenOcean API erwartet den Betrag direkt)
-      const amountForApi = sellAmount; // Direkt den eingegebenen Betrag verwenden
-    
-      console.log("=== OpenOcean Sell Swap Request ===");
-      console.log("Chain:", "polygon");
-      console.log("InToken (D.FAITH):", DFAITH_TOKEN);
-      console.log("OutToken (POL):", "0x0000000000000000000000000000000000001010");
-      console.log("Amount (D.FAITH):", amountForApi); // Ohne Dezimalumrechnung
-      console.log("Slippage:", slippage);
-      console.log("GasPrice:", "50");
-      console.log("Account:", account.address);
-      
+      if (!sellAmount || parseFloat(sellAmount) <= 0 || !account?.address) return;
+
       const params = new URLSearchParams({
         chain: "polygon",
         inTokenAddress: DFAITH_TOKEN,
         outTokenAddress: "0x0000000000000000000000000000000000001010",
-        amount: amountForApi, // Hier ohne Dezimalumrechnung
+        amount: sellAmount,
         slippage: slippage,
         gasPrice: "50",
         account: account.address,
       });
-      
       const url = `https://open-api.openocean.finance/v3/polygon/swap_quote?${params}`;
-      console.log("Full URL:", url);
-      
       const response = await fetch(url);
-      console.log("Response Status:", response.status);
-      
-      if (!response.ok) {
-        throw new Error(`OpenOcean API Fehler: ${response.status}`);
-      }
-      
+      if (!response.ok) throw new Error(`OpenOcean API Fehler: ${response.status}`);
       const data = await response.json();
-      console.log("=== OpenOcean Sell Swap Response ===");
-      console.log("Full Response:", JSON.stringify(data, null, 2));
-      
-      if (!data) {
-        throw new Error('OpenOcean: Keine Response erhalten');
-      }
-      
-      if (data.code !== 200) {
-        throw new Error(`OpenOcean: API Error Code ${data.code} - ${JSON.stringify(data)}`);
-      }
-      
-      if (!data.data) {
-        throw new Error('OpenOcean: Keine data in Response');
-      }
-      
+      if (!data || !data.data) throw new Error("OpenOcean: Keine Daten erhalten");
       const txData = data.data;
-      console.log("=== Transaction Data Structure ===");
-      console.log("to:", txData.to);
-      console.log("data:", txData.data);
-      console.log("value:", txData.value);
-      console.log("gasPrice:", txData.gasPrice);
-      console.log("estimatedGas:", txData.estimatedGas);
-      console.log("outAmount:", txData.outAmount);
-      console.log("inAmount:", txData.inAmount);
+      const spender = txData.spender || txData.approveTarget;
+      if (!spender) throw new Error("OpenOcean: Keine Spenderadresse erhalten");
 
-      // === KORREKTUR: Spenderadresse flexibel holen ===
-      // OpenOcean kann spender ODER approveTarget liefern
-      const spenderAddress = txData.spender || txData.approveTarget;
-      if (!spenderAddress) {
-        throw new Error("OpenOcean: Keine Spenderadresse (spender/approveTarget) in der Swap-Quote erhalten");
-      }
+      setQuoteTxData(txData);
+      setSpenderAddress(spender);
 
-      // Überprüfen ob alle notwendigen Felder vorhanden sind
-      if (!txData.to || !txData.data) {
-        console.error("Fehlende tx data in response:", txData);
-        throw new Error('OpenOcean: Unvollständige Transaktionsdaten');
-      }
-
-      // **WICHTIG: Allowance mit OpenOcean API prüfen**
+      // Allowance prüfen
       const allowanceParams = new URLSearchParams({
         chain: "polygon",
         account: account.address,
         inTokenAddress: DFAITH_TOKEN
       });
-
       const allowanceUrl = `https://open-api.openocean.finance/v3/polygon/allowance?${allowanceParams}`;
-      console.log("Checking allowance:", allowanceUrl);
-
       const allowanceResponse = await fetch(allowanceUrl);
-
       let allowanceValue = "0";
       if (allowanceResponse.ok) {
         const allowanceData = await allowanceResponse.json();
-        console.log("Allowance Response:", allowanceData);
-
         if (allowanceData && allowanceData.data !== undefined && allowanceData.data !== null) {
           if (typeof allowanceData.data === "object") {
             if (Array.isArray(allowanceData.data)) {
-              // Falls Array, nimm das erste Element
               const first = allowanceData.data[0];
               if (typeof first === "object" && first !== null) {
                 const values = Object.values(first);
                 if (values.length > 0) allowanceValue = values[0]?.toString() ?? "0";
               }
             } else {
-              // Objekt: nimm den ersten Wert
               const values = Object.values(allowanceData.data);
               if (values.length > 0) allowanceValue = values[0]?.toString() ?? "0";
             }
           } else {
-            // String oder Zahl direkt
             allowanceValue = allowanceData.data.toString();
           }
         }
         let currentAllowance: bigint;
         try {
           currentAllowance = BigInt(allowanceValue);
-        } catch (e) {
-          console.error("Fehler beim Parsen der Allowance als BigInt:", allowanceValue, e);
+        } catch {
           currentAllowance = BigInt(0);
         }
-        // Für die Allowance-Prüfung benötigen wir trotzdem den korrekten Wert mit Dezimalstellen
-        // === KORREKTUR: Approve-Betrag korrekt in Wei berechnen ===
         const amountInWei = (parseFloat(sellAmount) * Math.pow(10, DFAITH_DECIMALS)).toFixed(0);
         const requiredAmount = BigInt(amountInWei);
 
-        console.log("Current Allowance:", currentAllowance.toString());
-        console.log("Required Amount:", requiredAmount.toString());
-
-        // Wenn Allowance nicht ausreicht, Approve-Transaktion senden
         if (currentAllowance < requiredAmount) {
-          console.log("Insufficient allowance, requesting approval...");
           setNeedsApproval(true);
-          setSwapTxStatus("approving");
+        } else {
+          setNeedsApproval(false);
+        }
+      } else {
+        setNeedsApproval(true);
+      }
+      setSwapTxStatus(null);
+    } catch (e: any) {
+      setQuoteError(e.message || "Quote Fehler");
+      setSwapTxStatus("error");
+      setTimeout(() => setSwapTxStatus(null), 4000);
+    }
+  };
 
+  const handleApprove = async () => {
+    if (!spenderAddress || !account?.address) return;
+    setSwapTxStatus("approving");
+    try {
+      const contract = getContract({
+        client,
+        chain: polygon,
+        address: DFAITH_TOKEN
+      });
+      const amountInWei = (parseFloat(sellAmount) * Math.pow(10, DFAITH_DECIMALS)).toFixed(0);
+      const requiredAmountWithBuffer = BigInt(Math.floor(Number(amountInWei) * 1.1).toString());
+      const approveTransaction = prepareContractCall({
+        contract,
+        method: "function approve(address spender, uint256 amount) returns (bool)",
+        params: [spenderAddress, requiredAmountWithBuffer]
+      });
+      const approveResult = await sendTransaction(approveTransaction);
+      setSwapTxStatus("waiting_approval");
+      const { waitForReceipt } = await import("thirdweb");
+      await waitForReceipt(approveResult);
+      setNeedsApproval(false);
+      setSwapTxStatus(null);
+    } catch (e) {
+      setSwapTxStatus("error");
+      setTimeout(() => setSwapTxStatus(null), 4000);
+    }
+  };
+
+  const handleSellSwap = async () => {
+    if (!quoteTxData || !account?.address) return;
+    setIsSwapping(true);
+    setSwapTxStatus("swapping");
+    try {
+      const { prepareTransaction } = await import("thirdweb");
+      const tx = prepareTransaction({
+        to: quoteTxData.to,
+        data: quoteTxData.data,
+        value: BigInt(quoteTxData.value || "0"),
+        chain: polygon,
+        client
+      });
+      await sendTransaction(tx);
+      setSwapTxStatus("confirming");
+      await new Promise(resolve => setTimeout(resolve, 8000));
+      // Balance nach Swap aktualisieren
+      const fetchDfaithBalance = async () => {
+        if (!account?.address) return;
+        try {
           const contract = getContract({
             client,
             chain: polygon,
             address: DFAITH_TOKEN
           });
-
-          // Statt einer sehr hohen Allowance, verwende genau den Betrag, den du tatsächlich verkaufen willst
-          // plus etwas Puffer für Slippage (z.B. +10%)
-          const requiredAmountWithBuffer = BigInt(Math.floor(Number(amountInWei) * 1.1).toString());
-
-          // === KORREKTUR: Approve an spenderAddress (OpenOcean Router) ===
-          const approveTransaction = prepareContractCall({
+          const balance = await balanceOf({
             contract,
-            method: "function approve(address spender, uint256 amount) returns (bool)",
-            params: [spenderAddress, requiredAmountWithBuffer]
+            address: account.address
           });
-
-          // Approve senden
-          const approveResult = await sendTransaction(approveTransaction);
-          console.log("Approval sent:", approveResult);
-
-          // Warten bis Approve-Transaktion bestätigt ist
-          setSwapTxStatus("waiting_approval");
-          try {
-            // Warte auf Bestätigung statt einfach Zeit verstreichen zu lassen
-            const { waitForReceipt } = await import("thirdweb");
-            await waitForReceipt(approveResult);
-            console.log("Approval confirmed in blockchain");
-          } catch (error) {
-            console.error("Error waiting for approval confirmation:", error);
-            throw new Error("Approval-Transaktion wurde nicht bestätigt");
-          }
-
-          // Allowance erneut prüfen
-          const newAllowanceResponse = await fetch(allowanceUrl);
-          let newAllowanceValue = "0";
-          if (newAllowanceResponse.ok) {
-            const newAllowanceData = await newAllowanceResponse.json();
-            if (newAllowanceData && newAllowanceData.data !== undefined && newAllowanceData.data !== null) {
-              if (typeof newAllowanceData.data === "object") {
-                if (Array.isArray(newAllowanceData.data)) {
-                  const first = newAllowanceData.data[0];
-                  if (typeof first === "object" && first !== null) {
-                    const values = Object.values(first);
-                    if (values.length > 0) newAllowanceValue = values[0]?.toString() ?? "0";
-                  }
-                } else {
-                  const values = Object.values(newAllowanceData.data);
-                  if (values.length > 0) newAllowanceValue = values[0]?.toString() ?? "0";
-                }
-              } else {
-                newAllowanceValue = newAllowanceData.data.toString();
-              }
-            }
-            const newAllowance = BigInt(newAllowanceValue);
-
-            console.log("New Allowance:", newAllowance.toString());
-
-            if (newAllowance < requiredAmount) {
-              throw new Error('Approval fehlgeschlagen oder noch nicht bestätigt');
-            }
-          }
-        } else {
-          console.log("Sufficient allowance, proceeding with swap...");
-          setNeedsApproval(false);
-        }
-      } else {
-        console.warn("Allowance check failed, proceeding anyway");
-      }
-
-    // Jetzt den eigentlichen Swap durchführen
-    setSwapTxStatus("swapping");
-    
-    const { prepareTransaction } = await import("thirdweb");
-    const tx = prepareTransaction({
-      to: txData.to,
-      data: txData.data,
-      value: BigInt(txData.value || "0"),
-      chain: polygon,
-      client
-    });
-
-    console.log("Prepared transaction:", tx);
-    console.log("Sending transaction...");
-    
-    const transactionResult = await sendTransaction(tx);
-    console.log("Transaction sent:", transactionResult);
-    
-    setSwapTxStatus("confirming");
-    
-    // Länger warten auf Bestätigung
-    await new Promise(resolve => setTimeout(resolve, 8000));
-    
-    // Balance nach Swap aktualisieren
-    const fetchDfaithBalance = async () => {
-      if (!account?.address) return;
-      try {
-        const contract = getContract({
-          client,
-          chain: polygon,
-          address: DFAITH_TOKEN
-        });
-        
-        const balance = await balanceOf({
-          contract,
-          address: account.address
-        });
-        
-        const balanceFormatted = Number(balance) / Math.pow(10, DFAITH_DECIMALS);
-        setDfaithBalance(balanceFormatted.toFixed(2));
-      } catch (error) {
-        console.error("Balance update error:", error);
-      }
-    };
-    
-    await fetchDfaithBalance();
-    
-    setSwapTxStatus("success");
-    setSellAmount("");
-    
-    setTimeout(() => {
-      setSwapTxStatus(null);
-    }, 5000);
-    
-  } catch (error) {
-    console.error("Sell Swap Error:", error);
-    setSwapTxStatus("error");
-    
-    setTimeout(() => {
-      setSwapTxStatus(null);
-    }, 5000);
-  } finally {
-    setIsSwapping(false);
-  }
+          const balanceFormatted = Number(balance) / Math.pow(10, DFAITH_DECIMALS);
+          setDfaithBalance(balanceFormatted.toFixed(2));
+        } catch {}
+      };
+      await fetchDfaithBalance();
+      setSwapTxStatus("success");
+      setSellAmount("");
+      setQuoteTxData(null);
+      setSpenderAddress(null);
+      setTimeout(() => setSwapTxStatus(null), 5000);
+    } catch (error) {
+      setSwapTxStatus("error");
+      setTimeout(() => setSwapTxStatus(null), 5000);
+    } finally {
+      setIsSwapping(false);
+    }
   };
 
   return (
@@ -573,95 +455,39 @@ export default function SellTab() {
 
             {/* Buttons */}
             <div className="space-y-3">
-              {needsApproval && (
+              {!quoteTxData && (
+                <Button
+                  className="w-full bg-gradient-to-r from-red-500 to-red-600 text-white font-bold py-3 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50"
+                  onClick={handleGetQuote}
+                  disabled={!sellAmount || parseFloat(sellAmount) <= 0 || isSwapping || parseFloat(sellAmount) > parseFloat(dfaithBalance)}
+                >
+                  <FaExchangeAlt className="inline mr-2" />
+                  {isSwapping ? "Lade Quote..." : `${sellAmount || "0"} D.FAITH verkaufen`}
+                </Button>
+              )}
+              {quoteError && (
+                <div className="text-red-400 text-sm text-center">{quoteError}</div>
+              )}
+              {quoteTxData && needsApproval && (
                 <Button
                   className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 rounded-xl mb-2"
-                  onClick={async () => {
-                    // Nur Approve ausführen, Swap erst nach Bestätigung möglich
-                    setSwapTxStatus("approving");
-
-                    try {
-                      // Hole spenderAddress aus aktuellem Swap-Quote
-                      const params = new URLSearchParams({
-                        chain: "polygon",
-                        inTokenAddress: DFAITH_TOKEN,
-                        outTokenAddress: "0x0000000000000000000000000000000000001010",
-                        amount: sellAmount,
-                        slippage: slippage,
-                        gasPrice: "50",
-                        account: account?.address || "",
-                      });
-                      const url = `https://open-api.openocean.finance/v3/polygon/swap_quote?${params}`;
-                      const response = await fetch(url);
-                      if (!response.ok) throw new Error("OpenOcean API Fehler beim Approve");
-                      const data = await response.json();
-                      if (!data || !data.data) throw new Error("OpenOcean Approve: Keine Daten erhalten");
-                      const txData = data.data;
-                      const spenderAddress = txData.spender || txData.approveTarget;
-                      if (!spenderAddress) throw new Error("OpenOcean Approve: Keine Spenderadresse erhalten");
-
-                      const contract = getContract({
-                        client,
-                        chain: polygon,
-                        address: DFAITH_TOKEN
-                      });
-
-                      // amountInWei berechnen (wie im Swap-Handler)
-                      const amountInWei = (parseFloat(sellAmount) * Math.pow(10, DFAITH_DECIMALS)).toFixed(0);
-
-                      // Statt einer sehr hohen Allowance, verwende genau den Betrag, den du tatsächlich verkaufen willst
-                      // plus etwas Puffer für Slippage (z.B. +10%)
-                      const requiredAmountWithBuffer = BigInt(Math.floor(Number(amountInWei) * 1.1).toString());
-
-                      // === KORREKTUR: Approve an spenderAddress (OpenOcean Router) ===
-                      const approveTransaction = prepareContractCall({
-                        contract,
-                        method: "function approve(address spender, uint256 amount) returns (bool)",
-                        params: [spenderAddress, requiredAmountWithBuffer]
-                      });
-
-                      // Approve senden
-                      const approveResult = await sendTransaction(approveTransaction);
-                      console.log("Approval sent:", approveResult);
-
-                      // Warten bis Approve-Transaktion bestätigt ist
-                      setSwapTxStatus("waiting_approval");
-                      try {
-                        // Warte auf Bestätigung statt einfach Zeit verstreichen zu lassen
-                        const { waitForReceipt } = await import("thirdweb");
-                        await waitForReceipt(approveResult);
-                        console.log("Approval confirmed in blockchain");
-                      } catch (error) {
-                        console.error("Error waiting for approval confirmation:", error);
-                        throw new Error("Approval-Transaktion wurde nicht bestätigt");
-                      }
-
-                      setNeedsApproval(false);
-                      setSwapTxStatus(null);
-                    } catch (error) {
-                      console.error("Approve Error:", error);
-                      setSwapTxStatus("error");
-                      setTimeout(() => {
-                        setSwapTxStatus(null);
-                      }, 5000);
-                    }
-                  }}
+                  onClick={handleApprove}
                   disabled={isSwapping}
                 >
                   <FaArrowDown className="inline mr-2" />
                   D.FAITH Token für Verkauf freigeben (Approve)
                 </Button>
               )}
-              
-              <Button
-                className="w-full bg-gradient-to-r from-red-500 to-red-600 text-white font-bold py-3 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50"
-                onClick={handleSellSwap}
-                disabled={!sellAmount || parseFloat(sellAmount) <= 0 || isSwapping || parseFloat(sellAmount) > parseFloat(dfaithBalance)}
-              >
-                <FaExchangeAlt className="inline mr-2" />
-                {isSwapping ? "Verkaufe..." : `${sellAmount || "0"} D.FAITH verkaufen`}
-              </Button>
-              
+              {quoteTxData && !needsApproval && (
+                <Button
+                  className="w-full bg-gradient-to-r from-red-500 to-red-600 text-white font-bold py-3 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50"
+                  onClick={handleSellSwap}
+                  disabled={isSwapping}
+                >
+                  <FaExchangeAlt className="inline mr-2" />
+                  {isSwapping ? "Verkaufe..." : `${sellAmount || "0"} D.FAITH verkaufen`}
+                </Button>
+              )}
               <Button
                 className="w-full bg-zinc-600 hover:bg-zinc-700 text-white font-bold py-2 rounded-xl"
                 onClick={() => {
@@ -669,6 +495,10 @@ export default function SellTab() {
                   setSellAmount("");
                   setSlippage("1");
                   setSwapTxStatus(null);
+                  setQuoteTxData(null);
+                  setSpenderAddress(null);
+                  setNeedsApproval(false);
+                  setQuoteError(null);
                 }}
                 disabled={isSwapping}
               >
