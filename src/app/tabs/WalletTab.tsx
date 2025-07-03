@@ -472,13 +472,6 @@ export default function WalletTab() {
               </div>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={analyzeBalanceIssue}
-                  className="px-2 py-1 text-xs bg-indigo-700/50 hover:bg-indigo-700/70 text-indigo-200 rounded-lg transition-colors"
-                  title="Balance-Problem analysieren"
-                >
-                  Diagnose
-                </button>
-                <button
                   onClick={refreshBalances}
                   disabled={isRefreshing || isLoadingBalances}
                   className={`p-2 rounded-lg ${isRefreshing || isLoadingBalances ? 'bg-amber-600/20' : 'bg-zinc-700 hover:bg-zinc-600'} text-zinc-200 text-sm font-medium transition-all duration-200`}
