@@ -275,6 +275,32 @@ export default function SellTab() {
     }
   };
 
+  const handleSellAllInOne = async () => {
+    if (!sellAmount || parseFloat(sellAmount) <= 0 || isSwapping || parseFloat(sellAmount) > parseFloat(dfaithBalance)) return;
+    setIsSwapping(true);
+    setSwapTxStatus("pending");
+    setQuoteError(null);
+
+    try {
+      // 1. Quote holen
+      await handleGetQuote();
+
+      // 2. Falls Approve nötig, Approve durchführen
+      if (needsApproval) {
+        await handleApprove();
+      }
+
+      // 3. Swap durchführen
+      await handleSellSwap();
+    } catch (e: any) {
+      setQuoteError(e.message || "Fehler beim Verkauf");
+      setSwapTxStatus("error");
+      setTimeout(() => setSwapTxStatus(null), 4000);
+    } finally {
+      setIsSwapping(false);
+    }
+  };
+
   return (
     <div className="flex flex-col gap-6 p-6">
       <div className="text-center mb-6">
@@ -481,8 +507,8 @@ export default function SellTab() {
               {quoteTxData && !needsApproval && (
                 <Button
                   className="w-full bg-gradient-to-r from-red-500 to-red-600 text-white font-bold py-3 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50"
-                  onClick={handleSellSwap}
-                  disabled={isSwapping}
+                  onClick={handleSellAllInOne}
+                  disabled={!sellAmount || parseFloat(sellAmount) <= 0 || isSwapping || parseFloat(sellAmount) > parseFloat(dfaithBalance)}
                 >
                   <FaExchangeAlt className="inline mr-2" />
                   {isSwapping ? "Verkaufe..." : `${sellAmount || "0"} D.FAITH verkaufen`}
