@@ -156,7 +156,7 @@ export default function BuyTab() {
     return () => clearInterval(interval);
   }, [account?.address]);
 
-  // D.FAITH Swap Funktion mit konfigurierbarer Slippage
+  // D.FAITH Swap Funktion mit Transaktionsbestätigung
   const handleDfaithSwap = async () => {
     if (!swapAmountPol || parseFloat(swapAmountPol) <= 0 || !account?.address) return;
     setIsSwapping(true);
@@ -170,7 +170,7 @@ export default function BuyTab() {
       console.log("InToken:", "0x0000000000000000000000000000000000001010");
       console.log("OutToken:", "0xF051E3B0335eB332a7ef0dc308BB4F0c10301060");
       console.log("Amount:", amountStr);
-      console.log("Slippage:", slippage); // Verwendung der konfigurierbaren Slippage
+      console.log("Slippage:", slippage);
       console.log("GasPrice:", "50");
       console.log("Account:", account.address);
       
@@ -180,7 +180,7 @@ export default function BuyTab() {
         inTokenAddress: "0x0000000000000000000000000000000000001010",
         outTokenAddress: "0xF051E3B0335eB332a7ef0dc308BB4F0c10301060",
         amount: amountStr,
-        slippage: slippage, // Verwendung der konfigurierbaren Slippage
+        slippage: slippage,
         gasPrice: "50",
         account: account.address,
       });
@@ -221,7 +221,7 @@ export default function BuyTab() {
         throw new Error('OpenOcean: Unvollständige Transaktionsdaten');
       }
       
-      // 2. Sende die Transaktion mit thirdweb
+      // 2. Sende die Transaktion mit thirdweb und warte auf Bestätigung
       const { prepareTransaction } = await import("thirdweb");
       const tx = prepareTransaction({
         to: txData.to,
@@ -231,13 +231,62 @@ export default function BuyTab() {
         client
       });
 
-      await sendTransaction(tx);
+      console.log("Sending transaction...");
+      
+      // Sende die Transaktion und warte auf die Bestätigung
+      const transactionResult = await sendTransaction(tx);
+      console.log("Transaction sent:", transactionResult);
+      
+      // Warte auf Transaction Receipt (Bestätigung)
+      console.log("Waiting for transaction confirmation...");
+      
+      // Aktualisiere Status
+      setSwapTxStatus("confirming");
+      
+      // Warte 5 Sekunden auf Bestätigung
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      
+      // Aktualisiere POL Balance
+      const fetchPolBalance = async () => {
+        if (!account?.address) return;
+        try {
+          const response = await fetch(polygon.rpc, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              jsonrpc: '2.0',
+              method: 'eth_getBalance',
+              params: [account.address, 'latest'],
+              id: 1
+            })
+          });
+          const data = await response.json();
+          const balance = BigInt(data.result);
+          const polFormatted = Number(balance) / Math.pow(10, 18);
+          setPolBalance(polFormatted.toFixed(4));
+        } catch (error) {
+          console.error("Balance update error:", error);
+        }
+      };
+      
+      await fetchPolBalance();
       
       setSwapTxStatus("success");
       setSwapAmountPol("");
+      
+      // Status nach 5 Sekunden zurücksetzen
+      setTimeout(() => {
+        setSwapTxStatus(null);
+      }, 5000);
+      
     } catch (error) {
       console.error("OpenOcean Swap Fehler:", error);
       setSwapTxStatus("error");
+      
+      // Fehler nach 5 Sekunden zurücksetzen
+      setTimeout(() => {
+        setSwapTxStatus(null);
+      }, 5000);
     } finally {
       setIsSwapping(false);
     }
@@ -470,11 +519,33 @@ export default function BuyTab() {
                   <div className={`mb-4 p-3 rounded-lg text-center ${
                     swapTxStatus === "success" ? "bg-green-500/20 text-green-400" :
                     swapTxStatus === "error" ? "bg-red-500/20 text-red-400" :
+                    swapTxStatus === "confirming" ? "bg-blue-500/20 text-blue-400" :
                     "bg-yellow-500/20 text-yellow-400"
                   }`}>
-                    {swapTxStatus === "success" && "Swap erfolgreich!"}
-                    {swapTxStatus === "error" && "Swap fehlgeschlagen!"}
-                    {swapTxStatus === "pending" && "Transaktion läuft..."}
+                    {swapTxStatus === "success" && (
+                      <div>
+                        <div className="font-bold">🎉 Swap erfolgreich!</div>
+                        <div className="text-xs mt-1">Token wurden erfolgreich getauscht</div>
+                      </div>
+                    )}
+                    {swapTxStatus === "error" && (
+                      <div>
+                        <div className="font-bold">❌ Swap fehlgeschlagen!</div>
+                        <div className="text-xs mt-1">Bitte versuchen Sie es erneut</div>
+                      </div>
+                    )}
+                    {swapTxStatus === "confirming" && (
+                      <div>
+                        <div className="font-bold">⏳ Bestätigung läuft...</div>
+                        <div className="text-xs mt-1">Warte auf Blockchain-Bestätigung</div>
+                      </div>
+                    )}
+                    {swapTxStatus === "pending" && (
+                      <div>
+                        <div className="font-bold">📝 Transaktion wird vorbereitet...</div>
+                        <div className="text-xs mt-1">Bitte bestätigen Sie in Ihrem Wallet</div>
+                      </div>
+                    )}
                   </div>
                 )}
                 
@@ -486,9 +557,12 @@ export default function BuyTab() {
                     disabled={!swapAmountPol || parseFloat(swapAmountPol) <= 0 || isSwapping || !account?.address || parseFloat(polBalance) <= 0}
                   >
                     <FaExchangeAlt className="inline mr-2" />
-                    {isSwapping ? "Swapping..." : 
-                     parseFloat(polBalance) <= 0 ? "Keine POL verfügbar" :
-                     `${swapAmountPol || "0"} POL → D.FAITH (${slippage}%)`}
+                    {isSwapping ? (
+                      swapTxStatus === "pending" ? "Wallet-Bestätigung..." :
+                      swapTxStatus === "confirming" ? "Bestätigung..." :
+                      "Swapping..."
+                    ) : parseFloat(polBalance) <= 0 ? "Keine POL verfügbar" :
+                      `${swapAmountPol || "0"} POL → D.FAITH (${slippage}%)`}
                   </Button>
                   
                   <Button
