@@ -176,12 +176,18 @@ export default function WalletTab() {
       ]);
       
       if (currentRequestId !== requestIdRef.current) return;
-      
-      setDfaithBalance({ displayValue: Number(dfaithValue).toFixed(2) });
+
+      // D.FAITH: Balance korrekt formatieren (Dezimalstellen beachten)
+      const dfaithRaw = Number(dfaithValue);
+      const dfaithDisplay = (dfaithRaw / Math.pow(10, DFAITH_TOKEN.decimals)).toFixed(DFAITH_TOKEN.decimals);
+
+      setDfaithBalance({ displayValue: dfaithDisplay });
+
+      // D.INVEST: Keine Dezimalstellen
       setDinvestBalance({ displayValue: Math.floor(Number(dinvestValue)).toString() });
       // Optional: State für POL-Balance hinzufügen, falls du sie anzeigen möchtest
       // setPolBalance({ displayValue: ... });
-      fetchDfaithEurValue(dfaithValue);
+      fetchDfaithEurValue(dfaithDisplay);
 
       // Debug-Ausgabe für D.INVEST API-Antwort
       console.debug("DINVEST Insight API Wert (raw):", dinvestValue);
@@ -210,7 +216,7 @@ export default function WalletTab() {
     }
   };
 
-  // UseEffect für initiales Laden und periodische Aktualisierung (alle 15 Sekunden)
+  // UseEffect für initiales Laden und periodische Aktualisierung (alle 30 Sekunden)
   useEffect(() => {
     let isMounted = true;
     let intervalId: NodeJS.Timeout | null = null;
@@ -226,13 +232,13 @@ export default function WalletTab() {
     // Initiales Laden
     loadData();
     
-    // Regelmäßige Aktualisierung alle 15 Sekunden (weniger aggressiv)
+    // Regelmäßige Aktualisierung alle 30 Sekunden
     intervalId = setInterval(() => {
       if (isMounted && account?.address) {
-        console.log("⏰ 15-Sekunden-Intervall: Lade Balances neu...");
+        console.log("⏰ 30-Sekunden-Intervall: Lade Balances neu...");
         loadData();
       }
-    }, 15000); // 15 Sekunden statt 10
+    }, 30000); // 30 Sekunden
     
     return () => {
       isMounted = false;
