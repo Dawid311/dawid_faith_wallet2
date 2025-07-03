@@ -220,10 +220,6 @@ export default function WalletTab() {
       return;
     }
 
-    // Direkt auf Ladezustand setzen, damit keine alte Balance angezeigt wird
-    setDfaithBalance(null);
-    setDinvestBalance(null);
-
     try {
       // D.FAITH Balance abrufen
       const dfaithContract = getContract({
@@ -236,6 +232,7 @@ export default function WalletTab() {
         contract: dfaithContract,
         address: account.address
       });
+      if (myRequestId !== requestIdRef.current) return;
 
       // D.INVEST Balance abrufen
       const dinvestContract = getContract({
@@ -248,17 +245,15 @@ export default function WalletTab() {
         contract: dinvestContract,
         address: account.address
       });
+      if (myRequestId !== requestIdRef.current) return;
 
       // Balances formatieren und setzen
       const dfaithFormatted = Number(dfaithBalanceResult) / Math.pow(10, DFAITH_TOKEN.decimals);
       const dinvestFormatted = Number(dinvestBalanceResult) / Math.pow(10, DINVEST_TOKEN.decimals);
 
-      // Nur setzen, wenn dies der aktuellste Request ist
-      if (myRequestId === requestIdRef.current) {
-        setDfaithBalance({ displayValue: dfaithFormatted.toFixed(2) });
-        setDinvestBalance({ displayValue: Math.floor(dinvestFormatted).toString() });
-        fetchDfaithEurValue(dfaithFormatted.toFixed(2));
-      }
+      setDfaithBalance({ displayValue: dfaithFormatted.toFixed(2) });
+      setDinvestBalance({ displayValue: Math.floor(dinvestFormatted).toString() });
+      fetchDfaithEurValue(dfaithFormatted.toFixed(2));
     } catch (error) {
       if (myRequestId === requestIdRef.current) {
         setDfaithBalance({ displayValue: "0.00" });
