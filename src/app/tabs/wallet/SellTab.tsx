@@ -331,6 +331,10 @@ export default function SellTab() {
     if (!quoteTxData || !account?.address) return;
     setIsSwapping(true);
     setSwapTxStatus("swapping");
+    
+    // Aktuelle Balance vor dem Swap speichern
+    const initialBalance = parseFloat(dfaithBalance);
+    
     try {
       console.log("4. Swap Transaktion starten");
       console.log("Swap TX Daten:", quoteTxData);
@@ -349,33 +353,85 @@ export default function SellTab() {
       console.log("Swap TX gesendet:", swapResult);
       
       setSwapTxStatus("confirming");
-      await new Promise(resolve => setTimeout(resolve, 8000));
       
-      // Balance nach Swap aktualisieren
-      console.log("5. Aktualisiere Balance nach Swap");
-      const fetchDfaithBalance = async () => {
-        if (!account?.address) return;
+      // Warte auf Transaktionsbestätigung
+      const { waitForReceipt } = await import("thirdweb");
+      console.log("Warte auf Transaktionsbestätigung...");
+      const receipt = await waitForReceipt(swapResult);
+      console.log("Transaktion bestätigt:", receipt);
+      
+      // Prüfe ob Transaktion erfolgreich war
+      if (receipt.status !== "success") {
+        throw new Error("Transaktion fehlgeschlagen - Status: " + receipt.status);
+      }
+      
+      setSwapTxStatus("verifying");
+      console.log("5. Verifiziere Balance-Änderung...");
+      
+      // Mehrfache Versuche zur Balance-Verifizierung
+      let balanceVerified = false;
+      let attempts = 0;
+      const maxAttempts = 5;
+      
+      while (!balanceVerified && attempts < maxAttempts) {
+        attempts++;
+        console.log(`Balance-Verifizierung Versuch ${attempts}/${maxAttempts}`);
+        
         try {
-          // Insight API für D.FAITH Balance
-          const response = await fetch(`https://explorer-api.maticvigil.com/api/addr/${account.address}/token/${DFAITH_TOKEN}/balance`);
-          const data = await response.json();
-          const balanceFormatted = Number(data.balance) / Math.pow(10, DFAITH_DECIMALS);
-          setDfaithBalance(balanceFormatted.toFixed(2));
-        } catch (error) {
-          console.error("Balance update error:", error);
+          // Warte zwischen Versuchen
+          if (attempts > 1) {
+            await new Promise(resolve => setTimeout(resolve, 3000));
+          }
+          
+          const dfaithValue = await fetchTokenBalanceViaInsightApi(DFAITH_TOKEN, account.address);
+          const dfaithRaw = Number(dfaithValue);
+          const currentBalance = dfaithRaw / Math.pow(10, DFAITH_DECIMALS);
+          
+          console.log(`Initiale Balance: ${initialBalance}, Aktuelle Balance: ${currentBalance}`);
+          
+          // Prüfe ob sich die Balance um mindestens den Verkaufsbetrag verringert hat
+          const expectedDecrease = parseFloat(sellAmount);
+          const actualDecrease = initialBalance - currentBalance;
+          
+          console.log(`Erwartete Verringerung: ${expectedDecrease}, Tatsächliche Verringerung: ${actualDecrease}`);
+          
+          if (actualDecrease >= (expectedDecrease * 0.95)) { // 5% Toleranz für Rundungsfehler
+            console.log("✅ Balance-Änderung verifiziert - Swap erfolgreich!");
+            setDfaithBalance(currentBalance.toFixed(DFAITH_DECIMALS));
+            balanceVerified = true;
+            setSellStep('completed');
+            setSwapTxStatus("success");
+            setSellAmount("");
+            setQuoteTxData(null);
+            setSpenderAddress(null);
+            setTimeout(() => setSwapTxStatus(null), 5000);
+          } else if (attempts === maxAttempts) {
+            console.log("⚠️ Balance-Änderung konnte nicht verifiziert werden");
+            setDfaithBalance(currentBalance.toFixed(DFAITH_DECIMALS));
+            throw new Error("Swap-Verifizierung fehlgeschlagen - Balance nicht wie erwartet geändert");
+          }
+        } catch (balanceError) {
+          console.error(`Balance-Verifizierung Versuch ${attempts} fehlgeschlagen:`, balanceError);
+          if (attempts === maxAttempts) {
+            throw new Error("Balance-Verifizierung nach mehreren Versuchen fehlgeschlagen");
+          }
         }
-      };
+      }
       
-      await fetchDfaithBalance();
-      setSellStep('completed');
-      setSwapTxStatus("success");
-      setSellAmount("");
-      setQuoteTxData(null);
-      setSpenderAddress(null);
-      setTimeout(() => setSwapTxStatus(null), 5000);
     } catch (error) {
       console.error("Swap Fehler:", error);
       setSwapTxStatus("error");
+      
+      // Versuche trotzdem die Balance zu aktualisieren
+      try {
+        const dfaithValue = await fetchTokenBalanceViaInsightApi(DFAITH_TOKEN, account.address);
+        const dfaithRaw = Number(dfaithValue);
+        const currentBalance = (dfaithRaw / Math.pow(10, DFAITH_DECIMALS)).toFixed(DFAITH_DECIMALS);
+        setDfaithBalance(currentBalance);
+      } catch (balanceError) {
+        console.error("Fehler beim Aktualisieren der Balance nach Swap-Fehler:", balanceError);
+      }
+      
       setTimeout(() => setSwapTxStatus(null), 5000);
     } finally {
       setIsSwapping(false);
@@ -594,6 +650,7 @@ export default function SellTab() {
                 swapTxStatus === "success" ? "bg-green-500/20 text-green-400" :
                 swapTxStatus === "error" ? "bg-red-500/20 text-red-400" :
                 swapTxStatus === "confirming" ? "bg-blue-500/20 text-blue-400" :
+                swapTxStatus === "verifying" ? "bg-blue-500/20 text-blue-400" :
                 swapTxStatus === "approving" ? "bg-orange-500/20 text-orange-400" :
                 swapTxStatus === "swapping" ? "bg-purple-500/20 text-purple-400" :
                 "bg-yellow-500/20 text-yellow-400"
@@ -601,7 +658,7 @@ export default function SellTab() {
                 {swapTxStatus === "success" && (
                   <>
                     <div>🎉 Verkauf erfolgreich!</div>
-                    <div className="text-xs mt-1">Ihre D.FAITH wurden erfolgreich in POL getauscht</div>
+                    <div className="text-xs mt-1">Ihre D.FAITH wurden erfolgreich in POL getauscht und verifiziert</div>
                   </>
                 )}
                 {swapTxStatus === "error" && (
@@ -612,8 +669,14 @@ export default function SellTab() {
                 )}
                 {swapTxStatus === "confirming" && (
                   <>
-                    <div>⏳ Bestätigung läuft...</div>
-                    <div className="text-xs mt-1">Warte auf Blockchain-Bestätigung</div>
+                    <div>⏳ Blockchain-Bestätigung...</div>
+                    <div className="text-xs mt-1">Warte auf Transaktionsbestätigung</div>
+                  </>
+                )}
+                {swapTxStatus === "verifying" && (
+                  <>
+                    <div>🔍 Verifiziere Swap...</div>
+                    <div className="text-xs mt-1">Prüfe Balance-Änderung zur Bestätigung</div>
                   </>
                 )}
                 {swapTxStatus === "approving" && (

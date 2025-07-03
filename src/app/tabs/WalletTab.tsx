@@ -396,12 +396,12 @@ export default function WalletTab() {
   const fetchDfaithEurValue = async (balance: string) => {
     try {
       const balanceFloat = parseFloat(balance);
-      if (balanceFloat <= 0) {
+      if (balanceFloat <= 0 || dfaithPriceEur <= 0) {
         setDfaithEurValue("0.00");
         return;
       }
 
-      // Verwende den aktuellen D.FAITH EUR Preis
+      // Verwende den aktuellen D.FAITH EUR Preis nur wenn vorhanden
       const eurValue = balanceFloat * dfaithPriceEur;
       setDfaithEurValue(eurValue.toFixed(2));
       
@@ -410,6 +410,13 @@ export default function WalletTab() {
       setDfaithEurValue("0.00");
     }
   };
+
+  // EUR-Wert neu berechnen wenn sich Preis oder Balance ändert
+  useEffect(() => {
+    if (dfaithBalance?.displayValue) {
+      fetchDfaithEurValue(dfaithBalance.displayValue);
+    }
+  }, [dfaithPriceEur, dfaithBalance?.displayValue]);
 
   // Entferne fetchTokenBalanceViaContract komplett (nicht mehr benötigt)
 
