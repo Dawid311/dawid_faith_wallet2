@@ -35,44 +35,84 @@ export default function SellTab() {
   // Neuer State für prozessschritte
   const [sellStep, setSellStep] = useState<'initial' | 'quoteFetched' | 'approved' | 'completed'>('initial');
   
+  // Korrekte API-Funktion für Balance-Abfrage
+  const fetchTokenBalanceViaInsightApi = async (
+    tokenAddress: string,
+    accountAddress: string
+  ): Promise<string> => {
+    if (!accountAddress) return "0";
+    try {
+      const params = new URLSearchParams({
+        chain_id: "137",
+        token_address: tokenAddress,
+        owner_address: accountAddress,
+        include_native: "true",
+        resolve_metadata_links: "true",
+        include_spam: "false",
+        limit: "50",
+        metadata: "false",
+      });
+      const url = `https://insight.thirdweb.com/v1/tokens?${params.toString()}`;
+      const res = await fetch(url, {
+        method: "GET",
+        headers: {
+          "x-client-id": process.env.NEXT_PUBLIC_TEMPLATE_CLIENT_ID || "",
+        },
+      });
+      
+      if (!res.ok) {
+        console.error("Insight API Fehlerstatus:", res.status, res.statusText);
+        throw new Error("API Error");
+      }
+      
+      const data = await res.json();
+      const balance = data?.data?.[0]?.balance ?? "0";
+      return balance;
+    } catch (e) {
+      console.error("Insight API Fehler:", e);
+      return "0";
+    }
+  };
+  
   // D.FAITH & D.INVEST Balance laden
   useEffect(() => {
     let isMounted = true;
     let latestRequest = 0;
 
-    const fetchDfaithBalance = async () => {
+    const fetchBalances = async () => {
       const requestId = ++latestRequest;
       if (!account?.address) {
         if (isMounted) setDfaithBalance("0");
         if (isMounted) setDinvestBalance("0");
         return;
       }
+      
       try {
         // D.FAITH
-        const res = await fetch(`https://insight.thirdweb.com/v1/tokens?chain_id=137&token_address=${DFAITH_TOKEN}&owner_address=${account.address}&include_native=true`);
-        const data = await res.json();
-        const bal = data?.data?.[0]?.balance ?? "0";
+        const dfaithValue = await fetchTokenBalanceViaInsightApi(DFAITH_TOKEN, account.address);
+        const dfaithRaw = Number(dfaithValue);
+        const dfaithDisplay = (dfaithRaw / Math.pow(10, DFAITH_DECIMALS)).toFixed(DFAITH_DECIMALS);
+        
         if (isMounted && requestId === latestRequest) {
-          setDfaithBalance((Number(bal) / Math.pow(10, DFAITH_DECIMALS)).toFixed(DFAITH_DECIMALS));
+          setDfaithBalance(dfaithDisplay);
         }
-      } catch (error) {
-        if (isMounted) setDfaithBalance("0");
-      }
-      try {
+
         // D.INVEST
-        const res = await fetch(`https://insight.thirdweb.com/v1/tokens?chain_id=137&token_address=${DINVEST_TOKEN}&owner_address=${account.address}&include_native=true`);
-        const data = await res.json();
-        const bal = data?.data?.[0]?.balance ?? "0";
+        const dinvestValue = await fetchTokenBalanceViaInsightApi(DINVEST_TOKEN, account.address);
         if (isMounted && requestId === latestRequest) {
-          setDinvestBalance(Math.floor(Number(bal)).toString());
+          setDinvestBalance(Math.floor(Number(dinvestValue)).toString());
         }
       } catch (error) {
-        if (isMounted) setDinvestBalance("0");
+        console.error("Fehler beim Laden der Balances:", error);
+        if (isMounted) {
+          setDfaithBalance("0");
+          setDinvestBalance("0");
+        }
       }
     };
 
-    fetchDfaithBalance();
-    const interval = setInterval(fetchDfaithBalance, 10000);
+    fetchBalances();
+    const interval = setInterval(fetchBalances, 10000);
     return () => {
       isMounted = false;
       clearInterval(interval);

@@ -32,21 +32,54 @@ export default function StakeTab() {
   const [dfaithBalance, setDfaithBalance] = useState("0.00");
   const [dinvestBalance, setDinvestBalance] = useState("0");
 
+  // Korrekte API-Funktion für Balance-Abfrage  
+  const fetchTokenBalanceViaInsightApi = async (
+    tokenAddress: string,
+    accountAddress: string
+  ): Promise<string> => {
+    if (!accountAddress) return "0";
+    try {
+      const params = new URLSearchParams({
+        chain_id: "137",
+        token_address: tokenAddress,
+        owner_address: accountAddress,
+        include_native: "true",
+        resolve_metadata_links: "true",
+        include_spam: "false",
+        limit: "50",
+        metadata: "false",
+      });
+      const url = `https://insight.thirdweb.com/v1/tokens?${params.toString()}`;
+      const res = await fetch(url, {
+        method: "GET",
+        headers: {
+          "x-client-id": process.env.NEXT_PUBLIC_TEMPLATE_CLIENT_ID || "",
+        },
+      });
+      
+      if (!res.ok) {
+        console.error("Insight API Fehlerstatus:", res.status, res.statusText);
+        throw new Error("API Error");
+      }
+      
+      const data = await res.json();
+      const balance = data?.data?.[0]?.balance ?? "0";
+      return balance;
+    } catch (e) {
+      console.error("Insight API Fehler:", e);
+      return "0";
+    }
+  };
+
   // Fetch balances und Contract-Status
   useEffect(() => {
     if (!account?.address) return;
     setLoading(true);
     (async () => {
       try {
-        // D.INVEST Balance (0 Decimals)
-        const dinvest = getContract({ client, chain: polygon, address: DINVEST_TOKEN });
-        const dinvestBalanceResult = await balanceOf({
-          contract: dinvest,
-          address: account.address
-        });
-        
-        // D.INVEST hat 0 Decimals
-        setAvailable(dinvestBalanceResult.toString());
+        // D.INVEST Balance via Insight API (0 Decimals)
+        const dinvestValue = await fetchTokenBalanceViaInsightApi(DINVEST_TOKEN, account.address);
+        setAvailable(Math.floor(Number(dinvestValue)).toString());
         
         // Staking Contract Daten abrufen
         const staking = getContract({ client, chain: polygon, address: STAKING_CONTRACT });

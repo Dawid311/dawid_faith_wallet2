@@ -5,7 +5,7 @@ import { useActiveAccount, useSendTransaction } from "thirdweb/react";
 import { polygon } from "thirdweb/chains";
 import { getContract, prepareContractCall } from "thirdweb";
 import { client } from "../../client";
-import { balanceOf } from "thirdweb/extensions/erc20";
+import { fetchAllBalances, TOKEN_ADDRESSES, TOKEN_DECIMALS } from "../../utils/balanceUtils";
 
 export default function SendTab() {
   const [sendAmount, setSendAmount] = useState("");
@@ -16,19 +16,18 @@ export default function SendTab() {
   const { mutateAsync: sendTransaction } = useSendTransaction();
 
   // Token-Konstanten mit neuen Adressen
-  const DFAITH_TOKEN = "0xF051E3B0335eB332a7ef0dc308BB4F0c10301060";
-  const DFAITH_DECIMALS = 2;
-  const DINVEST_TOKEN = "0x90aCC32F7b0B1CACc3958a260c096c10CCfa0383";
-  const DINVEST_DECIMALS = 0;
-  const POL_TOKEN = "0x0000000000000000000000000000000000001010";
-  const POL_DECIMALS = 18;
+  const DFAITH_TOKEN = TOKEN_ADDRESSES.DFAITH;
+  const DFAITH_DECIMALS = TOKEN_DECIMALS.DFAITH;
+  const DINVEST_TOKEN = TOKEN_ADDRESSES.DINVEST;
+  const DINVEST_DECIMALS = TOKEN_DECIMALS.DINVEST;
+  const POL_TOKEN = TOKEN_ADDRESSES.NATIVE_POL;
+  const POL_DECIMALS = TOKEN_DECIMALS.POL;
 
   // Balances
   const [dfaithBalance, setDfaithBalance] = useState("0.00");
-  const [dinvestBalance, setDinvestBalance] = useState("0.0000");
+  const [dinvestBalance, setDinvestBalance] = useState("0");
   const [polBalance, setPolBalance] = useState("0.0000");
 
-  // Balances laden
   useEffect(() => {
     if (!account?.address) {
       setDfaithBalance("0.00");
@@ -36,32 +35,24 @@ export default function SendTab() {
       setPolBalance("0.0000");
       return;
     }
-    // D.FAITH
-    (async () => {
+
+    const loadBalances = async () => {
       try {
-        const res = await fetch(`https://insight.thirdweb.com/v1/tokens?chain_id=137&token_address=${DFAITH_TOKEN}&owner_address=${account.address}&include_native=true`);
-        const data = await res.json();
-        const bal = data?.data?.[0]?.balance ?? "0";
-        setDfaithBalance((Number(bal) / Math.pow(10, DFAITH_DECIMALS)).toFixed(DFAITH_DECIMALS));
-      } catch { setDfaithBalance("0.00"); }
-    })();
-    // D.INVEST
-    (async () => {
-      try {
-        const res = await fetch(`https://insight.thirdweb.com/v1/tokens?chain_id=137&token_address=${DINVEST_TOKEN}&owner_address=${account.address}&include_native=true`);
-        const data = await res.json();
-        const bal = data?.data?.[0]?.balance ?? "0";
-        setDinvestBalance(Math.floor(Number(bal)).toString());
-      } catch { setDinvestBalance("0"); }
-    })();
-    // POL (native) via Insight API
-    (async () => {
-      try {
-        const response = await fetch(`https://explorer-api.maticvigil.com/api/addr/${account.address}/balance`);
-        const data = await response.json();
-        setPolBalance((Number(data.balance) / Math.pow(10, POL_DECIMALS)).toFixed(4));
-      } catch { setPolBalance("0.0000"); }
-    })();
+        const balances = await fetchAllBalances(account.address);
+        setDfaithBalance(balances.dfaith);
+        setDinvestBalance(balances.dinvest);
+        setPolBalance(balances.pol);
+      } catch (error) {
+        console.error("Fehler beim Laden der Balances:", error);
+        setDfaithBalance("0.00");
+        setDinvestBalance("0");
+        setPolBalance("0.0000");
+      }
+    };
+
+    loadBalances();
+    const interval = setInterval(loadBalances, 10000); // Update alle 10 Sekunden
+    return () => clearInterval(interval);
   }, [account?.address, isSending]);
 
   const handleSend = async () => {
