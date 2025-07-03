@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { Button } from "../../../../components/ui/button";
-import { FaCoins, FaLock, FaExchangeAlt } from "react-icons/fa";
+import { FaCoins, FaLock, FaExchangeAlt, FaSync, FaRegCopy } from "react-icons/fa";
 import { useActiveAccount, useSendTransaction, BuyWidget } from "thirdweb/react";
 import { polygon } from "thirdweb/chains";
 import { NATIVE_TOKEN_ADDRESS, getContract, prepareContractCall, sendAndConfirmTransaction, readContract } from "thirdweb";
@@ -234,51 +234,45 @@ export default function BuyTab() {
         throw new Error('OpenOcean: Unvollständige Transaktionsdaten');
       }
       
-      const { prepareTransaction } = await import("thirdweb");
-      const tx = prepareTransaction({
-        to: txData.to,
-        data: txData.data,
-        value: BigInt(txData.value || "0"),
-        chain: polygon,
-        client
-      });
+      // Fix für das Transaktions-Handling
+      try {
+        const { prepareTransaction } = await import("thirdweb");
+        const tx = await prepareTransaction({
+          to: txData.to,
+          data: txData.data,
+          value: BigInt(txData.value || "0"),
+          chain: polygon,
+          client
+        });
 
-      console.log("Sending transaction...");
+        console.log("Prepared Transaction:", tx);
+        console.log("Sending transaction...");
+        
+        const transactionResult = await sendTransaction(tx);
+        console.log("Transaction sent:", transactionResult);
+        
+        setSwapTxStatus("confirming");
+        
+        // Warte auf Bestätigung
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        
+        // Aktualisiere POL-Balance
+        await updatePolBalance();
+        
+        setSwapTxStatus("success");
+        setSwapAmountPol("");
+      } catch (txError) {
+        console.error("Transaction Error:", txError);
+        throw new Error(
+          `Transaktionsfehler: ${
+            typeof txError === "object" && txError !== null && "message" in txError
+              ? (txError as { message?: string }).message
+              : "Unbekannter Fehler"
+          }`
+        );
+      }
       
-      const transactionResult = await sendTransaction(tx);
-      console.log("Transaction sent:", transactionResult);
-      
-      setSwapTxStatus("confirming");
-      
-      await new Promise(resolve => setTimeout(resolve, 5000));
-      
-      const fetchPolBalance = async () => {
-        if (!account?.address) return;
-        try {
-          const response = await fetch(polygon.rpc, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              jsonrpc: '2.0',
-              method: 'eth_getBalance',
-              params: [account.address, 'latest'],
-              id: 1
-            })
-          });
-          const data = await response.json();
-          const balance = BigInt(data.result);
-          const polFormatted = Number(balance) / Math.pow(10, 18);
-          setPolBalance(polFormatted.toFixed(3)); // Auf 3 Stellen
-        } catch (error) {
-          console.error("Balance update error:", error);
-        }
-      };
-      
-      await fetchPolBalance();
-      
-      setSwapTxStatus("success");
-      setSwapAmountPol("");
-      
+      // Timer um Success-Meldung auszublenden
       setTimeout(() => {
         setSwapTxStatus(null);
       }, 5000);
@@ -294,13 +288,36 @@ export default function BuyTab() {
       setIsSwapping(false);
     }
   };
+  
+  // Funktion zum Aktualisieren der POL-Balance
+  const updatePolBalance = async () => {
+    if (!account?.address) return;
+    try {
+      const response = await fetch(polygon.rpc, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          method: 'eth_getBalance',
+          params: [account.address, 'latest'],
+          id: 1
+        })
+      });
+      const data = await response.json();
+      const balance = BigInt(data.result);
+      const polFormatted = Number(balance) / Math.pow(10, 18);
+      setPolBalance(polFormatted.toFixed(3)); // Auf 3 Stellen
+    } catch (error) {
+      console.error("Balance update error:", error);
+    }
+  };
 
-  // === NEU: Refs für die Modals ===
+  // Refs für die Modals
   const polBuyModalRef = useRef<HTMLDivElement>(null);
   const dfaithBuyModalRef = useRef<HTMLDivElement>(null);
   const investBuyModalRef = useRef<HTMLDivElement>(null);
 
-  // === NEU: Scrollen zu den Modals, wenn sie geöffnet werden ===
+  // Scrollen zu den Modals, wenn sie geöffnet werden
   useEffect(() => {
     if (showPolBuyModal && polBuyModalRef.current) {
       setTimeout(() => {
