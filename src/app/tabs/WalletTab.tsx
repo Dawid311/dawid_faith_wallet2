@@ -134,7 +134,7 @@ export default function WalletTab() {
       const res = await fetch(url, {
         method: "GET",
         headers: {
-          "Content-Type": "application/json",
+          "x-client-id": process.env.NEXT_PUBLIC_TEMPLATE_CLIENT_ID || "",
         },
       });
       let data;
@@ -182,6 +182,10 @@ export default function WalletTab() {
       // Optional: State für POL-Balance hinzufügen, falls du sie anzeigen möchtest
       // setPolBalance({ displayValue: ... });
       fetchDfaithEurValue(dfaithValue);
+
+      // Debug-Ausgabe für D.INVEST API-Antwort
+      console.debug("DINVEST Insight API Wert (raw):", dinvestValue);
+      // Optional: Hier könntest du auch fetchDinvestEurValue(dinvestValue) aufrufen, wenn du einen EUR-Wert anzeigen willst.
     } catch (error) {
       // Fehlerbehandlung
     } finally {
