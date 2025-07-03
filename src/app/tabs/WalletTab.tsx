@@ -75,6 +75,14 @@ export default function WalletTab() {
 
   const [dfaithEurValue, setDfaithEurValue] = useState<string>("0.00");
   const [dfaithPriceEur, setDfaithPriceEur] = useState<number>(0.001);
+  const [polPriceEur, setPolPriceEur] = useState<number>(0.50);
+  const [lastKnownPrices, setLastKnownPrices] = useState<{
+    dfaith?: number;
+    dfaithEur?: number;
+    polEur?: number;
+    timestamp?: number;
+  }>({});
+  const [priceError, setPriceError] = useState<string | null>(null);
   // State für Loading und Refresh
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLoadingBalances, setIsLoadingBalances] = useState(false);
@@ -249,29 +257,130 @@ export default function WalletTab() {
     };
   }, [account?.address]);
 
-  // D.FAITH EUR-Preis holen (basierend auf POL-Preis)
+  // D.FAITH EUR-Preis holen mit Fallback System (basierend auf OpenOcean API)
   const fetchDfaithPrice = async () => {
     try {
-      // POL-Preis in EUR holen (ungefähr 0.50€)
-      const polPriceEur = 0.50;
-      
-      // D.FAITH pro POL von Paraswap holen
-      const response = await fetch(
-        `https://apiv5.paraswap.io/prices?srcToken=0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270&destToken=0xF051E3B0335eB332a7ef0dc308BB4F0c10301060&amount=1000000000000000000&srcDecimals=18&destDecimals=2&network=137`
-      );
-      
-      if (response.ok) {
-        const data = await response.json();
-        const dfaithPerPol = Number(data.priceRoute.destAmount) / Math.pow(10, 2);
-        const dfaithPriceEur = polPriceEur / dfaithPerPol;
-        setDfaithPriceEur(dfaithPriceEur);
-      } else {
-        // Fallback: 0.50€ / 500 = 0.001€ pro D.FAITH
-        setDfaithPriceEur(0.001);
+      // Lade gespeicherte Preise beim Start
+      const loadStoredPrices = () => {
+        try {
+          const stored = localStorage.getItem('dawid_faith_prices');
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            const now = Date.now();
+            // Verwende gespeicherte Preise wenn sie weniger als 6 Stunden alt sind
+            if (parsed.timestamp && (now - parsed.timestamp) < 6 * 60 * 60 * 1000) {
+              setLastKnownPrices(parsed);
+              if (parsed.dfaithEur) setDfaithPriceEur(parsed.dfaithEur);
+              if (parsed.polEur) setPolPriceEur(parsed.polEur);
+              return true;
+            }
+          }
+        } catch (e) {
+          console.log('Fehler beim Laden gespeicherter Preise:', e);
+        }
+        return false;
+      };
+
+      // Verwende gespeicherte Preise falls verfügbar
+      const hasStoredPrices = loadStoredPrices();
+
+      let polEur: number | null = null;
+      let dfaithPriceEur: number | null = null;
+      let errorMsg = "";
+
+      try {
+        // 1. Hole POL/EUR Preis von CoinGecko
+        const polResponse = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=polygon-ecosystem-token&vs_currencies=eur');
+        if (polResponse.ok) {
+          const polData = await polResponse.json();
+          polEur = polData['polygon-ecosystem-token']?.eur;
+          if (polEur) {
+            // Auf 2 Dezimalstellen runden
+            polEur = Math.round(polEur * 100) / 100;
+          }
+        }
+      } catch (e) {
+        console.log('POL Preis Fehler:', e);
       }
+
+      // Fallback auf letzten bekannten POL Preis
+      if (!polEur && lastKnownPrices.polEur) {
+        polEur = lastKnownPrices.polEur;
+      } else if (!polEur) {
+        polEur = 0.50; // Hard fallback
+      }
+
+      try {
+        // 2. Hole D.FAITH Preis von OpenOcean
+        const params = new URLSearchParams({
+          chain: "polygon",
+          inTokenAddress: "0x0000000000000000000000000000000000001010", // Polygon Native Token (MATIC)
+          outTokenAddress: DFAITH_TOKEN.address,
+          amount: "1", // 1 POL
+          gasPrice: "50",
+        });
+        
+        const response = await fetch(`https://open-api.openocean.finance/v3/polygon/quote?${params}`);
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data && data.data && data.data.outAmount && data.data.outAmount !== "0") {
+            // outAmount ist in D.FAITH (mit 2 Decimals)
+            const dfaithPerPol = Number(data.data.outAmount) / Math.pow(10, DFAITH_TOKEN.decimals);
+            // Berechne EUR Preis: 1 D.FAITH = POL_EUR / DFAITH_PER_POL
+            dfaithPriceEur = polEur / dfaithPerPol;
+          } else {
+            errorMsg = "OpenOcean: Keine Liquidität verfügbar";
+          }
+        } else {
+          errorMsg = `OpenOcean: ${response.status}`;
+        }
+      } catch (e) {
+        console.log("OpenOcean Fehler:", e);
+        errorMsg = "OpenOcean API Fehler";
+      }
+
+      // Fallback auf letzte bekannte D.FAITH Preise
+      if (!dfaithPriceEur && lastKnownPrices.dfaithEur) {
+        dfaithPriceEur = lastKnownPrices.dfaithEur;
+        errorMsg = "";
+      }
+
+      // Setze Preise (entweder neue oder Fallback)
+      if (polEur) setPolPriceEur(polEur);
+      if (dfaithPriceEur) setDfaithPriceEur(dfaithPriceEur);
+
+      // Speichere erfolgreiche Preise
+      if (dfaithPriceEur && polEur) {
+        const newPrices = {
+          dfaithEur: dfaithPriceEur,
+          polEur: polEur,
+          timestamp: Date.now()
+        };
+        setLastKnownPrices(prev => ({ ...prev, ...newPrices }));
+        try {
+          localStorage.setItem('dawid_faith_prices', JSON.stringify(newPrices));
+        } catch (e) {
+          console.log('Fehler beim Speichern der Preise:', e);
+        }
+        setPriceError(null);
+      } else {
+        setPriceError(errorMsg || "Preise nicht verfügbar");
+      }
+
     } catch (error) {
       console.error("Fehler beim Abrufen des D.FAITH EUR-Preises:", error);
-      setDfaithPriceEur(0.001);
+      // Verwende letzte bekannte Preise als Fallback
+      if (lastKnownPrices.dfaithEur) {
+        setDfaithPriceEur(lastKnownPrices.dfaithEur);
+      } else {
+        setDfaithPriceEur(0.001);
+      }
+      if (lastKnownPrices.polEur) {
+        setPolPriceEur(lastKnownPrices.polEur);
+      } else {
+        setPolPriceEur(0.50);
+      }
     }
   };
 
@@ -283,34 +392,22 @@ export default function WalletTab() {
 
   const formatAddress = (address: string) => `${address.slice(0, 6)}...${address.slice(-4)}`;
 
-  // D.FAITH Wert in EUR live berechnen
+  // D.FAITH Wert in EUR berechnen basierend auf aktuellen Preisen
   const fetchDfaithEurValue = async (balance: string) => {
     try {
-      // 1. OpenOcean Quote: Wie viel POL bekomme ich für 1 D.FAITH?
-      const params = new URLSearchParams({
-        chain: "polygon",
-        inTokenAddress: "0xF051E3B0335eB332a7ef0dc308BB4F0c10301060", // D.FAITH
-        outTokenAddress: "0x0000000000000000000000000000000000001010", // POL (MATIC)
-        amount: "1",
-        gasPrice: "50",
-      });
-      const quoteRes = await fetch(`https://open-api.openocean.finance/v3/polygon/quote?${params}`);
-      const quoteData = await quoteRes.json();
-      const dfaithToPol = Number(quoteData.data.outAmount) / Math.pow(10, 18); // POL hat 18 Dezimalstellen
+      const balanceFloat = parseFloat(balance);
+      if (balanceFloat <= 0) {
+        setDfaithEurValue("0.00");
+        return;
+      }
 
-      // 2. POL/EUR Preis holen (z.B. von CoinGecko)
-      const polRes = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=polygon-ecosystem-token&vs_currencies=eur');
-      const polData = await polRes.json();
-      const polEur = polData["polygon-ecosystem-token"].eur;
-
-      // 3. D.FAITH Gesamtwert in EUR berechnen
-      const totalEur = Number(balance) * dfaithToPol * polEur;
-      setDfaithEurValue(totalEur.toFixed(2));
-    } catch (e) {
-      console.error("Fehler bei der EUR-Wertberechnung:", e);
-      // Fallback: ungefähre Berechnung mit statischem Preis
-      const totalEur = Number(balance) * dfaithPriceEur;
-      setDfaithEurValue(totalEur.toFixed(2));
+      // Verwende den aktuellen D.FAITH EUR Preis
+      const eurValue = balanceFloat * dfaithPriceEur;
+      setDfaithEurValue(eurValue.toFixed(2));
+      
+    } catch (error) {
+      console.error("Fehler beim Berechnen des D.FAITH EUR-Wertes:", error);
+      setDfaithEurValue("0.00");
     }
   };
 
@@ -457,8 +554,20 @@ export default function WalletTab() {
               
               <div className="w-full h-px bg-gradient-to-r from-transparent via-zinc-700/50 to-transparent my-3"></div>
               
-              <div className="text-xs text-zinc-500">
-                ≈ {dfaithEurValue} EUR
+              <div className="text-xs text-zinc-500 space-y-1">
+                <div>≈ {dfaithEurValue} EUR</div>
+                <div className="text-[10px] text-zinc-600">
+                  Preis: {dfaithPriceEur.toFixed(3)}€/D.FAITH
+                  {priceError && (
+                    <span className="text-yellow-400 ml-1">(cached)</span>
+                  )}
+                </div>
+                <div className="text-[10px] text-zinc-600">
+                  POL: {polPriceEur.toFixed(2)}€
+                  {priceError && (
+                    <span className="text-yellow-400 ml-1">(cached)</span>
+                  )}
+                </div>
               </div>
             </div>
 

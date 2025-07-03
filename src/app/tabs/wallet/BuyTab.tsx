@@ -20,6 +20,12 @@ export default function BuyTab() {
   const [dfaithPriceEur, setDfaithPriceEur] = useState<number | null>(null);
   const [polPriceEur, setPolPriceEur] = useState<number | null>(null);
   const [isLoadingPrice, setIsLoadingPrice] = useState(true);
+  const [lastKnownPrices, setLastKnownPrices] = useState<{
+    dfaith?: number;
+    dfaithEur?: number;
+    polEur?: number;
+    timestamp?: number;
+  }>({});
   const account = useActiveAccount();
   const [showInvestModal, setShowInvestModal] = useState(false);
   const [showBuyModal, setShowBuyModal] = useState(false);
@@ -33,8 +39,30 @@ export default function BuyTab() {
   const { mutate: sendTransaction, isPending: isSwapPending } = useSendTransaction();
   const [swapStatus, setSwapStatus] = useState<string | null>(null);
 
-  // D.FAITH Preis von OpenOcean holen und in Euro umrechnen
+  // D.FAITH Preis von OpenOcean holen und in Euro umrechnen mit Fallback
   useEffect(() => {
+    // Lade gespeicherte Preise beim Start
+    const loadStoredPrices = () => {
+      try {
+        const stored = localStorage.getItem('dawid_faith_prices');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          const now = Date.now();
+          // Verwende gespeicherte Preise wenn sie weniger als 6 Stunden alt sind
+          if (parsed.timestamp && (now - parsed.timestamp) < 6 * 60 * 60 * 1000) {
+            setLastKnownPrices(parsed);
+            if (parsed.dfaith) setDfaithPrice(parsed.dfaith);
+            if (parsed.dfaithEur) setDfaithPriceEur(parsed.dfaithEur);
+            if (parsed.polEur) setPolPriceEur(parsed.polEur);
+          }
+        }
+      } catch (e) {
+        console.log('Fehler beim Laden gespeicherter Preise:', e);
+      }
+    };
+
+    loadStoredPrices();
+
     const fetchDfaithPrice = async () => {
       setIsLoadingPrice(true);
       setPriceError(null);
@@ -45,66 +73,114 @@ export default function BuyTab() {
       
       try {
         // 1. Hole POL/EUR Preis von CoinGecko
-        const polResponse = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=polygon-ecosystem-token&vs_currencies=eur');
-        if (polResponse.ok) {
-          const polData = await polResponse.json();
-          polEur = polData['polygon-ecosystem-token']?.eur || 0.50; // Fallback zu 0.50€
-        } else {
-          polEur = 0.50; // Fallback
+        try {
+          const polResponse = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=polygon-ecosystem-token&vs_currencies=eur');
+          if (polResponse.ok) {
+            const polData = await polResponse.json();
+            polEur = polData['polygon-ecosystem-token']?.eur;
+            if (polEur) {
+              // Auf 2 Dezimalstellen runden
+              polEur = Math.round(polEur * 100) / 100;
+            }
+          }
+        } catch (e) {
+          console.log('POL Preis Fehler:', e);
+        }
+        
+        // Fallback auf letzten bekannten POL Preis
+        if (!polEur && lastKnownPrices.polEur) {
+          polEur = lastKnownPrices.polEur;
+        } else if (!polEur) {
+          polEur = 0.50; // Hard fallback
         }
         
         // 2. Hole D.FAITH Preis von OpenOcean
-        const params = new URLSearchParams({
-          chain: "polygon",
-          inTokenAddress: "0x0000000000000000000000000000000000001010", // Polygon Native Token (MATIC)
-          outTokenAddress: DFAITH_TOKEN,
-          amount: "1", // 1 POL
-          gasPrice: "50",
-        });
-        
-        const response = await fetch(`https://open-api.openocean.finance/v3/polygon/quote?${params}`);
-        
-        if (response.ok) {
-          const data = await response.json();
-          console.log("OpenOcean Response:", data);
-          if (data && data.data && data.data.outAmount && data.data.outAmount !== "0") {
-            // outAmount ist in D.FAITH (mit 2 Decimals)
-            price = Number(data.data.outAmount) / Math.pow(10, DFAITH_DECIMALS);
-            // Berechne EUR Preis: (D.FAITH pro POL) * (POL Preis in EUR) = D.FAITH Preis in EUR
-            priceEur = (polEur ?? 0.5) / price; // 1 D.FAITH = POL_EUR / DFAITH_PER_POL
+        try {
+          const params = new URLSearchParams({
+            chain: "polygon",
+            inTokenAddress: "0x0000000000000000000000000000000000001010", // Polygon Native Token (MATIC)
+            outTokenAddress: DFAITH_TOKEN,
+            amount: "1", // 1 POL
+            gasPrice: "50",
+          });
+          
+          const response = await fetch(`https://open-api.openocean.finance/v3/polygon/quote?${params}`);
+          
+          if (response.ok) {
+            const data = await response.json();
+            console.log("OpenOcean Response:", data);
+            if (data && data.data && data.data.outAmount && data.data.outAmount !== "0") {
+              // outAmount ist in D.FAITH (mit 2 Decimals)
+              price = Number(data.data.outAmount) / Math.pow(10, DFAITH_DECIMALS);
+              // Berechne EUR Preis: (D.FAITH pro POL) * (POL Preis in EUR) = D.FAITH Preis in EUR
+              priceEur = polEur / price; // 1 D.FAITH = POL_EUR / DFAITH_PER_POL
+            } else {
+              errorMsg = "OpenOcean: Keine Liquidität verfügbar";
+            }
           } else {
-            errorMsg = "OpenOcean: Keine Liquidität verfügbar";
+            errorMsg = `OpenOcean: ${response.status}`;
           }
-        } else {
-          errorMsg = `OpenOcean: ${response.status}`;
+        } catch (e) {
+          console.log("OpenOcean Fehler:", e);
+          errorMsg = "OpenOcean API Fehler";
         }
+        
+        // Fallback auf letzte bekannte D.FAITH Preise
+        if (!price && lastKnownPrices.dfaith) {
+          price = lastKnownPrices.dfaith;
+          errorMsg = "";
+        }
+        if (!priceEur && lastKnownPrices.dfaithEur) {
+          priceEur = lastKnownPrices.dfaithEur;
+          errorMsg = "";
+        }
+        
       } catch (e) {
         console.error("Price fetch error:", e);
         errorMsg = "Preis-API Fehler";
+        
+        // Verwende letzte bekannte Preise als Fallback
+        if (lastKnownPrices.dfaith) price = lastKnownPrices.dfaith;
+        if (lastKnownPrices.dfaithEur) priceEur = lastKnownPrices.dfaithEur;
+        if (lastKnownPrices.polEur) polEur = lastKnownPrices.polEur;
+        
+        if (price && priceEur && polEur) {
+          errorMsg = ""; // Kein Fehler anzeigen wenn Fallback verfügbar
+        }
       }
       
+      // Setze Preise (entweder neue oder Fallback)
+      if (polEur) setPolPriceEur(polEur);
+      if (price) setDfaithPrice(price);
+      if (priceEur) setDfaithPriceEur(priceEur);
+      
+      // Speichere erfolgreiche Preise
       if (price && priceEur && polEur) {
-        setDfaithPrice(price);
-        setDfaithPriceEur(priceEur);
-        setPolPriceEur(polEur);
+        const newPrices = {
+          dfaith: price,
+          dfaithEur: priceEur,
+          polEur: polEur,
+          timestamp: Date.now()
+        };
+        setLastKnownPrices(newPrices);
+        try {
+          localStorage.setItem('dawid_faith_prices', JSON.stringify(newPrices));
+        } catch (e) {
+          console.log('Fehler beim Speichern der Preise:', e);
+        }
         setPriceError(null);
       } else {
-        setDfaithPrice(null);
-        setDfaithPriceEur(null);
-        setPolPriceEur(polEur);
-        setPriceError(errorMsg || "Preis nicht verfügbar");
+        setPriceError(errorMsg || "Preise nicht verfügbar");
       }
+      
       setIsLoadingPrice(false);
     };
 
     fetchDfaithPrice();
-    // Preis nur alle 60 Sekunden (1 Minute) aktualisieren statt alle 30 Sekunden
-    // Für noch weniger API-Calls (alle 2 Minuten):
+    // Preis alle 2 Minuten aktualisieren
     const interval = setInterval(fetchDfaithPrice, 120000);
-    // Oder alle 5 Minuten für sehr seltene Updates:
-    // const interval = setInterval(fetchDfaithPrice, 300000);
     return () => clearInterval(interval);
-  }, []);
+  }, [lastKnownPrices.dfaith, lastKnownPrices.dfaithEur, lastKnownPrices.polEur]);
 
   // D.INVEST kaufen Modal öffnen
   const handleInvestBuy = async () => {
@@ -410,36 +486,41 @@ export default function BuyTab() {
               </div>
             </div>
             <span className="text-xs text-zinc-400 bg-zinc-700/50 px-2 py-1 rounded">mit POL kaufen</span>
-          </div>
-          
-          <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
-              <span className="text-sm text-zinc-400">Aktueller Preis:</span>
-              <span className="text-sm text-amber-400 font-medium">
-                {isLoadingPrice ? (
-                  <span className="animate-pulse">Laden...</span>
-                ) : priceError ? (
-                  <span className="text-red-400 text-xs">{priceError}</span>
-                ) : dfaithPriceEur ? (
-                  `${dfaithPriceEur.toFixed(3)}€ pro D.FAITH`
-                ) : (
-                  "Preis nicht verfügbar"
-                )}
-              </span>
+          </div>            <div className="space-y-4">
+              <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
+                <span className="text-sm text-zinc-400">Aktueller Preis:</span>
+                <span className="text-sm text-amber-400 font-medium">
+                  {isLoadingPrice && !dfaithPriceEur ? (
+                    <span className="animate-pulse">Laden...</span>
+                  ) : dfaithPriceEur ? (
+                    <span>
+                      {dfaithPriceEur.toFixed(3)}€ pro D.FAITH
+                      {priceError && (
+                        <span className="text-xs text-yellow-400 ml-1">(cached)</span>
+                      )}
+                    </span>
+                  ) : (
+                    <span className="text-red-400 text-xs">{priceError || "Preis nicht verfügbar"}</span>
+                  )}
+                </span>
+              </div>
+              
+              <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
+                <span className="text-sm text-zinc-400">Wechselkurs:</span>
+                <span className="text-sm text-zinc-300 font-medium">
+                  {dfaithPrice ? (
+                    <span>
+                      1 POL = {dfaithPrice.toFixed(2)} D.FAITH
+                      {priceError && (
+                        <span className="text-xs text-yellow-400 ml-1">(cached)</span>
+                      )}
+                    </span>
+                  ) : (
+                    "Wird geladen..."
+                  )}
+                </span>
+              </div>
             </div>
-            
-            <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
-              <span className="text-sm text-zinc-400">Wechselkurs:</span>
-              <span className="text-sm text-zinc-300 font-medium">
-                {dfaithPrice ? `1 POL = ${dfaithPrice.toFixed(2)} D.FAITH` : "Wird geladen..."}
-              </span>
-            </div>
-            
-            <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
-              <span className="text-sm text-zinc-400">Minimum:</span>
-              <span className="text-sm text-zinc-300 font-medium">0.001 POL</span>
-            </div>
-          </div>
           
           {/* D.FAITH kaufen Modal */}
           {showDfaithBuyModal ? (
@@ -753,7 +834,7 @@ export default function BuyTab() {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-gradient-to-r from-purple-500 to-purple-700 rounded-full">
-                <span className="text-purple-400 text-lg font-bold">POL</span>
+                <span className="text-white text-lg font-bold">🔷</span>
               </div>
               <div>
                 <h3 className="font-bold text-purple-400">POL Token</h3>
@@ -767,12 +848,17 @@ export default function BuyTab() {
             <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
               <span className="text-sm text-zinc-400">Aktueller Preis:</span>
               <span className="text-sm text-purple-400 font-bold">
-                {polPriceEur ? `${polPriceEur.toFixed(3)}€ pro POL` : "~0.500€ pro POL"}
+                {polPriceEur ? (
+                  <span>
+                    {polPriceEur.toFixed(2)}€ pro POL
+                    {priceError && (
+                      <span className="text-xs text-yellow-400 ml-1">(cached)</span>
+                    )}
+                  </span>
+                ) : (
+                  "~0.50€ pro POL"
+                )}
               </span>
-            </div>
-            <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
-              <span className="text-sm text-zinc-400">Minimum:</span>
-              <span className="text-sm text-zinc-300 font-medium">1 EUR</span>
             </div>
           </div>
           
