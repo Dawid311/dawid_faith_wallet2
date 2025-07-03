@@ -295,10 +295,12 @@ export default function BuyTab() {
     }
   };
 
-  // === NEU: Ref für das POL-Buy-Modal ===
+  // === NEU: Refs für die Modals ===
   const polBuyModalRef = useRef<HTMLDivElement>(null);
+  const dfaithBuyModalRef = useRef<HTMLDivElement>(null);
+  const investBuyModalRef = useRef<HTMLDivElement>(null);
 
-  // === NEU: Scrollen zum Modal, wenn es geöffnet wird ===
+  // === NEU: Scrollen zu den Modals, wenn sie geöffnet werden ===
   useEffect(() => {
     if (showPolBuyModal && polBuyModalRef.current) {
       setTimeout(() => {
@@ -306,6 +308,22 @@ export default function BuyTab() {
       }, 50);
     }
   }, [showPolBuyModal]);
+
+  useEffect(() => {
+    if (showDfaithBuyModal && dfaithBuyModalRef.current) {
+      setTimeout(() => {
+        dfaithBuyModalRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 50);
+    }
+  }, [showDfaithBuyModal]);
+
+  useEffect(() => {
+    if (showInvestModal && investBuyModalRef.current) {
+      setTimeout(() => {
+        investBuyModalRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 50);
+    }
+  }, [showInvestModal]);
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -362,7 +380,10 @@ export default function BuyTab() {
           {/* D.FAITH kaufen Modal */}
           {showDfaithBuyModal ? (
             <div className="fixed inset-0 z-50 flex items-start justify-center min-h-screen bg-black/60 overflow-y-auto">
-              <div className="bg-zinc-900 rounded-xl p-6 max-w-md w-full mx-4 border border-amber-400 my-8 mt-12 flex flex-col items-center justify-center">
+              <div
+                ref={dfaithBuyModalRef}
+                className="bg-zinc-900 rounded-xl p-6 max-w-md w-full mx-4 border border-amber-400 my-8 mt-12 flex flex-col items-center justify-center"
+              >
                 <div className="mb-6 text-amber-400 text-2xl font-bold text-center">D.FAITH kaufen</div>
                 
                 {/* POL Balance */}
@@ -631,7 +652,6 @@ export default function BuyTab() {
               <div
                 className="fixed inset-0 z-50 flex items-center justify-center min-h-screen bg-black/60 overflow-y-auto"
               >
-                {/* === ref hier setzen === */}
                 <div
                   ref={polBuyModalRef}
                   className="bg-zinc-900 rounded-xl p-4 max-w-full w-full sm:max-w-xs border border-purple-500 text-center flex flex-col items-center justify-center my-4"
@@ -687,7 +707,10 @@ export default function BuyTab() {
       {/* Info Modal für D.INVEST */}
       {showInvestModal && (
         <div className="fixed inset-0 z-50 flex items-start justify-center min-h-screen bg-black/60 overflow-y-auto">
-          <div className="bg-zinc-900 rounded-xl p-8 w-full max-w-xs border border-amber-400 text-center flex flex-col items-center justify-center my-8 mt-12">
+          <div
+            ref={investBuyModalRef}
+            className="bg-zinc-900 rounded-xl p-8 w-full max-w-xs border border-amber-400 text-center flex flex-col items-center justify-center my-8 mt-12"
+          >
             <div className="mb-4 text-amber-400 text-2xl font-bold">Wichtiger Hinweis</div>
             <div className="mb-4 text-zinc-300 text-sm">
               {copied

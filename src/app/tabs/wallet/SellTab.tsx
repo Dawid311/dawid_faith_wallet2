@@ -185,17 +185,18 @@ export default function SellTab() {
       console.log("estimatedGas:", txData.estimatedGas);
       console.log("outAmount:", txData.outAmount);
       console.log("inAmount:", txData.inAmount);
-      
+
+      // === KORREKTUR: Spenderadresse flexibel holen ===
+      // OpenOcean kann spender ODER approveTarget liefern
+      const spenderAddress = txData.spender || txData.approveTarget;
+      if (!spenderAddress) {
+        throw new Error("OpenOcean: Keine Spenderadresse (spender/approveTarget) in der Swap-Quote erhalten");
+      }
+
       // Überprüfen ob alle notwendigen Felder vorhanden sind
       if (!txData.to || !txData.data) {
         console.error("Fehlende tx data in response:", txData);
         throw new Error('OpenOcean: Unvollständige Transaktionsdaten');
-      }
-
-      // === KORREKTUR: Spenderadresse aus der API holen ===
-      const spenderAddress = txData.spender;
-      if (!spenderAddress) {
-        throw new Error("OpenOcean: Keine Spenderadresse in der Swap-Quote erhalten");
       }
 
       // **WICHTIG: Allowance mit OpenOcean API prüfen**
