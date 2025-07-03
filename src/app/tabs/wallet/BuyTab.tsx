@@ -15,6 +15,8 @@ const UNISWAP_ROUTER = "0xa5E0829CaCEd8fFDD4De3c43696c57F7D7A678ff"; // QuickSwa
 
 export default function BuyTab() {
   const [dfaithPrice, setDfaithPrice] = useState<number | null>(null);
+  const [dfaithPriceEur, setDfaithPriceEur] = useState<number | null>(null);
+  const [polPriceEur, setPolPriceEur] = useState<number | null>(null);
   const [isLoadingPrice, setIsLoadingPrice] = useState(true);
   const account = useActiveAccount();
   const [showInvestModal, setShowInvestModal] = useState(false);
@@ -29,54 +31,71 @@ export default function BuyTab() {
   const { mutate: sendTransaction, isPending: isSwapPending } = useSendTransaction();
   const [swapStatus, setSwapStatus] = useState<string | null>(null);
 
-  // D.FAITH Preis von OpenOcean holen
+  // D.FAITH Preis von OpenOcean holen und in Euro umrechnen
   useEffect(() => {
     const fetchDfaithPrice = async () => {
       setIsLoadingPrice(true);
       setPriceError(null);
       let price: number | null = null;
+      let priceEur: number | null = null;
+      let polEur: number | null = null;
       let errorMsg = "";
+      
       try {
-        // OpenOcean v3 Quote API - GET Request mit Query Parameters
+        // 1. Hole POL/EUR Preis von CoinGecko
+        const polResponse = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=polygon-ecosystem-token&vs_currencies=eur');
+        if (polResponse.ok) {
+          const polData = await polResponse.json();
+          polEur = polData['polygon-ecosystem-token']?.eur || 0.50; // Fallback zu 0.50€
+        } else {
+          polEur = 0.50; // Fallback
+        }
+        
+        // 2. Hole D.FAITH Preis von OpenOcean
         const params = new URLSearchParams({
           chain: "polygon",
           inTokenAddress: "0x0000000000000000000000000000000000001010", // Polygon Native Token (MATIC)
           outTokenAddress: DFAITH_TOKEN,
-          amount: "1", // 1 POL (OHNE Decimals!) - das war das Problem!
-          gasPrice: "50", // 50 GWEI (ohne Decimals)
+          amount: "1", // 1 POL
+          gasPrice: "50",
         });
         
         const response = await fetch(`https://open-api.openocean.finance/v3/polygon/quote?${params}`);
         
         if (response.ok) {
           const data = await response.json();
-          console.log("OpenOcean Response:", data); // Debug
+          console.log("OpenOcean Response:", data);
           if (data && data.data && data.data.outAmount && data.data.outAmount !== "0") {
-            // outAmount ist in D.FAITH (mit 2 Decimals) - daher durch 10^2 teilen
+            // outAmount ist in D.FAITH (mit 2 Decimals)
             price = Number(data.data.outAmount) / Math.pow(10, DFAITH_DECIMALS);
+            // Berechne EUR Preis: (D.FAITH pro POL) * (POL Preis in EUR) = D.FAITH Preis in EUR
+            priceEur = (polEur ?? 0.5) / price; // 1 D.FAITH = POL_EUR / DFAITH_PER_POL
           } else {
-            errorMsg = "OpenOcean: Keine Liquidität verfügbar (outAmount = 0)";
+            errorMsg = "OpenOcean: Keine Liquidität verfügbar";
           }
         } else {
           errorMsg = `OpenOcean: ${response.status}`;
         }
       } catch (e) {
-        console.error("OpenOcean API Fehler:", e);
-        errorMsg = "OpenOcean Fehler";
+        console.error("Price fetch error:", e);
+        errorMsg = "Preis-API Fehler";
       }
       
-      if (price) {
+      if (price && priceEur && polEur) {
         setDfaithPrice(price);
+        setDfaithPriceEur(priceEur);
+        setPolPriceEur(polEur);
         setPriceError(null);
       } else {
         setDfaithPrice(null);
+        setDfaithPriceEur(null);
+        setPolPriceEur(polEur);
         setPriceError(errorMsg || "Preis nicht verfügbar");
       }
       setIsLoadingPrice(false);
     };
 
     fetchDfaithPrice();
-    // Preis alle 30 Sekunden aktualisieren
     const interval = setInterval(fetchDfaithPrice, 30000);
     return () => clearInterval(interval);
   }, []);
@@ -97,12 +116,12 @@ export default function BuyTab() {
   // State für D.FAITH Swap
   const [showDfaithBuyModal, setShowDfaithBuyModal] = useState(false);
   const [swapAmountPol, setSwapAmountPol] = useState("");
-  const [slippage, setSlippage] = useState("1"); // Slippage State hinzufügen
+  const [slippage, setSlippage] = useState("1");
   const [polBalance, setPolBalance] = useState("0");
   const [isSwapping, setIsSwapping] = useState(false);
   const [swapTxStatus, setSwapTxStatus] = useState<string | null>(null);
 
-  // POL Balance laden
+  // POL Balance laden (auf 3 Stellen)
   useEffect(() => {
     const fetchPolBalance = async () => {
       if (!account?.address) {
@@ -112,17 +131,15 @@ export default function BuyTab() {
       try {
         console.log("Fetching native POL balance for:", account.address);
         
-        // Native POL Balance direkt über readContract abrufen
         const balance = await readContract({
           contract: getContract({
             client,
             chain: polygon,
-            address: "0x0000000000000000000000000000000000000000" // Dummy für native token
+            address: "0x0000000000000000000000000000000000000000"
           }),
           method: "function balanceOf(address) view returns (uint256)",
           params: [account.address]
         }).catch(async () => {
-          // Fallback: Verwende eth_getBalance über RPC
           const response = await fetch(polygon.rpc, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -142,7 +159,8 @@ export default function BuyTab() {
         const polFormatted = Number(balance) / Math.pow(10, 18);
         console.log("Native POL formatted:", polFormatted);
         
-        setPolBalance(polFormatted.toFixed(4));
+        // Auf 3 Stellen formatieren
+        setPolBalance(polFormatted.toFixed(3));
         
       } catch (error) {
         console.error("Fehler beim Laden der POL Balance:", error);
@@ -151,7 +169,6 @@ export default function BuyTab() {
     };
     
     fetchPolBalance();
-    // Balance alle 10 Sekunden aktualisieren
     const interval = setInterval(fetchPolBalance, 10000);
     return () => clearInterval(interval);
   }, [account?.address]);
@@ -164,7 +181,6 @@ export default function BuyTab() {
     try {
       const amountStr = parseFloat(swapAmountPol).toString();
       
-      // Debug: Zeige alle Parameter
       console.log("=== OpenOcean Swap Request ===");
       console.log("Chain:", "polygon");
       console.log("InToken:", "0x0000000000000000000000000000000000001010");
@@ -174,7 +190,6 @@ export default function BuyTab() {
       console.log("GasPrice:", "50");
       console.log("Account:", account.address);
       
-      // 1. Hole Swap-Transaktionsdaten von OpenOcean v3
       const params = new URLSearchParams({
         chain: "polygon",
         inTokenAddress: "0x0000000000000000000000000000000000001010",
@@ -199,7 +214,6 @@ export default function BuyTab() {
       console.log("=== OpenOcean Swap Response ===");
       console.log("Full Response:", JSON.stringify(data, null, 2));
       
-      // Prüfe die vollständige Response-Struktur
       if (!data) {
         throw new Error('OpenOcean: Keine Response erhalten');
       }
@@ -212,16 +226,13 @@ export default function BuyTab() {
         throw new Error('OpenOcean: Keine data in Response');
       }
       
-      // OpenOcean gibt die Transaktionsdaten direkt in data.data zurück
       const txData = data.data;
       console.log("Transaction Data:", txData);
       
-      // Validiere tx data
       if (!txData.to || !txData.data) {
         throw new Error('OpenOcean: Unvollständige Transaktionsdaten');
       }
       
-      // 2. Sende die Transaktion mit thirdweb und warte auf Bestätigung
       const { prepareTransaction } = await import("thirdweb");
       const tx = prepareTransaction({
         to: txData.to,
@@ -233,20 +244,13 @@ export default function BuyTab() {
 
       console.log("Sending transaction...");
       
-      // Sende die Transaktion und warte auf die Bestätigung
       const transactionResult = await sendTransaction(tx);
       console.log("Transaction sent:", transactionResult);
       
-      // Warte auf Transaction Receipt (Bestätigung)
-      console.log("Waiting for transaction confirmation...");
-      
-      // Aktualisiere Status
       setSwapTxStatus("confirming");
       
-      // Warte 5 Sekunden auf Bestätigung
       await new Promise(resolve => setTimeout(resolve, 5000));
       
-      // Aktualisiere POL Balance
       const fetchPolBalance = async () => {
         if (!account?.address) return;
         try {
@@ -263,7 +267,7 @@ export default function BuyTab() {
           const data = await response.json();
           const balance = BigInt(data.result);
           const polFormatted = Number(balance) / Math.pow(10, 18);
-          setPolBalance(polFormatted.toFixed(4));
+          setPolBalance(polFormatted.toFixed(3)); // Auf 3 Stellen
         } catch (error) {
           console.error("Balance update error:", error);
         }
@@ -274,7 +278,6 @@ export default function BuyTab() {
       setSwapTxStatus("success");
       setSwapAmountPol("");
       
-      // Status nach 5 Sekunden zurücksetzen
       setTimeout(() => {
         setSwapTxStatus(null);
       }, 5000);
@@ -283,7 +286,6 @@ export default function BuyTab() {
       console.error("OpenOcean Swap Fehler:", error);
       setSwapTxStatus("error");
       
-      // Fehler nach 5 Sekunden zurücksetzen
       setTimeout(() => {
         setSwapTxStatus(null);
       }, 5000);
@@ -320,7 +322,9 @@ export default function BuyTab() {
           <div className="space-y-3">
             <div className="flex justify-between text-sm">
               <span className="text-zinc-400">Aktueller Preis:</span>
-              <span className="text-purple-400 font-bold">~0.50€ pro POL</span>
+              <span className="text-purple-400 font-bold">
+                {polPriceEur ? `${polPriceEur.toFixed(3)}€ pro POL` : "~0.500€ pro POL"}
+              </span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-zinc-400">Minimum:</span>
@@ -385,11 +389,17 @@ export default function BuyTab() {
                   <span className="animate-pulse">Laden...</span>
                 ) : priceError ? (
                   <span className="text-red-400">{priceError}</span>
-                ) : dfaithPrice ? (
-                  `1 POL = ${dfaithPrice.toFixed(2)} D.FAITH`
+                ) : dfaithPriceEur ? (
+                  `${dfaithPriceEur.toFixed(3)}€ pro D.FAITH`
                 ) : (
                   "Preis nicht verfügbar"
                 )}
+              </span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-zinc-400">Wechselkurs:</span>
+              <span className="text-zinc-300">
+                {dfaithPrice ? `1 POL = ${dfaithPrice.toFixed(2)} D.FAITH` : "Wird geladen..."}
               </span>
             </div>
             <div className="flex justify-between text-sm">
@@ -429,7 +439,7 @@ export default function BuyTab() {
                     />
                     <button
                       className="absolute right-3 top-1/2 transform -translate-y-1/2 text-xs px-2 py-1 bg-purple-500/20 text-purple-400 rounded hover:bg-purple-500/30 transition"
-                      onClick={() => setSwapAmountPol((parseFloat(polBalance) * 0.95).toFixed(4))}
+                      onClick={() => setSwapAmountPol((parseFloat(polBalance) * 0.95).toFixed(3))}
                       disabled={isSwapping || parseFloat(polBalance) <= 0}
                     >
                       MAX
@@ -485,12 +495,18 @@ export default function BuyTab() {
                 </div>
                 
                 {/* Estimated Output */}
-                {swapAmountPol && parseFloat(swapAmountPol) > 0 && dfaithPrice && (
+                {swapAmountPol && parseFloat(swapAmountPol) > 0 && dfaithPrice && dfaithPriceEur && (
                   <div className="mb-4 p-3 bg-zinc-800/50 rounded-lg">
                     <div className="flex justify-between text-sm">
                       <span className="text-zinc-400">Geschätzte D.FAITH:</span>
                       <span className="text-amber-400 font-bold">
                         ~{(parseFloat(swapAmountPol) * dfaithPrice).toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-zinc-400">Geschätzter Wert:</span>
+                      <span className="text-green-400 font-bold">
+                        ~{(parseFloat(swapAmountPol) * dfaithPrice * dfaithPriceEur).toFixed(3)}€
                       </span>
                     </div>
                     <div className="text-xs text-zinc-500 mt-1">
@@ -570,7 +586,7 @@ export default function BuyTab() {
                     onClick={() => {
                       setShowDfaithBuyModal(false);
                       setSwapAmountPol("");
-                      setSlippage("1"); // Reset Slippage auf 1%
+                      setSlippage("1");
                       setSwapTxStatus(null);
                     }}
                     disabled={isSwapping}
