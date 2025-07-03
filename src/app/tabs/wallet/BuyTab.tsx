@@ -410,10 +410,10 @@ export default function BuyTab() {
           
           {/* D.FAITH kaufen Modal */}
           {showDfaithBuyModal ? (
-            <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 overflow-y-auto pt-4 pb-20">
+            <div className="fixed inset-0 z-50 flex items-center justify-center min-h-screen bg-black/60 overflow-y-auto">
               <div
                 ref={dfaithBuyModalRef}
-                className="bg-zinc-900 rounded-xl p-4 sm:p-6 max-w-md w-full mx-4 border border-amber-400 mt-4 mb-4"
+                className="bg-zinc-900 rounded-xl p-4 sm:p-6 max-w-md w-full mx-4 border border-amber-400 my-8"
               >
                 {/* Header mit Close Button */}
                 <div className="flex items-center justify-between mb-6">
@@ -791,10 +791,10 @@ export default function BuyTab() {
 
       {/* Info Modal für D.INVEST */}
       {showInvestModal && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center min-h-screen bg-black/60 overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center min-h-screen bg-black/60 overflow-y-auto">
           <div
             ref={investBuyModalRef}
-            className="bg-zinc-900 rounded-xl p-8 w-full max-w-xs border border-amber-400 text-center flex flex-col items-center justify-center my-8 mt-12"
+            className="bg-zinc-900 rounded-xl p-8 w-full max-w-xs border border-amber-400 text-center flex flex-col items-center justify-center my-8"
           >
             <div className="mb-4 text-amber-400 text-2xl font-bold">Wichtiger Hinweis</div>
             <div className="mb-4 text-zinc-300 text-sm">

@@ -17,10 +17,77 @@ export default function HistoryTab() {
   const [activeFilter, setActiveFilter] = useState("all");
   const [transactions, setTransactions] = useState<Transaction[]>([]);
 
+  // Adresse aus Context/Prop holen!
+  const userAddress = ""; // TODO: Hier die Wallet-Adresse einfügen
+
   useEffect(() => {
-    const history = JSON.parse(localStorage.getItem("walletHistory") || "[]");
-    setTransactions(history);
-  }, []);
+    if (!userAddress) {
+      setTransactions([]);
+      return;
+    }
+
+    // Polygonscan API Call
+    const fetchTx = async () => {
+      try {
+        const apiKey = "V6Q5223DMWPP3HQJE9IJ8UIHSP3NUHID5K";
+        const url = `https://api.polygonscan.com/api?module=account&action=txlist&address=${userAddress}&startblock=0&endblock=99999999&sort=desc&apikey=${apiKey}`;
+        const res = await fetch(url);
+        const data = await res.json();
+
+        if (data.status !== "1" || !Array.isArray(data.result)) {
+          setTransactions([]);
+          return;
+        }
+
+        // Mapping auf unser Transaction-Format
+        const mapped: Transaction[] = data.result.slice(0, 50).map((tx: any) => {
+          // Typ bestimmen
+          let type = "send";
+          if (
+            typeof tx.to === "string" &&
+            typeof userAddress === "string" &&
+            !!tx.to &&
+            !!userAddress &&
+            (tx.to as string).toLowerCase() === (userAddress as string).toLowerCase()
+          )
+            type = "receive";
+          // Swap, Stake, Reward etc. können nur mit zusätzlicher Logik erkannt werden
+
+          // Token-Name (hier nur MATIC, für ERC20 müsste ein weiterer API-Call gemacht werden)
+          const token = "POL";
+
+          // Amount
+          const value = Number(tx.value) / 1e18;
+          const amount = (type === "send" ? "-" : "+") + value.toFixed(4);
+
+          // Status
+          let status = "pending";
+          if (tx.isError === "0" && tx.confirmations > 0) status = "success";
+          if (tx.isError === "1") status = "failed";
+
+          // Zeit
+          const time = new Date(Number(tx.timeStamp) * 1000).toLocaleString();
+
+          return {
+            id: tx.hash,
+            type,
+            token,
+            amount,
+            address: type === "send" ? tx.to : tx.from,
+            hash: tx.hash,
+            time,
+            status,
+          };
+        });
+
+        setTransactions(mapped);
+      } catch (e) {
+        setTransactions([]);
+      }
+    };
+
+    fetchTx();
+  }, [userAddress]);
 
   const getTransactionIcon = (type: string) => {
     switch (type) {
