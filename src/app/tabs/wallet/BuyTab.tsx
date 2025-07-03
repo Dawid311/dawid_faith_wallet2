@@ -183,112 +183,81 @@ export default function BuyTab() {
     if (!swapAmountPol || parseFloat(swapAmountPol) <= 0 || !account?.address) return;
     setIsSwapping(true);
     setSwapTxStatus("pending");
-    try {
-      // WICHTIG: OpenOcean erwartet amount OHNE Dezimalstellen!
-      // Nicht in Wei konvertieren, sondern den rohen Betrag verwenden
-      const amountToSend = swapAmountPol; // z.B. "1.5" für 1.5 POL
     
-      console.log("=== OpenOcean Swap Request ===");
-      console.log("Chain:", "polygon");
-      console.log("InToken:", "0x0000000000000000000000000000000000001010");
-      console.log("OutToken:", "0xF051E3B0335eB332a7ef0dc308BB4F0c10301060");
-      console.log("Amount (RAW):", amountToSend); // Zeigt z.B. "1.5"
-      console.log("Slippage:", slippage);
-      console.log("GasPrice:", "50");
-      console.log("Account:", account.address);
+    try {
+      // Step 1: Hole Quote von OpenOcean
+      const amountToSend = swapAmountPol;
       
-      const params = new URLSearchParams({
+      console.log("=== OpenOcean Quote Request ===");
+      console.log("POL Amount:", amountToSend);
+      
+      const quoteParams = new URLSearchParams({
         chain: "polygon",
-        inTokenAddress: "0x0000000000000000000000000000000000001010",
-        outTokenAddress: "0xF051E3B0335eB332a7ef0dc308BB4F0c10301060",
-        amount: amountToSend, // Hier ist die Änderung: RAW amount ohne Dezimalkonvertierung
+        inTokenAddress: "0x0000000000000000000000000000000000001010", // Native POL
+        outTokenAddress: "0xF051E3B0335eB332a7ef0dc308BB4F0c10301060", // D.FAITH
+        amount: amountToSend,
         slippage: slippage,
         gasPrice: "50",
         account: account.address,
       });
       
-      const url = `https://open-api.openocean.finance/v3/polygon/swap_quote?${params}`;
-      console.log("Full URL:", url);
+      const quoteUrl = `https://open-api.openocean.finance/v3/polygon/swap_quote?${quoteParams}`;
+      const quoteResponse = await fetch(quoteUrl);
       
-      const response = await fetch(url);
-      console.log("Response Status:", response.status);
-      
-      if (!response.ok) {
-        throw new Error(`OpenOcean API Fehler: ${response.status}`);
+      if (!quoteResponse.ok) {
+        throw new Error(`OpenOcean Quote Fehler: ${quoteResponse.status}`);
       }
       
-      const data = await response.json();
-      console.log("=== OpenOcean Swap Response ===");
-      console.log("Full Response:", JSON.stringify(data, null, 2));
+      const quoteData = await quoteResponse.json();
+      console.log("Quote Response:", quoteData);
       
-      if (!data) {
-        throw new Error('OpenOcean: Keine Response erhalten');
+      if (!quoteData || quoteData.code !== 200 || !quoteData.data) {
+        throw new Error('OpenOcean: Keine gültige Quote erhalten');
       }
       
-      if (data.code !== 200) {
-        throw new Error(`OpenOcean: API Error Code ${data.code} - ${JSON.stringify(data)}`);
-      }
-      
-      if (!data.data) {
-        throw new Error('OpenOcean: Keine data in Response');
-      }
-      
-      const txData = data.data;
-      console.log("Transaction Data:", txData);
+      const txData = quoteData.data;
       
       if (!txData.to || !txData.data) {
         throw new Error('OpenOcean: Unvollständige Transaktionsdaten');
       }
       
-      // Fix für das Transaktions-Handling
-      try {
-        const { prepareTransaction } = await import("thirdweb");
-        const tx = await prepareTransaction({
-          to: txData.to,
-          data: txData.data,
-          value: BigInt(txData.value || "0"),
-          chain: polygon,
-          client
-        });
-
-        console.log("Prepared Transaction:", tx);
-        console.log("Sending transaction...");
-        
-        const transactionResult = await sendTransaction(tx);
-        console.log("Transaction sent:", transactionResult);
-        
-        setSwapTxStatus("confirming");
-        
-        // Sofortige Balance-Aktualisierung starten
-        updatePolBalance(true);
-        
-        // Nach kurzer Verzögerung noch einmal aktualisieren für genauere Balance
-        setTimeout(() => {
-          updatePolBalance(true);
-        }, 3000);
-        
-        setSwapTxStatus("success");
-        setSwapAmountPol("");
-      } catch (txError) {
-        console.error("Transaction Error:", txError);
-        throw new Error(
-          `Transaktionsfehler: ${
-            typeof txError === "object" && txError !== null && "message" in txError
-              ? (txError as { message?: string }).message
-              : "Unbekannter Fehler"
-          }`
-        );
-      }
+      // Step 2: Bereite Transaktion vor
+      const { prepareTransaction } = await import("thirdweb");
+      const transaction = await prepareTransaction({
+        to: txData.to,
+        data: txData.data,
+        value: BigInt(txData.value || "0"),
+        chain: polygon,
+        client
+      });
       
-      // Timer um Success-Meldung auszublenden
+      console.log("Prepared Transaction:", transaction);
+      setSwapTxStatus("confirming");
+      
+      // Step 3: Sende Transaktion - sendTransaction ist async und gibt Promise<void> zurück
+      await sendTransaction(transaction);
+      console.log("Transaction sent successfully");
+      
+      // Bei erfolgreichem Senden
+      setSwapTxStatus("success");
+      
+      // Balance sofort aktualisieren
+      setTimeout(() => updatePolBalance(true), 1000);
+      setTimeout(() => updatePolBalance(true), 3000);
+      
+      // Input zurücksetzen
+      setSwapAmountPol("");
+      
+      // Success-Status nach 5 Sekunden ausblenden
       setTimeout(() => {
         setSwapTxStatus(null);
       }, 5000);
       
     } catch (error) {
-      console.error("OpenOcean Swap Fehler:", error);
+      console.error("Swap Error:", error);
       setSwapTxStatus("error");
       
+      // Error-Status nach 5 Sekunden ausblenden
       setTimeout(() => {
         setSwapTxStatus(null);
       }, 5000);
@@ -599,24 +568,37 @@ export default function BuyTab() {
                   </div>
                 )}
                 
-                {/* Buttons */}
+                {/* Swap Button */}
                 <div className="space-y-3">
                   <Button
                     className="w-full bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-3 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50"
                     onClick={handleDfaithSwap}
-                    disabled={!swapAmountPol || parseFloat(swapAmountPol) <= 0 || isSwapping || !account?.address || parseFloat(polBalance) <= 0}
+                    disabled={
+                      !swapAmountPol || 
+                      parseFloat(swapAmountPol) <= 0 || 
+                      isSwapping || 
+                      !account?.address || 
+                      parseFloat(polBalance) <= 0 ||
+                      parseFloat(swapAmountPol) > parseFloat(polBalance)
+                    }
                   >
                     <FaExchangeAlt className="inline mr-2" />
                     {isSwapping ? (
-                      swapTxStatus === "pending" ? "Wallet-Bestätigung..." :
-                      swapTxStatus === "confirming" ? "Bestätigung..." :
+                      swapTxStatus === "pending" ? "Bereite Swap vor..." :
+                      swapTxStatus === "confirming" ? "Bestätige Transaktion..." :
                       "Swapping..."
-                    ) : parseFloat(polBalance) <= 0 ? "Keine POL verfügbar" :
-                      `${swapAmountPol || "0"} POL → D.FAITH (${slippage}%)`}
+                    ) : parseFloat(polBalance) <= 0 ? 
+                      "Keine POL verfügbar" :
+                    parseFloat(swapAmountPol) > parseFloat(polBalance) ?
+                      "Nicht genügend POL" :
+                    swapAmountPol ? 
+                      `${swapAmountPol} POL → D.FAITH` : 
+                      "Betrag eingeben"
+                    }
                   </Button>
                   
                   <Button
-                    className="w-full bg-zinc-600 hover:bg-zinc-700 text-white font-bold py-2 rounded-xl"
+                    className="w-full bg-zinc-600 hover:bg-zinc-700 text-white font-bold py-2 rounded-xl transition-colors"
                     onClick={() => {
                       setShowDfaithBuyModal(false);
                       setSwapAmountPol("");
@@ -628,6 +610,32 @@ export default function BuyTab() {
                     Schließen
                   </Button>
                 </div>
+
+                {/* Validation und Error Messages */}
+                {parseFloat(swapAmountPol) > parseFloat(polBalance) && (
+                  <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <span className="text-red-400 text-xs">❌</span>
+                      <div className="text-sm text-red-400">
+                        Nicht genügend POL verfügbar
+                      </div>
+                    </div>
+                    <div className="text-xs text-red-300/70 mt-1">
+                      Verfügbar: {polBalance} POL | Benötigt: {swapAmountPol} POL
+                    </div>
+                  </div>
+                )}
+
+                {parseFloat(swapAmountPol) > 0 && parseFloat(swapAmountPol) < 0.001 && (
+                  <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <span className="text-yellow-400 text-xs">⚠️</span>
+                      <div className="text-sm text-yellow-400">
+                        Minimum: 0.001 POL
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           ) : (
