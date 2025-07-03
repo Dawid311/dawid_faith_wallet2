@@ -129,6 +129,7 @@ export default function WalletTab() {
         limit: 50,
         metadata: false,
       };
+      console.debug("Insight API Request Body:", JSON.stringify(body, null, 2)); // <--- Request-Body loggen
       const res = await fetch(
         `https://insight.thirdweb.com/v1/tokens`,
         {
@@ -139,9 +140,19 @@ export default function WalletTab() {
           body: JSON.stringify(body),
         }
       );
-      if (!res.ok) throw new Error("API Error");
-      const data = await res.json();
-      console.debug("Insight API Antwort:", JSON.stringify(data, null, 2)); // <--- Debug-Log hinzugefügt
+      let data;
+      try {
+        data = await res.json();
+      } catch (jsonErr) {
+        console.error("Insight API konnte keine JSON-Antwort parsen:", jsonErr);
+        data = null;
+      }
+      if (!res.ok) {
+        console.error("Insight API Fehlerstatus:", res.status, res.statusText);
+        console.error("Insight API Fehlerantwort:", JSON.stringify(data, null, 2));
+        throw new Error("API Error");
+      }
+      console.debug("Insight API Antwort:", JSON.stringify(data, null, 2));
       const balance = data?.data?.[0]?.balance ?? "0";
       return balance;
     } catch (e) {
