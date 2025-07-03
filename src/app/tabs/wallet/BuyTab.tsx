@@ -304,68 +304,6 @@ export default function BuyTab() {
       </div>
 
       <div className="flex flex-col gap-4">
-        {/* POL kaufen */}
-        <div className="bg-gradient-to-br from-blue-800/30 to-blue-900/30 rounded-xl p-6 border border-blue-700/50">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-gradient-to-r from-purple-500 to-purple-700 rounded-full">
-                <span className="text-purple-400 text-lg font-bold">POL</span>
-              </div>
-              <div>
-                <h3 className="font-bold text-purple-400">POL Token</h3>
-                <p className="text-xs text-zinc-500">Polygon Native Token</p>
-              </div>
-            </div>
-            <span className="text-xs text-zinc-400 bg-zinc-700/50 px-2 py-1 rounded">mit EUR kaufen</span>
-          </div>
-          
-          <div className="space-y-3">
-            <div className="flex justify-between text-sm">
-              <span className="text-zinc-400">Aktueller Preis:</span>
-              <span className="text-purple-400 font-bold">
-                {polPriceEur ? `${polPriceEur.toFixed(3)}€ pro POL` : "~0.500€ pro POL"}
-              </span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-zinc-400">Minimum:</span>
-              <span className="text-zinc-300">1 EUR</span>
-            </div>
-          </div>
-          
-          <div className="w-full mt-4">
-            {showPolBuyModal ? (
-              <div className="fixed inset-0 z-50 flex items-center justify-center min-h-screen bg-black/60">
-                <div className="bg-zinc-900 rounded-xl p-4 max-w-full w-full sm:max-w-xs border border-purple-500 text-center overflow-y-auto h-[90vh] flex flex-col items-center justify-center">
-                  <div className="mb-4 text-purple-400 text-2xl font-bold">POL kaufen</div>
-                  <div className="w-full flex-1 flex items-center justify-center">
-                    <BuyWidget
-                      client={client}
-                      tokenAddress={NATIVE_TOKEN_ADDRESS}
-                      chain={polygon}
-                      amount="1"
-                      theme="dark"
-                      className="w-full"
-                    />
-                  </div>
-                  <Button
-                    className="w-full bg-zinc-600 hover:bg-zinc-700 text-white font-bold py-2 rounded-xl mt-4"
-                    onClick={() => setShowPolBuyModal(false)}
-                  >
-                    Schließen
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <Button
-                className="w-full bg-gradient-to-r from-purple-500 to-purple-700 text-white font-bold py-3 rounded-xl hover:opacity-90 transition-opacity"
-                onClick={() => setShowPolBuyModal(true)}
-              >
-                POL kaufen
-              </Button>
-            )}
-          </div>
-        </div>
-
         {/* DFAITH kaufen */}
         <div className="bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl p-6 border border-zinc-700">
           <div className="flex items-center justify-between mb-4">
@@ -525,7 +463,7 @@ export default function BuyTab() {
                       </div>
                     </div>
                     <div className="text-xs text-yellow-300/70 mt-1">
-                      Kaufen Sie zuerst POL Token oben über das BuyWidget
+                      Kaufen Sie zuerst POL Token unten über das BuyWidget
                     </div>
                   </div>
                 )}
@@ -639,6 +577,68 @@ export default function BuyTab() {
           >
             D.INVEST kaufen
           </Button>
+        </div>
+
+        {/* POL kaufen */}
+        <div className="bg-gradient-to-br from-blue-800/30 to-blue-900/30 rounded-xl p-6 border border-blue-700/50">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-gradient-to-r from-purple-500 to-purple-700 rounded-full">
+                <span className="text-purple-400 text-lg font-bold">POL</span>
+              </div>
+              <div>
+                <h3 className="font-bold text-purple-400">POL Token</h3>
+                <p className="text-xs text-zinc-500">Polygon Native Token</p>
+              </div>
+            </div>
+            <span className="text-xs text-zinc-400 bg-zinc-700/50 px-2 py-1 rounded">mit EUR kaufen</span>
+          </div>
+          
+          <div className="space-y-3">
+            <div className="flex justify-between text-sm">
+              <span className="text-zinc-400">Aktueller Preis:</span>
+              <span className="text-purple-400 font-bold">
+                {polPriceEur ? `${polPriceEur.toFixed(3)}€ pro POL` : "~0.500€ pro POL"}
+              </span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-zinc-400">Minimum:</span>
+              <span className="text-zinc-300">1 EUR</span>
+            </div>
+          </div>
+          
+          <div className="w-full mt-4">
+            {showPolBuyModal ? (
+              <div className="fixed inset-0 z-50 flex items-center justify-center min-h-screen bg-black/60">
+                <div className="bg-zinc-900 rounded-xl p-4 max-w-full w-full sm:max-w-xs border border-purple-500 text-center overflow-y-auto h-[90vh] flex flex-col items-center justify-center">
+                  <div className="mb-4 text-purple-400 text-2xl font-bold">POL kaufen</div>
+                  <div className="w-full flex-1 flex items-center justify-center">
+                    <BuyWidget
+                      client={client}
+                      tokenAddress={NATIVE_TOKEN_ADDRESS}
+                      chain={polygon}
+                      amount="1"
+                      theme="dark"
+                      className="w-full"
+                    />
+                  </div>
+                  <Button
+                    className="w-full bg-zinc-600 hover:bg-zinc-700 text-white font-bold py-2 rounded-xl mt-4"
+                    onClick={() => setShowPolBuyModal(false)}
+                  >
+                    Schließen
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <Button
+                className="w-full bg-gradient-to-r from-purple-500 to-purple-700 text-white font-bold py-3 rounded-xl hover:opacity-90 transition-opacity"
+                onClick={() => setShowPolBuyModal(true)}
+              >
+                POL kaufen
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 
