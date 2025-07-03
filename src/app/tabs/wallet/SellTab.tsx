@@ -197,7 +197,7 @@ export default function SellTab() {
         chain: "polygon",
         inTokenAddress: DFAITH_TOKEN,
         outTokenAddress: "0x0000000000000000000000000000000000001010",
-        amount: sellAmount,
+        amount: sellAmount, // ← Ohne Dezimalstellen, wie in Docs beschrieben
         slippage: slippage,
         gasPrice: "50",
         account: account.address,
@@ -257,7 +257,7 @@ export default function SellTab() {
           currentAllowance = BigInt(0);
         }
         const amountInWei = (parseFloat(sellAmount) * Math.pow(10, DFAITH_DECIMALS)).toFixed(0);
-        const requiredAmount = BigInt(amountInWei);
+        const requiredAmount = BigInt(Math.floor(parseFloat(sellAmount)).toString()); // ← Kein * 10^decimals
 
         console.log("Benötigte Allowance:", requiredAmount.toString());
         console.log("Aktuelle Allowance:", currentAllowance.toString());
@@ -297,7 +297,7 @@ export default function SellTab() {
         address: DFAITH_TOKEN
       });
       
-      // Maximaler Approve-Betrag (type(uint256).max)
+      // Maximaler Approve-Betrag (type(uint256).max) - bleibt unverändert
       const maxApproval = BigInt("115792089237316195423570985008687907853269984665640564039457584007913129639935");
       
       console.log("Verkaufsbetrag:", sellAmount);
