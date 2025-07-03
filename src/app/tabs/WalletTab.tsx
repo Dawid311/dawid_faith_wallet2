@@ -7,7 +7,7 @@ import { polygon } from "thirdweb/chains";
 import { balanceOf, approve, allowance } from "thirdweb/extensions/erc20";
 import { Card, CardContent } from "../../../components/ui/card";
 import { Button } from "../../../components/ui/button";
-import { FaRegCopy, FaCoins, FaArrowDown, FaArrowUp, FaPaperPlane, FaLock, FaHistory, FaTimes } from "react-icons/fa";
+import { FaRegCopy, FaCoins, FaArrowDown, FaArrowUp, FaPaperPlane, FaLock, FaHistory, FaTimes, FaSync } from "react-icons/fa";
 
 // Import Subtabs
 import BuyTab from "./wallet/BuyTab";
@@ -115,6 +115,8 @@ export default function WalletTab() {
   const [dfaithPriceEur, setDfaithPriceEur] = useState<number>(0.001);
   // Tracking für die aktuellste Anfrage als State hinzufügen
   const [latestRequest, setLatestRequest] = useState(0);
+  // State für Refresh-Animation
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Modal States
   const [showBuyModal, setShowBuyModal] = useState(false);
@@ -148,6 +150,33 @@ export default function WalletTab() {
   };
 
   const requestIdRef = useRef(0);
+  const lastSuccessfulBalanceRef = useRef<{ 
+    dfaith: number | null, 
+    dinvest: number | null,
+    dfaithRaw: string | null,
+    dinvestRaw: string | null
+  }>({ 
+    dfaith: null, 
+    dinvest: null,
+    dfaithRaw: null,
+    dinvestRaw: null
+  });
+
+  // Funktion für manuelle Aktualisierung der Balance
+  const refreshBalances = async () => {
+    if (!account?.address || isRefreshing) return;
+    
+    setIsRefreshing(true);
+    
+    try {
+      const myRequestId = ++requestIdRef.current;
+      await fetchBalances(myRequestId);
+      await fetchDfaithPrice();
+    } finally {
+      // Nach einer kurzen Verzögerung den Refresh-Status zurücksetzen (Animation)
+      setTimeout(() => setIsRefreshing(false), 800);
+    }
+  };
 
   // EIN useEffect für alles:
   useEffect(() => {
@@ -165,11 +194,12 @@ export default function WalletTab() {
       load();
     }
 
+    // Aktualisierung alle 15 Sekunden
     const interval = setInterval(() => {
       if (account?.address) {
         load();
       }
-    }, 30000);
+    }, 15000); // 15 Sekunden
 
     return () => {
       isMounted = false;
@@ -211,7 +241,7 @@ export default function WalletTab() {
 
   const formatAddress = (address: string) => `${address.slice(0, 6)}...${address.slice(-4)}`;
 
-  // Balance-Aktualisierung
+  // Balance-Aktualisierung mit Konsistenzprüfung
   const fetchBalances = async (myRequestId?: number) => {
     if (!account?.address) {
       setDfaithBalance(null);
@@ -239,6 +269,7 @@ export default function WalletTab() {
         address: account.address
       });
       console.log("D.FAITH Rohe Balance:", dfaithBalanceResult.toString());
+      console.log(`D.FAITH Vorherige Rohe Balance: ${lastSuccessfulBalanceRef.current.dfaithRaw || 'keine'}`);
       if (myRequestId !== requestIdRef.current) {
         console.log("Request abgebrochen - nicht mehr aktuell");
         return;
@@ -257,28 +288,97 @@ export default function WalletTab() {
         address: account.address
       });
       console.log("D.INVEST Rohe Balance:", dinvestBalanceResult.toString());
+      console.log(`D.INVEST Vorherige Rohe Balance: ${lastSuccessfulBalanceRef.current.dinvestRaw || 'keine'}`);
       if (myRequestId !== requestIdRef.current) {
         console.log("Request abgebrochen - nicht mehr aktuell");
         return;
       }
 
-      // Balances formatieren und setzen
+      // Balances formatieren
       const dfaithFormatted = Number(dfaithBalanceResult) / Math.pow(10, DFAITH_TOKEN.decimals);
       const dinvestFormatted = Number(dinvestBalanceResult) / Math.pow(10, DINVEST_TOKEN.decimals);
 
+      console.log("D.FAITH Rohe Balance als BigInt:", dfaithBalanceResult.toString());
       console.log("D.FAITH Formatierte Balance:", dfaithFormatted.toFixed(2));
+      console.log("D.INVEST Rohe Balance als BigInt:", dinvestBalanceResult.toString());
       console.log("D.INVEST Formatierte Balance:", Math.floor(dinvestFormatted).toString());
+      
+      // Konsistenzprüfung: Nur aktualisieren, wenn die neuen Werte signifikant vom letzten Wert abweichen
+      // oder wir noch keine gespeicherten Werte haben
+      const lastDfaith = lastSuccessfulBalanceRef.current.dfaith;
+      const lastDinvest = lastSuccessfulBalanceRef.current.dinvest;
+      
+      // Prüfe, ob wir die Werte aktualisieren sollten
+      let shouldUpdateDfaith = true;
+      let shouldUpdateDinvest = true;
+      
+      if (lastDfaith !== null) {
+        // 1. Stabilität durch direkte BigInt-Vergleiche - verwende die unformatierten BigInt-Werte
+        // für absolute Konsistenz, da Fließkommazahlen zu Rundungsfehlern führen können
+        if (dfaithBalanceResult.toString() === lastSuccessfulBalanceRef.current.dfaithRaw) {
+          shouldUpdateDfaith = false;
+          console.log("D.FAITH: Keine Änderung der Rohdaten - keine Aktualisierung nötig");
+        } else {
+          // 2. Nur aktualisieren, wenn der Unterschied bedeutsam ist
+          // Bei sehr kleinen Balances (< 10 Tokens) ist jede Änderung relevant
+          const percentDiff = Math.abs((dfaithFormatted - lastDfaith) / (lastDfaith || 1)) * 100;
+          const minimalDiff = dfaithFormatted < 10 ? 0 : 0.5; // Bei kleinen Beträgen genauer sein
+          
+          shouldUpdateDfaith = percentDiff > minimalDiff;
+          console.log(`D.FAITH Änderung: ${percentDiff.toFixed(3)}%, Aktualisieren: ${shouldUpdateDfaith}`);
+        }
+      }
+      
+      if (lastDinvest !== null) {
+        // Ähnlicher Check für D.INVEST mit direktem BigInt-Vergleich
+        if (dinvestBalanceResult.toString() === lastSuccessfulBalanceRef.current.dinvestRaw) {
+          shouldUpdateDinvest = false;
+          console.log("D.INVEST: Keine Änderung der Rohdaten - keine Aktualisierung nötig");
+        } else {
+          // Bei D.INVEST ist jede ganze Einheit relevant
+          const absoluteDiff = Math.abs(dinvestFormatted - lastDinvest);
+          shouldUpdateDinvest = absoluteDiff >= 1;
+          console.log(`D.INVEST Änderung: ${absoluteDiff} Einheiten, Aktualisieren: ${shouldUpdateDinvest}`);
+        }
+      }
 
-      setDfaithBalance({ displayValue: dfaithFormatted.toFixed(2) });
-      setDinvestBalance({ displayValue: Math.floor(dinvestFormatted).toString() });
-      fetchDfaithEurValue(dfaithFormatted.toFixed(2));
+      // Setze neue Werte, wenn es signifikante Änderungen gibt
+      if (shouldUpdateDfaith) {
+        setDfaithBalance({ displayValue: dfaithFormatted.toFixed(2) });
+        lastSuccessfulBalanceRef.current.dfaith = dfaithFormatted;
+        lastSuccessfulBalanceRef.current.dfaithRaw = dfaithBalanceResult.toString();
+        fetchDfaithEurValue(dfaithFormatted.toFixed(2));
+      }
+      
+      if (shouldUpdateDinvest) {
+        setDinvestBalance({ displayValue: Math.floor(dinvestFormatted).toString() });
+        lastSuccessfulBalanceRef.current.dinvest = dinvestFormatted;
+        lastSuccessfulBalanceRef.current.dinvestRaw = dinvestBalanceResult.toString();
+      }
+      
+      // Beim allerersten Laden oder manuellem Refresh beide Werte setzen
+      if (lastDfaith === null || lastDinvest === null || myRequestId === requestIdRef.current) {
+        setDfaithBalance({ displayValue: dfaithFormatted.toFixed(2) });
+        setDinvestBalance({ displayValue: Math.floor(dinvestFormatted).toString() });
+        lastSuccessfulBalanceRef.current = {
+          dfaith: dfaithFormatted,
+          dinvest: dinvestFormatted,
+          dfaithRaw: dfaithBalanceResult.toString(),
+          dinvestRaw: dinvestBalanceResult.toString()
+        };
+        fetchDfaithEurValue(dfaithFormatted.toFixed(2));
+      }
+      
       console.log("=== Ende fetchBalances ===");
     } catch (error) {
       console.error("Fehler beim Abrufen der Balances:", error);
       if (myRequestId === requestIdRef.current) {
-        setDfaithBalance({ displayValue: "0.00" });
-        setDinvestBalance({ displayValue: "0" });
-        setDfaithEurValue("0.00");
+        // Bei Fehler keine Änderung, wenn wir bereits Werte haben
+        if (!lastSuccessfulBalanceRef.current.dfaith && !lastSuccessfulBalanceRef.current.dinvest) {
+          setDfaithBalance({ displayValue: "0.00" });
+          setDinvestBalance({ displayValue: "0" });
+          setDfaithEurValue("0.00");
+        }
       }
     }
   };
@@ -419,19 +519,29 @@ export default function WalletTab() {
               />
             </div>
 
-            {/* Wallet Address mit besserem Styling */}
+            {/* Wallet Address mit besserem Styling und Refresh Button */}
             <div className="flex justify-between items-center bg-zinc-800/70 backdrop-blur-sm rounded-xl p-3 mb-6 border border-zinc-700/80">
               <div className="flex flex-col">
                 <span className="text-xs text-zinc-500 mb-0.5">Wallet Adresse</span>
                 <span className="font-mono text-zinc-300 text-sm">{formatAddress(account.address)}</span>
               </div>
-              <button
-                onClick={copyWalletAddress}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-700 hover:bg-zinc-600 text-zinc-200 text-sm font-medium transition-all duration-200"
-                title="Adresse kopieren"
-              >
-                <FaRegCopy /> Kopieren
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={refreshBalances}
+                  disabled={isRefreshing}
+                  className={`p-2 rounded-lg ${isRefreshing ? 'bg-amber-600/20' : 'bg-zinc-700 hover:bg-zinc-600'} text-zinc-200 text-sm font-medium transition-all duration-200`}
+                  title="Aktualisieren"
+                >
+                  <FaSync className={`text-amber-400 ${isRefreshing ? 'animate-spin' : ''}`} />
+                </button>
+                <button
+                  onClick={copyWalletAddress}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-700 hover:bg-zinc-600 text-zinc-200 text-sm font-medium transition-all duration-200"
+                  title="Adresse kopieren"
+                >
+                  <FaRegCopy /> Kopieren
+                </button>
+              </div>
             </div>
 
             {/* DFAITH Token-Karte - jetzt mit D.FAITH */}
