@@ -299,6 +299,8 @@ export default function SellTab() {
       const amountInWei = (parseFloat(sellAmount) * Math.pow(10, DFAITH_DECIMALS)).toFixed(0);
       const requiredAmountWithBuffer = BigInt(Math.floor(Number(amountInWei) * 1.1).toString());
       
+      console.log("Verkaufsbetrag:", sellAmount);
+      console.log("Betrag in Wei:", amountInWei);
       console.log("Approve-Betrag mit Buffer:", requiredAmountWithBuffer.toString());
       
       const approveTransaction = prepareContractCall({
