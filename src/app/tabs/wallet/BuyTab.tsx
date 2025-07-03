@@ -557,17 +557,6 @@ export default function BuyTab() {
                   </div>
                 </div>
                 
-                {/* D.FAITH Balance */}
-                <div className="mb-4 p-3 bg-zinc-800/50 rounded-lg">
-                  <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
-                    <span className="text-sm text-zinc-400">Ihr D.FAITH:</span>
-                    <span className="text-sm text-amber-400 font-bold">{dfaithBalance} D.FAITH</span>
-                  </div>
-                  <div className="text-xs text-zinc-500 mt-1">
-                    Aus Ihrer Wallet
-                  </div>
-                </div>
-                
                 {/* Swap Input */}
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-zinc-300 mb-2">POL Betrag</label>
