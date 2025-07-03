@@ -296,17 +296,18 @@ export default function SellTab() {
         chain: polygon,
         address: DFAITH_TOKEN
       });
-      const amountInWei = (parseFloat(sellAmount) * Math.pow(10, DFAITH_DECIMALS)).toFixed(0);
-      const requiredAmountWithBuffer = BigInt(Math.floor(Number(amountInWei) * 1.1).toString());
+      
+      // Maximaler Approve-Betrag (type(uint256).max)
+      const maxApproval = BigInt("115792089237316195423570985008687907853269984665640564039457584007913129639935");
       
       console.log("Verkaufsbetrag:", sellAmount);
-      console.log("Betrag in Wei:", amountInWei);
-      console.log("Approve-Betrag mit Buffer:", requiredAmountWithBuffer.toString());
+      console.log("Approve-Betrag:", "MAX (type(uint256).max)");
+      console.log("Approve-Betrag Wert:", maxApproval.toString());
       
       const approveTransaction = prepareContractCall({
         contract,
         method: "function approve(address spender, uint256 amount) returns (bool)",
-        params: [spenderAddress, requiredAmountWithBuffer]
+        params: [spenderAddress, maxApproval]
       });
       
       console.log("Sending approve transaction...");
