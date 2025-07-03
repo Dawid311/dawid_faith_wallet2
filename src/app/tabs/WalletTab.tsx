@@ -147,19 +147,21 @@ export default function WalletTab() {
     symbol: "POL"
   };
 
-  // EIN useEffect für alles:
+  // EIN useEffect für alles, aber ohne latestRequest als Dependency:
   useEffect(() => {
     let isMounted = true;
 
     const load = async () => {
-      // Generiere eine neue Request-ID und speichere sie im State
-      const newRequestId = latestRequest + 1;
-      setLatestRequest(newRequestId);
-      
-      if (isMounted) {
-        await fetchBalances(newRequestId);
-        await fetchDfaithPrice();
-      }
+      // Funktionales Update verwenden, um Endlosschleifen zu vermeiden
+      setLatestRequest(prev => {
+        const newRequestId = prev + 1;
+        if (isMounted) {
+          // Sofort den fetchBalances und fetchDfaithPrice mit der neuen ID aufrufen
+          fetchBalances(newRequestId);
+          fetchDfaithPrice();
+        }
+        return newRequestId;
+      });
     };
 
     // Initial laden
@@ -168,16 +170,11 @@ export default function WalletTab() {
     // Intervall-Updates
     const interval = setInterval(load, 30000);
 
-    // Manuelle Aktualisierung bei jedem Wallet-Wechsel
-    if (account?.address) {
-      load();
-    }
-
     return () => {
       isMounted = false;
       clearInterval(interval);
     };
-  }, [account?.address, latestRequest]);
+  }, [account?.address]); // latestRequest aus den Dependencies entfernt!
 
   // D.FAITH EUR-Preis holen (basierend auf POL-Preis)
   const fetchDfaithPrice = async () => {
@@ -256,7 +253,7 @@ export default function WalletTab() {
         console.log(`Aktualisiere Balance mit Request ID ${requestId}, DFAITH: ${dfaithFormatted.toFixed(2)}`);
         setDfaithBalance({ displayValue: dfaithFormatted.toFixed(2) });
         setDinvestBalance({ displayValue: Math.floor(dinvestFormatted).toString() });
-        await fetchDfaithEurValue(dfaithFormatted.toFixed(2));
+        fetchDfaithEurValue(dfaithFormatted.toFixed(2)); // await entfernt, um async-Probleme zu vermeiden
       } else {
         console.log(`Ignoriere veraltete Balance von Request ID ${requestId}, aktuelle ID: ${latestRequest}`);
       }
