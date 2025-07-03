@@ -23,7 +23,7 @@ function Modal({ open, onClose, title, children }: { open: boolean, onClose: () 
   
   return (
     <div 
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 backdrop-blur-sm pt-8 sm:pt-12" // <-- items-start & pt-8/pt-12 für Abstand nach oben
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div 
@@ -144,8 +144,10 @@ export default function WalletTab() {
   // Zentrale Funktion zum Laden der Balances
   const fetchTokenBalances = async () => {
     if (!account?.address) return;
-    
+
     setIsLoadingBalances(true);
+    setDfaithBalance(null);      // <--- Balance auf null setzen
+    setDinvestBalance(null);     // <--- dito
     const currentRequestId = ++requestIdRef.current;
     
     try {
