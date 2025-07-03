@@ -192,129 +192,136 @@ export default function SellTab() {
         throw new Error('OpenOcean: Unvollständige Transaktionsdaten');
       }
 
-    // **WICHTIG: Allowance mit OpenOcean API prüfen**
-    const allowanceParams = new URLSearchParams({
-      chain: "polygon",
-      account: account.address,
-      inTokenAddress: DFAITH_TOKEN
-    });
-    
-    const allowanceUrl = `https://open-api.openocean.finance/v3/polygon/allowance?${allowanceParams}`;
-    console.log("Checking allowance:", allowanceUrl);
-    
-    const allowanceResponse = await fetch(allowanceUrl);
+      // === KORREKTUR: Spenderadresse aus der API holen ===
+      const spenderAddress = txData.spender;
+      if (!spenderAddress) {
+        throw new Error("OpenOcean: Keine Spenderadresse in der Swap-Quote erhalten");
+      }
 
-    let allowanceValue = "0";
-    if (allowanceResponse.ok) {
-      const allowanceData = await allowanceResponse.json();
-      console.log("Allowance Response:", allowanceData);
+      // **WICHTIG: Allowance mit OpenOcean API prüfen**
+      const allowanceParams = new URLSearchParams({
+        chain: "polygon",
+        account: account.address,
+        inTokenAddress: DFAITH_TOKEN
+      });
 
-      if (allowanceData && allowanceData.data !== undefined && allowanceData.data !== null) {
-        if (typeof allowanceData.data === "object") {
-          if (Array.isArray(allowanceData.data)) {
-            // Falls Array, nimm das erste Element
-            const first = allowanceData.data[0];
-            if (typeof first === "object" && first !== null) {
-              const values = Object.values(first);
+      const allowanceUrl = `https://open-api.openocean.finance/v3/polygon/allowance?${allowanceParams}`;
+      console.log("Checking allowance:", allowanceUrl);
+
+      const allowanceResponse = await fetch(allowanceUrl);
+
+      let allowanceValue = "0";
+      if (allowanceResponse.ok) {
+        const allowanceData = await allowanceResponse.json();
+        console.log("Allowance Response:", allowanceData);
+
+        if (allowanceData && allowanceData.data !== undefined && allowanceData.data !== null) {
+          if (typeof allowanceData.data === "object") {
+            if (Array.isArray(allowanceData.data)) {
+              // Falls Array, nimm das erste Element
+              const first = allowanceData.data[0];
+              if (typeof first === "object" && first !== null) {
+                const values = Object.values(first);
+                if (values.length > 0) allowanceValue = values[0]?.toString() ?? "0";
+              }
+            } else {
+              // Objekt: nimm den ersten Wert
+              const values = Object.values(allowanceData.data);
               if (values.length > 0) allowanceValue = values[0]?.toString() ?? "0";
             }
           } else {
-            // Objekt: nimm den ersten Wert
-            const values = Object.values(allowanceData.data);
-            if (values.length > 0) allowanceValue = values[0]?.toString() ?? "0";
+            // String oder Zahl direkt
+            allowanceValue = allowanceData.data.toString();
           }
-        } else {
-          // String oder Zahl direkt
-          allowanceValue = allowanceData.data.toString();
         }
-      }
-      let currentAllowance: bigint;
-      try {
-        currentAllowance = BigInt(allowanceValue);
-      } catch (e) {
-        console.error("Fehler beim Parsen der Allowance als BigInt:", allowanceValue, e);
-        currentAllowance = BigInt(0);
-      }
-      // Für die Allowance-Prüfung benötigen wir trotzdem den korrekten Wert mit Dezimalstellen
-      const amountInWei = (parseFloat(sellAmount) * Math.pow(10, DFAITH_DECIMALS)).toString();
-      const requiredAmount = BigInt(amountInWei);
-
-      console.log("Current Allowance:", currentAllowance.toString());
-      console.log("Required Amount:", requiredAmount.toString());
-      
-      // Wenn Allowance nicht ausreicht, Approve-Transaktion senden
-      if (currentAllowance < requiredAmount) {
-        console.log("Insufficient allowance, requesting approval...");
-        setSwapTxStatus("approving");
-        
-        const contract = getContract({
-          client,
-          chain: polygon,
-          address: DFAITH_TOKEN
-        });
-        
-        // Statt einer sehr hohen Allowance, verwende genau den Betrag, den du tatsächlich verkaufen willst
-        // plus etwas Puffer für Slippage (z.B. +10%)
-        const amountInWei = (parseFloat(sellAmount) * Math.pow(10, DFAITH_DECIMALS)).toString();
-        const requiredAmountWithBuffer = BigInt(Math.floor(parseFloat(amountInWei) * 1.1).toString());
-
-        const approveTransaction = prepareContractCall({
-          contract,
-          method: "function approve(address spender, uint256 amount) returns (bool)",
-          params: [txData.to, requiredAmountWithBuffer]
-        });
-
-        // Approve senden
-        const approveResult = await sendTransaction(approveTransaction);
-        console.log("Approval sent:", approveResult);
-
-        // Warten bis Approve-Transaktion bestätigt ist
-        setSwapTxStatus("waiting_approval");
+        let currentAllowance: bigint;
         try {
-          // Warte auf Bestätigung statt einfach Zeit verstreichen zu lassen
-          const { waitForReceipt } = await import("thirdweb");
-          await waitForReceipt(approveResult);
-          console.log("Approval confirmed in blockchain");
-        } catch (error) {
-          console.error("Error waiting for approval confirmation:", error);
-          throw new Error("Approval-Transaktion wurde nicht bestätigt");
+          currentAllowance = BigInt(allowanceValue);
+        } catch (e) {
+          console.error("Fehler beim Parsen der Allowance als BigInt:", allowanceValue, e);
+          currentAllowance = BigInt(0);
         }
+        // Für die Allowance-Prüfung benötigen wir trotzdem den korrekten Wert mit Dezimalstellen
+        // === KORREKTUR: Approve-Betrag korrekt in Wei berechnen ===
+        const amountInWei = (parseFloat(sellAmount) * Math.pow(10, DFAITH_DECIMALS)).toFixed(0);
+        const requiredAmount = BigInt(amountInWei);
 
-        // Allowance erneut prüfen
-        const newAllowanceResponse = await fetch(allowanceUrl);
-        let newAllowanceValue = "0";
-        if (newAllowanceResponse.ok) {
-          const newAllowanceData = await newAllowanceResponse.json();
-          if (newAllowanceData && newAllowanceData.data !== undefined && newAllowanceData.data !== null) {
-            if (typeof newAllowanceData.data === "object") {
-              if (Array.isArray(newAllowanceData.data)) {
-                const first = newAllowanceData.data[0];
-                if (typeof first === "object" && first !== null) {
-                  const values = Object.values(first);
+        console.log("Current Allowance:", currentAllowance.toString());
+        console.log("Required Amount:", requiredAmount.toString());
+
+        // Wenn Allowance nicht ausreicht, Approve-Transaktion senden
+        if (currentAllowance < requiredAmount) {
+          console.log("Insufficient allowance, requesting approval...");
+          setSwapTxStatus("approving");
+
+          const contract = getContract({
+            client,
+            chain: polygon,
+            address: DFAITH_TOKEN
+          });
+
+          // Statt einer sehr hohen Allowance, verwende genau den Betrag, den du tatsächlich verkaufen willst
+          // plus etwas Puffer für Slippage (z.B. +10%)
+          const requiredAmountWithBuffer = BigInt(Math.floor(Number(amountInWei) * 1.1).toString());
+
+          // === KORREKTUR: Approve an spenderAddress (OpenOcean Router) ===
+          const approveTransaction = prepareContractCall({
+            contract,
+            method: "function approve(address spender, uint256 amount) returns (bool)",
+            params: [spenderAddress, requiredAmountWithBuffer]
+          });
+
+          // Approve senden
+          const approveResult = await sendTransaction(approveTransaction);
+          console.log("Approval sent:", approveResult);
+
+          // Warten bis Approve-Transaktion bestätigt ist
+          setSwapTxStatus("waiting_approval");
+          try {
+            // Warte auf Bestätigung statt einfach Zeit verstreichen zu lassen
+            const { waitForReceipt } = await import("thirdweb");
+            await waitForReceipt(approveResult);
+            console.log("Approval confirmed in blockchain");
+          } catch (error) {
+            console.error("Error waiting for approval confirmation:", error);
+            throw new Error("Approval-Transaktion wurde nicht bestätigt");
+          }
+
+          // Allowance erneut prüfen
+          const newAllowanceResponse = await fetch(allowanceUrl);
+          let newAllowanceValue = "0";
+          if (newAllowanceResponse.ok) {
+            const newAllowanceData = await newAllowanceResponse.json();
+            if (newAllowanceData && newAllowanceData.data !== undefined && newAllowanceData.data !== null) {
+              if (typeof newAllowanceData.data === "object") {
+                if (Array.isArray(newAllowanceData.data)) {
+                  const first = newAllowanceData.data[0];
+                  if (typeof first === "object" && first !== null) {
+                    const values = Object.values(first);
+                    if (values.length > 0) newAllowanceValue = values[0]?.toString() ?? "0";
+                  }
+                } else {
+                  const values = Object.values(newAllowanceData.data);
                   if (values.length > 0) newAllowanceValue = values[0]?.toString() ?? "0";
                 }
               } else {
-                const values = Object.values(newAllowanceData.data);
-                if (values.length > 0) newAllowanceValue = values[0]?.toString() ?? "0";
+                newAllowanceValue = newAllowanceData.data.toString();
               }
-            } else {
-              newAllowanceValue = newAllowanceData.data.toString();
+            }
+            const newAllowance = BigInt(newAllowanceValue);
+
+            console.log("New Allowance:", newAllowance.toString());
+
+            if (newAllowance < requiredAmount) {
+              throw new Error('Approval fehlgeschlagen oder noch nicht bestätigt');
             }
           }
-          const newAllowance = BigInt(newAllowanceValue);
-
-          console.log("New Allowance:", newAllowance.toString());
-
-          if (newAllowance < requiredAmount) {
-            throw new Error('Approval fehlgeschlagen oder noch nicht bestätigt');
-          }
+        } else {
+          console.log("Sufficient allowance, proceeding with swap...");
         }
       } else {
-        console.log("Sufficient allowance, proceeding with swap...");
+        console.warn("Allowance check failed, proceeding anyway");
       }
-    } else {
-      console.warn("Allowance check failed, proceeding anyway");
-    }
 
     // Jetzt den eigentlichen Swap durchführen
     setSwapTxStatus("swapping");

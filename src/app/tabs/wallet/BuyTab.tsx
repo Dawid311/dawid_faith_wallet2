@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Button } from "../../../../components/ui/button";
 import { FaCoins, FaLock, FaExchangeAlt } from "react-icons/fa";
 import { useActiveAccount, useSendTransaction, BuyWidget } from "thirdweb/react";
@@ -294,6 +294,18 @@ export default function BuyTab() {
       setIsSwapping(false);
     }
   };
+
+  // === NEU: Ref für das POL-Buy-Modal ===
+  const polBuyModalRef = useRef<HTMLDivElement>(null);
+
+  // === NEU: Scrollen zum Modal, wenn es geöffnet wird ===
+  useEffect(() => {
+    if (showPolBuyModal && polBuyModalRef.current) {
+      setTimeout(() => {
+        polBuyModalRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 50);
+    }
+  }, [showPolBuyModal]);
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -616,8 +628,14 @@ export default function BuyTab() {
           
           <div className="w-full mt-4">
             {showPolBuyModal ? (
-              <div className="fixed inset-0 z-50 flex items-center justify-center min-h-screen bg-black/60 overflow-y-auto">
-                <div className="bg-zinc-900 rounded-xl p-4 max-w-full w-full sm:max-w-xs border border-purple-500 text-center flex flex-col items-center justify-center my-4">
+              <div
+                className="fixed inset-0 z-50 flex items-center justify-center min-h-screen bg-black/60 overflow-y-auto"
+              >
+                {/* === ref hier setzen === */}
+                <div
+                  ref={polBuyModalRef}
+                  className="bg-zinc-900 rounded-xl p-4 max-w-full w-full sm:max-w-xs border border-purple-500 text-center flex flex-col items-center justify-center my-4"
+                >
                   <div className="mb-4 text-purple-400 text-2xl font-bold">POL kaufen</div>
                   <div className="w-full flex-1 flex items-center justify-center">
                     <BuyWidget
@@ -642,6 +660,7 @@ export default function BuyTab() {
                 className="w-full bg-gradient-to-r from-purple-500 to-purple-700 text-white font-bold py-3 rounded-xl hover:opacity-90 transition-opacity"
                 onClick={() => {
                   setShowPolBuyModal(true);
+                  // Das Scrollen übernimmt jetzt der useEffect
                 }}
               >
                 POL kaufen
