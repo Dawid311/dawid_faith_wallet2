@@ -410,18 +410,33 @@ export default function BuyTab() {
           
           {/* D.FAITH kaufen Modal */}
           {showDfaithBuyModal ? (
-            <div className="fixed inset-0 z-50 flex items-start justify-center min-h-screen bg-black/60 overflow-y-auto">
+            <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 overflow-y-auto pt-4 pb-20">
               <div
                 ref={dfaithBuyModalRef}
-                className="bg-zinc-900 rounded-xl p-6 max-w-md w-full mx-4 border border-amber-400 my-8 mt-12 flex flex-col items-center justify-center"
+                className="bg-zinc-900 rounded-xl p-4 sm:p-6 max-w-md w-full mx-4 border border-amber-400 mt-4 mb-4"
               >
-                <div className="mb-6 text-amber-400 text-2xl font-bold text-center">D.FAITH kaufen</div>
+                {/* Header mit Close Button */}
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-xl sm:text-2xl font-bold text-amber-400">D.FAITH kaufen</h3>
+                  <button
+                    onClick={() => {
+                      setShowDfaithBuyModal(false);
+                      setSwapAmountPol("");
+                      setSlippage("1");
+                      setSwapTxStatus(null);
+                    }}
+                    className="p-2 text-amber-400 hover:text-yellow-300 hover:bg-zinc-800 rounded-lg transition-all flex-shrink-0"
+                    disabled={isSwapping}
+                  >
+                    <span className="text-lg">✕</span>
+                  </button>
+                </div>
                 
                 {/* POL Balance */}
                 <div className="mb-4 p-3 bg-zinc-800/50 rounded-lg">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-zinc-400">Verfügbare POL:</span>
-                    <span className="text-purple-400 font-bold">{polBalance}</span>
+                  <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
+                    <span className="text-sm text-zinc-400">Verfügbare POL:</span>
+                    <span className="text-sm text-purple-400 font-bold">{polBalance}</span>
                   </div>
                   <div className="text-xs text-zinc-500 mt-1">
                     Native POL Token für Swaps
@@ -435,7 +450,7 @@ export default function BuyTab() {
                     <input
                       type="number"
                       placeholder="0.0"
-                      className="w-full bg-zinc-800 border border-zinc-600 rounded-xl py-3 px-4 text-lg font-bold text-purple-400 focus:border-amber-500 focus:outline-none"
+                      className="w-full bg-zinc-800 border border-zinc-600 rounded-xl py-3 px-4 pr-16 text-lg font-bold text-purple-400 focus:border-amber-500 focus:outline-none"
                       value={swapAmountPol}
                       onChange={(e) => setSwapAmountPol(e.target.value)}
                       disabled={isSwapping}
@@ -456,7 +471,7 @@ export default function BuyTab() {
                 {/* Slippage Input */}
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-zinc-300 mb-2">Slippage Toleranz (%)</label>
-                  <div className="flex gap-2">
+                  <div className="flex flex-col sm:flex-row gap-2">
                     <input
                       type="number"
                       placeholder="1"
