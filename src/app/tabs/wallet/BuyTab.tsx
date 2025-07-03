@@ -37,22 +37,20 @@ export default function BuyTab() {
       let price: number | null = null;
       let errorMsg = "";
       try {
-        // OpenOcean v3 Quote API
-        const openOceanApi = `https://open-api.openocean.finance/v3/polygon/quote`;
-        const params = {
+        // OpenOcean v3 Quote API - GET Request mit Query Parameters
+        const params = new URLSearchParams({
           chain: "polygon",
           inTokenAddress: "0x0000000000000000000000000000000000001010", // Polygon Native Token (MATIC)
           outTokenAddress: DFAITH_TOKEN,
           amount: "1", // 1 POL (ohne Decimals)
-          gasPrice: "50", // Gaspreis in GWEI als String (Pflichtfeld laut OpenOcean)
-        };
-        const response = await fetch(openOceanApi, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(params),
+          gasPrice: "50", // 50 GWEI (ohne Decimals)
         });
+        
+        const response = await fetch(`https://open-api.openocean.finance/v3/polygon/quote?${params}`);
+        
         if (response.ok) {
           const data = await response.json();
+          console.log("OpenOcean Response:", data); // Debug
           if (data && data.data && data.data.outAmount) {
             // outAmount ist in D.FAITH (mit 2 Decimals) - daher durch 10^2 teilen
             price = Number(data.data.outAmount) / Math.pow(10, DFAITH_DECIMALS);
@@ -60,11 +58,13 @@ export default function BuyTab() {
             errorMsg = "OpenOcean: Keine Quote erhalten";
           }
         } else {
-          errorMsg = "OpenOcean: " + response.status;
+          errorMsg = `OpenOcean: ${response.status}`;
         }
       } catch (e) {
+        console.error("OpenOcean API Fehler:", e);
         errorMsg = "OpenOcean Fehler";
       }
+      
       if (price) {
         setDfaithPrice(price);
         setPriceError(null);
@@ -161,38 +161,50 @@ export default function BuyTab() {
     setIsSwapping(true);
     setSwapTxStatus("pending");
     try {
-      // OpenOcean v3 erwartet amount als Integer (ohne Decimals!)
-      // Für native POL: 1 POL = 1 (ohne 18 Decimals)
-      const amountInt = Math.floor(parseFloat(swapAmountPol)).toString();
+      // OpenOcean v3 erwartet amount als String (ohne Decimals!)
+      // Für native POL: 1 POL = "1" (ohne 18 Decimals)
+      const amountStr = parseFloat(swapAmountPol).toString();
       
-      // 1. Hole Swap-Transaktionsdaten von OpenOcean v3
-      const openOceanApi = `https://open-api.openocean.finance/v3/polygon/swap_quote`;
-      const params = {
+      // 1. Hole Swap-Transaktionsdaten von OpenOcean v3 - GET Request mit Query Parameters
+      const params = new URLSearchParams({
         chain: "polygon",
         inTokenAddress: "0x0000000000000000000000000000000000001010", // Polygon Native Token (MATIC)
         outTokenAddress: DFAITH_TOKEN,
-        amount: amountInt, // Amount ohne Decimals!
-        slippage: 1, // 1% Slippage
-        account: account.address,
-        gasPrice: "50", // Gaspreis in GWEI als String
-      };
-      const response = await fetch(openOceanApi, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(params),
+        amount: amountStr, // Amount ohne Decimals als String!
+        slippage: "1", // 1% Slippage als String
+        gasPrice: "50", // 50 GWEI als String (ohne Decimals)
+        account: account.address, // User's address für Transaktion
       });
-      if (!response.ok) throw new Error('OpenOcean API Fehler: ' + response.status);
+      
+      const response = await fetch(`https://open-api.openocean.finance/v3/polygon/swap_quote?${params}`);
+      
+      if (!response.ok) {
+        throw new Error(`OpenOcean API Fehler: ${response.status}`);
+      }
+      
       const data = await response.json();
-      if (!data.data || !data.data.tx) throw new Error('OpenOcean: Keine Transaktionsdaten erhalten');
-      const tx = data.data.tx;
-      // 2. Sende die Transaktion (raw tx)
-      await sendTransaction({
-        to: tx.to,
-        data: tx.data,
-        value: BigInt(tx.value || 0),
+      console.log("OpenOcean Swap Response:", data); // Debug
+      
+      if (!data || !data.data || !data.data.tx) {
+        throw new Error('OpenOcean: Keine Transaktionsdaten erhalten');
+      }
+      
+      const txData = data.data.tx;
+      
+      // 2. Sende die Transaktion mit thirdweb
+      // Use prepareTransaction for raw transaction data
+      // Import at top: import { prepareTransaction } from "thirdweb";
+      const { prepareTransaction } = await import("thirdweb");
+      const tx = prepareTransaction({
+        to: txData.to,
+        data: txData.data,
+        value: BigInt(txData.value || "0"),
         chain: polygon,
         client
       });
+
+      await sendTransaction(tx);
+      
       setSwapTxStatus("success");
       setSwapAmountPol("");
     } catch (error) {
