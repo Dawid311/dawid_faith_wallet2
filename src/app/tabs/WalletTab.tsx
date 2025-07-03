@@ -186,12 +186,15 @@ export default function WalletTab() {
   // Balance-Aktualisierung
   const fetchBalances = async () => {
     if (!account?.address) {
+      console.log("No account address available");
       setDfaithBalance(null);
       setDinvestBalance(null);
       return;
     }
     
     try {
+      console.log("Fetching balances for:", account.address);
+      
       // D.FAITH Balance abrufen
       const dfaithContract = getContract({
         client,
@@ -199,10 +202,14 @@ export default function WalletTab() {
         address: DFAITH_TOKEN.address
       });
       
+      console.log("D.FAITH Contract:", DFAITH_TOKEN.address);
+      
       const dfaithBalanceResult = await balanceOf({
         contract: dfaithContract,
         address: account.address
       });
+      
+      console.log("D.FAITH Balance Raw:", dfaithBalanceResult.toString());
       
       // D.INVEST Balance abrufen
       const dinvestContract = getContract({
@@ -211,17 +218,26 @@ export default function WalletTab() {
         address: DINVEST_TOKEN.address
       });
       
+      console.log("D.INVEST Contract:", DINVEST_TOKEN.address);
+      
       const dinvestBalanceResult = await balanceOf({
         contract: dinvestContract,
         address: account.address
       });
       
+      console.log("D.INVEST Balance Raw:", dinvestBalanceResult.toString());
+      
       // Balances formatieren und setzen
       const dfaithFormatted = Number(dfaithBalanceResult) / Math.pow(10, DFAITH_TOKEN.decimals);
-      const dinvestFormatted = Number(dinvestBalanceResult) / Math.pow(10, DINVEST_TOKEN.decimals); // Math.pow(10, 0) = 1
+      const dinvestFormatted = Number(dinvestBalanceResult) / Math.pow(10, DINVEST_TOKEN.decimals);
+      
+      console.log("D.FAITH Formatted:", dfaithFormatted);
+      console.log("D.INVEST Formatted:", dinvestFormatted);
       
       setDfaithBalance({ displayValue: dfaithFormatted.toFixed(2) });
-      setDinvestBalance({ displayValue: Math.floor(dinvestFormatted).toString() }); // Bleibt als ganze Zahl
+      setDinvestBalance({ displayValue: Math.floor(dinvestFormatted).toString() });
+      
+      console.log("Balances set successfully");
       
     } catch (error) {
       console.error("Fehler beim Abrufen der Balances:", error);
@@ -229,6 +245,43 @@ export default function WalletTab() {
       setDinvestBalance({ displayValue: "0" });
     }
   };
+
+  // useEffect für Balance-Updates
+  useEffect(() => {
+    console.log("useEffect triggered - Account:", account?.address);
+    if (account?.address) {
+      fetchBalances();
+      fetchDfaithPrice();
+      
+      // Balance alle 10 Sekunden aktualisieren
+      const interval = setInterval(() => {
+        console.log("Auto-refresh balances");
+        fetchBalances();
+      }, 10000);
+      
+      return () => clearInterval(interval);
+    }
+  }, [account?.address]);
+
+  // Event Listener für Balance Updates (nach Swaps)
+  useEffect(() => {
+    const handleBalanceUpdate = () => {
+      console.log("Balance update event triggered");
+      fetchBalances();
+    };
+    
+    window.addEventListener('balanceUpdate', handleBalanceUpdate);
+    return () => window.removeEventListener('balanceUpdate', handleBalanceUpdate);
+  }, []);
+
+  // Debug: State-Änderungen verfolgen
+  useEffect(() => {
+    console.log("D.FAITH Balance State changed:", dfaithBalance);
+  }, [dfaithBalance]);
+
+  useEffect(() => {
+    console.log("D.INVEST Balance State changed:", dinvestBalance);
+  }, [dinvestBalance]);
 
   if (status !== "connected" || !account?.address) {
     return (
@@ -328,12 +381,19 @@ export default function WalletTab() {
               </button>
             </div>
 
-            {/* DFAITH Token-Karte - jetzt mit D.FAITH */}
+            {/* DFAITH Token-Karte - mit Debug-Infos */}
             <div className="flex flex-col items-center p-4 bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl border border-zinc-700 w-full mb-6">
               <span className="uppercase text-xs tracking-widest text-amber-500/80 mb-2">D.FAITH</span>
               <div className="text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 drop-shadow-sm">
                 {dfaithBalance ? Number(dfaithBalance.displayValue).toFixed(2) : "0.00"}
               </div>
+              
+              {/* Debug Info - nur während Entwicklung */}
+              {process.env.NODE_ENV === 'development' && (
+                <div className="text-xs text-zinc-600 mt-1">
+                  Debug: {dfaithBalance ? `Balance: ${dfaithBalance.displayValue}` : "No balance"}
+                </div>
+              )}
               
               <div className="w-full h-px bg-gradient-to-r from-transparent via-zinc-700/50 to-transparent my-3"></div>
               
@@ -343,6 +403,16 @@ export default function WalletTab() {
                   : "0.00 EUR"
                 }
               </div>
+              
+              {/* Manual Refresh Button - nur während Entwicklung */}
+              {process.env.NODE_ENV === 'development' && (
+                <button 
+                  onClick={fetchBalances}
+                  className="text-xs text-zinc-500 hover:text-zinc-300 mt-2 px-2 py-1 bg-zinc-800 rounded"
+                >
+                  Refresh Balance
+                </button>
+              )}
             </div>
 
             {/* Action Buttons */}

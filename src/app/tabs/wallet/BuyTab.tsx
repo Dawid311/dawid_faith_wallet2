@@ -15,19 +15,116 @@ const UNISWAP_ROUTER = "0xa5E0829CaCEd8fFDD4De3c43696c57F7D7A678ff"; // QuickSwa
 
 export default function BuyTab() {
   const [dfaithPrice, setDfaithPrice] = useState<number | null>(null);
+  const [polPriceEur, setPolPriceEur] = useState<number | null>(null); // Neuer State für POL-Preis
   const [isLoadingPrice, setIsLoadingPrice] = useState(true);
+  const [isLoadingPolPrice, setIsLoadingPolPrice] = useState(true); // Neuer Loading-State
   const account = useActiveAccount();
   const [showInvestModal, setShowInvestModal] = useState(false);
   const [showBuyModal, setShowBuyModal] = useState(false);
   const [showPolBuyModal, setShowPolBuyModal] = useState(false);
   const [copied, setCopied] = useState(false);
   const [priceError, setPriceError] = useState<string | null>(null);
+  const [polPriceError, setPolPriceError] = useState<string | null>(null); // Neuer Error-State
   const [swapAmount, setSwapAmount] = useState("");
   const [swapQuote, setSwapQuote] = useState<any>(null);
   const [swapLoading, setSwapLoading] = useState(false);
   const [swapError, setSwapError] = useState<string | null>(null);
   const { mutate: sendTransaction, isPending: isSwapPending } = useSendTransaction();
   const [swapStatus, setSwapStatus] = useState<string | null>(null);
+
+  // POL-Preis in EUR von OpenOcean und CoinGecko holen
+  useEffect(() => {
+    const fetchPolPriceEur = async () => {
+      setIsLoadingPolPrice(true);
+      setPolPriceError(null);
+      let priceEur: number | null = null;
+      let errorMsg = "";
+      
+      try {
+        // 1. POL-Preis in USD von OpenOcean holen (POL → USDC)
+        const params = new URLSearchParams({
+          chain: "polygon",
+          inTokenAddress: "0x0000000000000000000000000000000000001010", // POL Native Token
+          outTokenAddress: "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174", // USDC
+          amount: "1", // 1 POL
+          gasPrice: "50",
+        });
+        
+        const response = await fetch(`https://open-api.openocean.finance/v3/polygon/quote?${params}`);
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log("POL → USDC OpenOcean Response:", data);
+          
+          if (data && data.data && data.data.outAmount && data.data.outAmount !== "0") {
+            // outAmount ist in USDC (mit 6 Decimals) - daher durch 10^6 teilen
+            const polPriceUsd = Number(data.data.outAmount) / Math.pow(10, 6);
+            console.log("POL Price in USD:", polPriceUsd);
+            
+            // 2. EUR/USD Wechselkurs von CoinGecko holen
+            const eurUsdResponse = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=usd&vs_currencies=eur');
+            
+            if (eurUsdResponse.ok) {
+              const eurUsdData = await eurUsdResponse.json();
+              const eurUsdRate = eurUsdData.usd?.eur || 0.85; // Fallback auf ~0.85
+              console.log("EUR/USD Rate:", eurUsdRate);
+              
+              // POL-Preis in EUR umrechnen
+              priceEur = polPriceUsd * eurUsdRate;
+              console.log("POL Price in EUR:", priceEur);
+            } else {
+              // Fallback: Direkt von CoinGecko POL-Preis in EUR holen
+              const coinGeckoResponse = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=polygon&vs_currencies=eur');
+              
+              if (coinGeckoResponse.ok) {
+                const coinGeckoData = await coinGeckoResponse.json();
+                priceEur = coinGeckoData.polygon?.eur || null;
+                console.log("POL Price from CoinGecko (EUR):", priceEur);
+              } else {
+                errorMsg = "Fehler beim Laden des EUR-Wechselkurses";
+              }
+            }
+          } else {
+            errorMsg = "OpenOcean: Keine POL-Liquidität verfügbar";
+          }
+        } else {
+          errorMsg = `OpenOcean API Fehler: ${response.status}`;
+        }
+      } catch (e) {
+        console.error("POL-Preis API Fehler:", e);
+        
+        // Fallback: Direkt von CoinGecko holen
+        try {
+          const coinGeckoResponse = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=polygon&vs_currencies=eur');
+          
+          if (coinGeckoResponse.ok) {
+            const coinGeckoData = await coinGeckoResponse.json();
+            priceEur = coinGeckoData.polygon?.eur || null;
+            console.log("POL Price from CoinGecko Fallback (EUR):", priceEur);
+          } else {
+            errorMsg = "Fehler beim Laden des POL-Preises";
+          }
+        } catch (fallbackError) {
+          console.error("CoinGecko Fallback Fehler:", fallbackError);
+          errorMsg = "POL-Preis nicht verfügbar";
+        }
+      }
+      
+      if (priceEur && priceEur > 0) {
+        setPolPriceEur(priceEur);
+        setPolPriceError(null);
+      } else {
+        setPolPriceEur(null);
+        setPolPriceError(errorMsg || "POL-Preis nicht verfügbar");
+      }
+      setIsLoadingPolPrice(false);
+    };
+
+    fetchPolPriceEur();
+    // Preis alle 60 Sekunden aktualisieren
+    const interval = setInterval(fetchPolPriceEur, 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   // D.FAITH Preis von OpenOcean holen
   useEffect(() => {
@@ -302,7 +399,86 @@ export default function BuyTab() {
       </div>
 
       <div className="flex flex-col gap-4">
-        {/* POL kaufen */}
+        {/* D.FAITH kaufen - Erste Stelle */}
+        <div className="bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl p-6 border border-zinc-700">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-gradient-to-r from-yellow-400 to-amber-600 rounded-full">
+                <FaCoins className="text-black text-lg" />
+              </div>
+              <div>
+                <h3 className="font-bold text-amber-400">D.FAITH Token</h3>
+                <p className="text-xs text-zinc-500">Dawid Faith Utility Token</p>
+              </div>
+            </div>
+            <span className="text-xs text-zinc-400 bg-zinc-700/50 px-2 py-1 rounded">mit POL kaufen</span>
+          </div>
+          
+          <div className="space-y-3">
+            <div className="flex justify-between text-sm">
+              <span className="text-zinc-400">Aktueller Preis:</span>
+              <span className="text-amber-400">
+                {isLoadingPrice ? (
+                  <span className="animate-pulse">Laden...</span>
+                ) : priceError ? (
+                  <span className="text-red-400">{priceError}</span>
+                ) : dfaithPrice ? (
+                  `1 POL = ${dfaithPrice.toFixed(2)} D.FAITH`
+                ) : (
+                  "Preis nicht verfügbar"
+                )}
+              </span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-zinc-400">Minimum:</span>
+              <span className="text-zinc-300">0.001 POL</span>
+            </div>
+          </div>
+          
+          <Button
+            className="w-full mt-4 bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-3 rounded-xl hover:opacity-90 transition-opacity"
+            onClick={() => account?.address ? setShowDfaithBuyModal(true) : alert('Bitte Wallet verbinden!')}
+            disabled={!account?.address}
+          >
+            D.FAITH kaufen
+          </Button>
+        </div>
+
+        {/* D.INVEST kaufen - Zweite Stelle */}
+        <div className="bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl p-6 border border-zinc-700">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-gradient-to-r from-yellow-400 to-amber-600 rounded-full">
+                <FaLock className="text-black text-lg" />
+              </div>
+              <div>
+                <h3 className="font-bold text-amber-400">D.INVEST Token</h3>
+                <p className="text-xs text-zinc-500">Investment & Staking Token</p>
+              </div>
+            </div>
+            <span className="text-xs text-zinc-400 bg-zinc-700/50 px-2 py-1 rounded">mit EUR kaufen</span>
+          </div>
+          
+          <div className="space-y-3">
+            <div className="flex justify-between text-sm">
+              <span className="text-zinc-400">Aktueller Preis:</span>
+              <span className="text-amber-400">5€ pro D.INVEST</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-zinc-400">Minimum:</span>
+              <span className="text-zinc-300">5 EUR</span>
+            </div>
+          </div>
+          
+          <Button
+            className="w-full mt-4 bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-3 rounded-xl hover:opacity-90 transition-opacity"
+            onClick={handleInvestBuy}
+          >
+            D.INVEST kaufen
+          </Button>
+        </div>
+
+        {/* POL kaufen - Dritte Stelle */}
         <div className="bg-gradient-to-br from-blue-800/30 to-blue-900/30 rounded-xl p-6 border border-blue-700/50">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
@@ -320,7 +496,17 @@ export default function BuyTab() {
           <div className="space-y-3">
             <div className="flex justify-between text-sm">
               <span className="text-zinc-400">Aktueller Preis:</span>
-              <span className="text-purple-400 font-bold">~0.50€ pro POL</span>
+              <span className="text-purple-400 font-bold">
+                {isLoadingPolPrice ? (
+                  <span className="animate-pulse">Laden...</span>
+                ) : polPriceError ? (
+                  <span className="text-red-400">{polPriceError}</span>
+                ) : polPriceEur ? (
+                  `€${polPriceEur.toFixed(4)} pro POL`
+                ) : (
+                  "Preis nicht verfügbar"
+                )}
+              </span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-zinc-400">Minimum:</span>
@@ -360,269 +546,6 @@ export default function BuyTab() {
               </Button>
             )}
           </div>
-        </div>
-
-        {/* DFAITH kaufen */}
-        <div className="bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl p-6 border border-zinc-700">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-gradient-to-r from-yellow-400 to-amber-600 rounded-full">
-                <FaCoins className="text-black text-lg" />
-              </div>
-              <div>
-                <h3 className="font-bold text-amber-400">D.FAITH Token</h3>
-                <p className="text-xs text-zinc-500">Dawid Faith Utility Token</p>
-              </div>
-            </div>
-            <span className="text-xs text-zinc-400 bg-zinc-700/50 px-2 py-1 rounded">mit POL kaufen</span>
-          </div>
-          
-          <div className="space-y-3">
-            <div className="flex justify-between text-sm">
-              <span className="text-zinc-400">Aktueller Preis:</span>
-              <span className="text-amber-400">
-                {isLoadingPrice ? (
-                  <span className="animate-pulse">Laden...</span>
-                ) : priceError ? (
-                  <span className="text-red-400">{priceError}</span>
-                ) : dfaithPrice ? (
-                  `1 POL = ${dfaithPrice.toFixed(2)} D.FAITH`
-                ) : (
-                  "Preis nicht verfügbar"
-                )}
-              </span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-zinc-400">Minimum:</span>
-              <span className="text-zinc-300">0.001 POL</span>
-            </div>
-          </div>
-          
-          {/* D.FAITH kaufen Modal */}
-          {showDfaithBuyModal ? (
-            <div className="fixed inset-0 z-50 flex items-center justify-center min-h-screen bg-black/60">
-              <div className="bg-zinc-900 rounded-xl p-6 max-w-md w-full mx-4 border border-amber-400">
-                <div className="mb-6 text-amber-400 text-2xl font-bold text-center">D.FAITH kaufen</div>
-                
-                {/* POL Balance */}
-                <div className="mb-4 p-3 bg-zinc-800/50 rounded-lg">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-zinc-400">Verfügbare POL:</span>
-                    <span className="text-purple-400 font-bold">{polBalance}</span>
-                  </div>
-                  <div className="text-xs text-zinc-500 mt-1">
-                    Native POL Token für Swaps
-                  </div>
-                </div>
-                
-                {/* Swap Input */}
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-zinc-300 mb-2">POL Betrag</label>
-                  <div className="relative">
-                    <input
-                      type="number"
-                      placeholder="0.0"
-                      className="w-full bg-zinc-800 border border-zinc-600 rounded-xl py-3 px-4 text-lg font-bold text-purple-400 focus:border-amber-500 focus:outline-none"
-                      value={swapAmountPol}
-                      onChange={(e) => setSwapAmountPol(e.target.value)}
-                      disabled={isSwapping}
-                    />
-                    <button
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-xs px-2 py-1 bg-purple-500/20 text-purple-400 rounded hover:bg-purple-500/30 transition"
-                      onClick={() => setSwapAmountPol((parseFloat(polBalance) * 0.95).toFixed(4))}
-                      disabled={isSwapping || parseFloat(polBalance) <= 0}
-                    >
-                      MAX
-                    </button>
-                  </div>
-                  <div className="text-xs text-zinc-500 mt-1">
-                    Native POL wird direkt für den Swap verwendet
-                  </div>
-                </div>
-                
-                {/* Slippage Input */}
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-zinc-300 mb-2">Slippage Toleranz (%)</label>
-                  <div className="flex gap-2">
-                    <input
-                      type="number"
-                      placeholder="1"
-                      min="0.1"
-                      max="50"
-                      step="0.1"
-                      className="flex-1 bg-zinc-800 border border-zinc-600 rounded-xl py-2 px-3 text-sm text-zinc-300 focus:border-amber-500 focus:outline-none"
-                      value={slippage}
-                      onChange={(e) => setSlippage(e.target.value)}
-                      disabled={isSwapping}
-                    />
-                    <div className="flex gap-1">
-                      <button
-                        className="text-xs px-2 py-1 bg-zinc-700/50 text-zinc-400 rounded hover:bg-zinc-600/50 transition"
-                        onClick={() => setSlippage("0.5")}
-                        disabled={isSwapping}
-                      >
-                        0.5%
-                      </button>
-                      <button
-                        className="text-xs px-2 py-1 bg-zinc-700/50 text-zinc-400 rounded hover:bg-zinc-600/50 transition"
-                        onClick={() => setSlippage("1")}
-                        disabled={isSwapping}
-                      >
-                        1%
-                      </button>
-                      <button
-                        className="text-xs px-2 py-1 bg-zinc-700/50 text-zinc-400 rounded hover:bg-zinc-600/50 transition"
-                        onClick={() => setSlippage("3")}
-                        disabled={isSwapping}
-                      >
-                        3%
-                      </button>
-                    </div>
-                  </div>
-                  <div className="text-xs text-zinc-500 mt-1">
-                    Höhere Slippage = höhere Erfolgswahrscheinlichkeit, aber weniger Token
-                  </div>
-                </div>
-                
-                {/* Estimated Output */}
-                {swapAmountPol && parseFloat(swapAmountPol) > 0 && dfaithPrice && (
-                  <div className="mb-4 p-3 bg-zinc-800/50 rounded-lg">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-zinc-400">Geschätzte D.FAITH:</span>
-                      <span className="text-amber-400 font-bold">
-                        ~{(parseFloat(swapAmountPol) * dfaithPrice).toFixed(2)}
-                      </span>
-                    </div>
-                    <div className="text-xs text-zinc-500 mt-1">
-                      Slippage: {slippage}% | Minimum: ~{(parseFloat(swapAmountPol) * dfaithPrice * (1 - parseFloat(slippage)/100)).toFixed(2)}
-                    </div>
-                  </div>
-                )}
-                
-                {/* Info wenn keine POL verfügbar */}
-                {parseFloat(polBalance) <= 0 && (
-                  <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
-                    <div className="flex items-center gap-2">
-                      <span className="text-yellow-400 text-xs">⚠️</span>
-                      <div className="text-sm text-yellow-400">
-                        Sie benötigen POL Token für den Swap
-                      </div>
-                    </div>
-                    <div className="text-xs text-yellow-300/70 mt-1">
-                      Kaufen Sie zuerst POL Token oben über das BuyWidget
-                    </div>
-                  </div>
-                )}
-                
-                {/* Transaction Status */}
-                {swapTxStatus && (
-                  <div className={`mb-4 p-3 rounded-lg text-center ${
-                    swapTxStatus === "success" ? "bg-green-500/20 text-green-400" :
-                    swapTxStatus === "error" ? "bg-red-500/20 text-red-400" :
-                    swapTxStatus === "confirming" ? "bg-blue-500/20 text-blue-400" :
-                    "bg-yellow-500/20 text-yellow-400"
-                  }`}>
-                    {swapTxStatus === "success" && (
-                      <div>
-                        <div className="font-bold">🎉 Swap erfolgreich!</div>
-                        <div className="text-xs mt-1">Token wurden erfolgreich getauscht</div>
-                      </div>
-                    )}
-                    {swapTxStatus === "error" && (
-                      <div>
-                        <div className="font-bold">❌ Swap fehlgeschlagen!</div>
-                        <div className="text-xs mt-1">Bitte versuchen Sie es erneut</div>
-                      </div>
-                    )}
-                    {swapTxStatus === "confirming" && (
-                      <div>
-                        <div className="font-bold">⏳ Bestätigung läuft...</div>
-                        <div className="text-xs mt-1">Warte auf Blockchain-Bestätigung</div>
-                      </div>
-                    )}
-                    {swapTxStatus === "pending" && (
-                      <div>
-                        <div className="font-bold">📝 Transaktion wird vorbereitet...</div>
-                        <div className="text-xs mt-1">Bitte bestätigen Sie in Ihrem Wallet</div>
-                      </div>
-                    )}
-                  </div>
-                )}
-                
-                {/* Buttons */}
-                <div className="space-y-3">
-                  <Button
-                    className="w-full bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-3 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50"
-                    onClick={handleDfaithSwap}
-                    disabled={!swapAmountPol || parseFloat(swapAmountPol) <= 0 || isSwapping || !account?.address || parseFloat(polBalance) <= 0}
-                  >
-                    <FaExchangeAlt className="inline mr-2" />
-                    {isSwapping ? (
-                      swapTxStatus === "pending" ? "Wallet-Bestätigung..." :
-                      swapTxStatus === "confirming" ? "Bestätigung..." :
-                      "Swapping..."
-                    ) : parseFloat(polBalance) <= 0 ? "Keine POL verfügbar" :
-                      `${swapAmountPol || "0"} POL → D.FAITH (${slippage}%)`}
-                  </Button>
-                  
-                  <Button
-                    className="w-full bg-zinc-600 hover:bg-zinc-700 text-white font-bold py-2 rounded-xl"
-                    onClick={() => {
-                      setShowDfaithBuyModal(false);
-                      setSwapAmountPol("");
-                      setSlippage("1"); // Reset Slippage auf 1%
-                      setSwapTxStatus(null);
-                    }}
-                    disabled={isSwapping}
-                  >
-                    Schließen
-                  </Button>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <Button
-              className="w-full mt-4 bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-3 rounded-xl hover:opacity-90 transition-opacity"
-              onClick={() => account?.address ? setShowDfaithBuyModal(true) : alert('Bitte Wallet verbinden!')}
-              disabled={!account?.address}
-            >
-              D.FAITH kaufen
-            </Button>
-          )}
-        </div>
-
-        {/* D.INVEST kaufen */}
-        <div className="bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl p-6 border border-zinc-700">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-gradient-to-r from-yellow-400 to-amber-600 rounded-full">
-                <FaLock className="text-black text-lg" />
-              </div>
-              <div>
-                <h3 className="font-bold text-amber-400">D.INVEST Token</h3>
-                <p className="text-xs text-zinc-500">Investment & Staking Token</p>
-              </div>
-            </div>
-            <span className="text-xs text-zinc-400 bg-zinc-700/50 px-2 py-1 rounded">mit EUR kaufen</span>
-          </div>
-          
-          <div className="space-y-3">
-            <div className="flex justify-between text-sm">
-              <span className="text-zinc-400">Aktueller Preis:</span>
-              <span className="text-amber-400">5€ pro D.INVEST</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-zinc-400">Minimum:</span>
-              <span className="text-zinc-300">5 EUR</span>
-            </div>
-          </div>
-          
-          <Button
-            className="w-full mt-4 bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-3 rounded-xl hover:opacity-90 transition-opacity"
-            onClick={handleInvestBuy}
-          >
-            D.INVEST kaufen
-          </Button>
         </div>
       </div>
 
