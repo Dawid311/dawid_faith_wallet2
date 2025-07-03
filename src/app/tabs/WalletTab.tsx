@@ -141,6 +141,7 @@ export default function WalletTab() {
       );
       if (!res.ok) throw new Error("API Error");
       const data = await res.json();
+      console.debug("Insight API Antwort:", JSON.stringify(data, null, 2)); // <--- Debug-Log hinzugefügt
       const balance = data?.data?.[0]?.balance ?? "0";
       return balance;
     } catch (e) {
