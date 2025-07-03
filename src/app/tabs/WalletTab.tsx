@@ -394,7 +394,7 @@ export default function WalletTab() {
                 wallets={wallets}
                 chain={{
                   id: 137,
-                  rpc: "https://polygon-rpc.com",
+                  rpc: "https://polygon-mainnet.g.alchemy.com/v2/QuM1jrRDMupJXFrsaMY5OQx5Y9n4h7C6",
                 }}
               />
             </div>
