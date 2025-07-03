@@ -270,6 +270,10 @@ export default function WalletTab() {
       });
       console.log("D.FAITH Rohe Balance:", dfaithBalanceResult.toString());
       console.log(`D.FAITH Vorherige Rohe Balance: ${lastSuccessfulBalanceRef.current.dfaithRaw || 'keine'}`);
+      console.log("D.FAITH Contract-Adresse:", DFAITH_TOKEN.address);
+      console.log("D.FAITH Wallet-Adresse:", account.address);
+      console.log("D.FAITH Rohwert-Typ:", typeof dfaithBalanceResult, "Wert-Länge:", dfaithBalanceResult.toString().length);
+      
       if (myRequestId !== requestIdRef.current) {
         console.log("Request abgebrochen - nicht mehr aktuell");
         return;
@@ -289,6 +293,10 @@ export default function WalletTab() {
       });
       console.log("D.INVEST Rohe Balance:", dinvestBalanceResult.toString());
       console.log(`D.INVEST Vorherige Rohe Balance: ${lastSuccessfulBalanceRef.current.dinvestRaw || 'keine'}`);
+      console.log("D.INVEST Contract-Adresse:", DINVEST_TOKEN.address);
+      console.log("D.INVEST Wallet-Adresse:", account.address);
+      console.log("D.INVEST Rohwert-Typ:", typeof dinvestBalanceResult, "Wert-Länge:", dinvestBalanceResult.toString().length);
+      
       if (myRequestId !== requestIdRef.current) {
         console.log("Request abgebrochen - nicht mehr aktuell");
         return;
@@ -486,6 +494,70 @@ export default function WalletTab() {
     );
   };
 
+  // Analyse-Funktion für Balance-Schwankungen
+  const analyzeBalanceIssue = async () => {
+    if (!account?.address) return;
+    
+    console.log("===== BALANCE SCHWANKUNGS-ANALYSE BEGINNT =====");
+    console.log("Zeit:", new Date().toISOString());
+    
+    try {
+      // Mehrere Anfragen nacheinander senden, um Schwankungen zu beobachten
+      const results = [];
+      const dfaithContract = getContract({
+        client,
+        chain: polygon,
+        address: DFAITH_TOKEN.address
+      });
+      
+      // 5 Abfragen hintereinander ausführen
+      for (let i = 0; i < 5; i++) {
+        console.log(`Abfrage #${i+1} startet...`);
+        const startTime = performance.now();
+        
+        const balanceResult = await balanceOf({
+          contract: dfaithContract,
+          address: account.address
+        });
+        
+        const endTime = performance.now();
+        const formattedBalance = Number(balanceResult) / Math.pow(10, DFAITH_TOKEN.decimals);
+        
+        results.push({
+          raw: balanceResult.toString(),
+          formatted: formattedBalance.toFixed(2),
+          responseTime: (endTime - startTime).toFixed(2) + 'ms'
+        });
+        
+        console.log(`Abfrage #${i+1}: Rohe Balance: ${balanceResult.toString()}, Formatiert: ${formattedBalance.toFixed(2)}`);
+        
+        // Kurze Pause zwischen Anfragen
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+      
+      // Analysiere die Ergebnisse
+      let allSame = true;
+      const firstRaw = results[0].raw;
+      
+      for (let i = 1; i < results.length; i++) {
+        if (results[i].raw !== firstRaw) {
+          allSame = false;
+          break;
+        }
+      }
+      
+      console.log("===== ANALYSE-ERGEBNISSE =====");
+      console.log("Alle 5 Ergebnisse identisch?", allSame ? "JA" : "NEIN");
+      console.log("Details:", results);
+      console.log("===== ANALYSE BEENDET =====");
+      
+      return {allSame, results};
+    } catch (error) {
+      console.error("Fehler bei der Balance-Analyse:", error);
+      return null;
+    }
+  };
+
   return (
     <div className="flex justify-center min-h-[70vh] items-center py-8 bg-black">
         <Card className="w-full max-w-xl bg-gradient-to-br from-zinc-900 to-black rounded-3xl shadow-2xl border border-zinc-700 relative overflow-hidden">
@@ -514,7 +586,8 @@ export default function WalletTab() {
                 wallets={wallets}
                 chain={{
                   id: 137,
-                  rpc: "https://polygon-mainnet.g.alchemy.com/v2/QuM1jrRDMupJXFrsaMY5OQx5Y9n4h7C6",
+                  // Verwende einen alternativen, stabileren RPC-Endpunkt
+                  rpc: "https://polygon-rpc.com",
                 }}
               />
             </div>
@@ -526,6 +599,13 @@ export default function WalletTab() {
                 <span className="font-mono text-zinc-300 text-sm">{formatAddress(account.address)}</span>
               </div>
               <div className="flex items-center gap-2">
+                <button
+                  onClick={analyzeBalanceIssue}
+                  className="px-2 py-1 text-xs bg-indigo-700/50 hover:bg-indigo-700/70 text-indigo-200 rounded-lg transition-colors"
+                  title="Balance-Problem analysieren"
+                >
+                  Diagnose
+                </button>
                 <button
                   onClick={refreshBalances}
                   disabled={isRefreshing}
