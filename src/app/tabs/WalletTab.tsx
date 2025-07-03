@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { createThirdwebClient, getContract } from "thirdweb";
 import { useActiveAccount, useActiveWalletConnectionStatus, useSendTransaction } from "thirdweb/react";
 import { ConnectButton } from "thirdweb/react";
@@ -147,13 +147,16 @@ export default function WalletTab() {
     symbol: "POL"
   };
 
+  const requestIdRef = useRef(0);
+
   // EIN useEffect für alles:
   useEffect(() => {
     let isMounted = true;
 
     const load = async () => {
+      const myRequestId = ++requestIdRef.current;
       if (isMounted) {
-        await fetchBalances();
+        await fetchBalances(myRequestId);
         await fetchDfaithPrice();
       }
     };
@@ -172,7 +175,7 @@ export default function WalletTab() {
       isMounted = false;
       clearInterval(interval);
     };
-  }, [account?.address]); // Nur bei Account-Änderung neu laden
+  }, [account?.address]);
 
   // D.FAITH EUR-Preis holen (basierend auf POL-Preis)
   const fetchDfaithPrice = async () => {
@@ -209,7 +212,7 @@ export default function WalletTab() {
   const formatAddress = (address: string) => `${address.slice(0, 6)}...${address.slice(-4)}`;
 
   // Balance-Aktualisierung
-  const fetchBalances = async () => {
+  const fetchBalances = async (myRequestId?: number) => {
     if (!account?.address) {
       setDfaithBalance(null);
       setDinvestBalance(null);
@@ -246,13 +249,18 @@ export default function WalletTab() {
       const dfaithFormatted = Number(dfaithBalanceResult) / Math.pow(10, DFAITH_TOKEN.decimals);
       const dinvestFormatted = Number(dinvestBalanceResult) / Math.pow(10, DINVEST_TOKEN.decimals);
 
-      setDfaithBalance({ displayValue: dfaithFormatted.toFixed(2) });
-      setDinvestBalance({ displayValue: Math.floor(dinvestFormatted).toString() });
-      fetchDfaithEurValue(dfaithFormatted.toFixed(2));
+      // Nur setzen, wenn dies der aktuellste Request ist
+      if (myRequestId === requestIdRef.current) {
+        setDfaithBalance({ displayValue: dfaithFormatted.toFixed(2) });
+        setDinvestBalance({ displayValue: Math.floor(dinvestFormatted).toString() });
+        fetchDfaithEurValue(dfaithFormatted.toFixed(2));
+      }
     } catch (error) {
-      setDfaithBalance({ displayValue: "0.00" });
-      setDinvestBalance({ displayValue: "0" });
-      setDfaithEurValue("0.00");
+      if (myRequestId === requestIdRef.current) {
+        setDfaithBalance({ displayValue: "0.00" });
+        setDinvestBalance({ displayValue: "0" });
+        setDfaithEurValue("0.00");
+      }
     }
   };
 
