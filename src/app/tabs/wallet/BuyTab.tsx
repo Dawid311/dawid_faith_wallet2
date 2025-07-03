@@ -180,13 +180,14 @@ export default function BuyTab() {
     setIsSwapping(true);
     setSwapTxStatus("pending");
     try {
-      const amountStr = parseFloat(swapAmountPol).toString();
+      // POL hat 18 Dezimalstellen - wir müssen den Betrag entsprechend anpassen
+      const amountInWei = (parseFloat(swapAmountPol) * Math.pow(10, 18)).toString();
       
       console.log("=== OpenOcean Swap Request ===");
       console.log("Chain:", "polygon");
       console.log("InToken:", "0x0000000000000000000000000000000000001010");
       console.log("OutToken:", "0xF051E3B0335eB332a7ef0dc308BB4F0c10301060");
-      console.log("Amount:", amountStr);
+      console.log("Amount (in Wei):", amountInWei);
       console.log("Slippage:", slippage);
       console.log("GasPrice:", "50");
       console.log("Account:", account.address);
@@ -195,7 +196,7 @@ export default function BuyTab() {
         chain: "polygon",
         inTokenAddress: "0x0000000000000000000000000000000000001010",
         outTokenAddress: "0xF051E3B0335eB332a7ef0dc308BB4F0c10301060",
-        amount: amountStr,
+        amount: amountInWei, // Hier ist die Änderung: Betrag in Wei
         slippage: slippage,
         gasPrice: "50",
         account: account.address,
