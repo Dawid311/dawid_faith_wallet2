@@ -3,7 +3,7 @@ import { Button } from "../../../../components/ui/button";
 import { FaCoins, FaExchangeAlt, FaArrowDown } from "react-icons/fa";
 import { useActiveAccount, useSendTransaction } from "thirdweb/react";
 import { polygon } from "thirdweb/chains";
-import { getContract, readContract } from "thirdweb";
+import { getContract, prepareContractCall } from "thirdweb";
 import { client } from "../../client";
 import { balanceOf } from "thirdweb/extensions/erc20";
 
@@ -191,68 +191,138 @@ export default function SellTab() {
         console.error("Fehlende tx data in response:", txData);
         throw new Error('OpenOcean: Unvollständige Transaktionsdaten');
       }
-      
-      const { prepareTransaction } = await import("thirdweb");
-      const tx = prepareTransaction({
-        to: txData.to,
-        data: txData.data,
-        value: BigInt(txData.value || "0"),
-        chain: polygon,
-        client
-      });
 
-      console.log("Prepared transaction:", tx);
-      console.log("Sending transaction...");
+    // **WICHTIG: Allowance mit OpenOcean API prüfen**
+    const allowanceParams = new URLSearchParams({
+      chain: "polygon",
+      account: account.address,
+      inTokenAddress: DFAITH_TOKEN
+    });
+    
+    const allowanceUrl = `https://open-api.openocean.finance/v3/polygon/allowance?${allowanceParams}`;
+    console.log("Checking allowance:", allowanceUrl);
+    
+    const allowanceResponse = await fetch(allowanceUrl);
+    
+    if (allowanceResponse.ok) {
+      const allowanceData = await allowanceResponse.json();
+      console.log("Allowance Response:", allowanceData);
       
-      const transactionResult = await sendTransaction(tx);
-      console.log("Transaction sent:", transactionResult);
-      
-      setSwapTxStatus("confirming");
-      
-      // Warten auf Bestätigung
-      await new Promise(resolve => setTimeout(resolve, 5000));
-      
-      // Balance nach Swap aktualisieren
-      const fetchDfaithBalance = async () => {
-        if (!account?.address) return;
-        try {
+      if (allowanceData && allowanceData.data) {
+        const currentAllowance = BigInt(allowanceData.data);
+        const requiredAmount = BigInt(amountInWei);
+        
+        console.log("Current Allowance:", currentAllowance.toString());
+        console.log("Required Amount:", requiredAmount.toString());
+        
+        // Wenn Allowance nicht ausreicht, Approve-Transaktion senden
+        if (currentAllowance < requiredAmount) {
+          console.log("Insufficient allowance, requesting approval...");
+          setSwapTxStatus("approving");
+          
           const contract = getContract({
             client,
             chain: polygon,
             address: DFAITH_TOKEN
           });
           
-          const balance = await balanceOf({
-            contract,
-            address: account.address
-          });
+          // Sehr hohe Allowance setzen
+          const maxAllowance = BigInt("115792089237316195423570985008687907853269984665640564039457584007913129639935");
           
-          const balanceFormatted = Number(balance) / Math.pow(10, DFAITH_DECIMALS);
-          setDfaithBalance(balanceFormatted.toFixed(2));
-        } catch (error) {
-          console.error("Balance update error:", error);
+          const approveTransaction = prepareContractCall({
+            contract,
+            method: "function approve(address spender, uint256 amount) returns (bool)",
+            params: [txData.to, maxAllowance]
+          });
+
+          const approveResult = await sendTransaction(approveTransaction);
+          console.log("Approval sent:", approveResult);
+          
+          // Länger warten bis Approval bestätigt ist
+          await new Promise(resolve => setTimeout(resolve, 5000));
+          
+          // Allowance erneut prüfen
+          const newAllowanceResponse = await fetch(allowanceUrl);
+          if (newAllowanceResponse.ok) {
+            const newAllowanceData = await newAllowanceResponse.json();
+            const newAllowance = BigInt(newAllowanceData.data || "0");
+            
+            console.log("New Allowance:", newAllowance.toString());
+            
+            if (newAllowance < requiredAmount) {
+              throw new Error('Approval fehlgeschlagen oder noch nicht bestätigt');
+            }
+          }
         }
-      };
-      
-      await fetchDfaithBalance();
-      
-      setSwapTxStatus("success");
-      setSellAmount("");
-      
-      setTimeout(() => {
-        setSwapTxStatus(null);
-      }, 5000);
-      
-    } catch (error) {
-      console.error("Sell Swap Error:", error);
-      setSwapTxStatus("error");
-      
-      setTimeout(() => {
-        setSwapTxStatus(null);
-      }, 5000);
-    } finally {
-      setIsSwapping(false);
+      }
+    } else {
+      console.warn("Allowance check failed, proceeding anyway");
     }
+
+    // Jetzt den eigentlichen Swap durchführen
+    setSwapTxStatus("swapping");
+    
+    const { prepareTransaction } = await import("thirdweb");
+    const tx = prepareTransaction({
+      to: txData.to,
+      data: txData.data,
+      value: BigInt(txData.value || "0"),
+      chain: polygon,
+      client
+    });
+
+    console.log("Prepared transaction:", tx);
+    console.log("Sending transaction...");
+    
+    const transactionResult = await sendTransaction(tx);
+    console.log("Transaction sent:", transactionResult);
+    
+    setSwapTxStatus("confirming");
+    
+    // Länger warten auf Bestätigung
+    await new Promise(resolve => setTimeout(resolve, 8000));
+    
+    // Balance nach Swap aktualisieren
+    const fetchDfaithBalance = async () => {
+      if (!account?.address) return;
+      try {
+        const contract = getContract({
+          client,
+          chain: polygon,
+          address: DFAITH_TOKEN
+        });
+        
+        const balance = await balanceOf({
+          contract,
+          address: account.address
+        });
+        
+        const balanceFormatted = Number(balance) / Math.pow(10, DFAITH_DECIMALS);
+        setDfaithBalance(balanceFormatted.toFixed(2));
+      } catch (error) {
+        console.error("Balance update error:", error);
+      }
+    };
+    
+    await fetchDfaithBalance();
+    
+    setSwapTxStatus("success");
+    setSellAmount("");
+    
+    setTimeout(() => {
+      setSwapTxStatus(null);
+    }, 5000);
+    
+  } catch (error) {
+    console.error("Sell Swap Error:", error);
+    setSwapTxStatus("error");
+    
+    setTimeout(() => {
+      setSwapTxStatus(null);
+    }, 5000);
+  } finally {
+    setIsSwapping(false);
+  }
   };
 
   return (
@@ -420,11 +490,15 @@ export default function SellTab() {
                 swapTxStatus === "success" ? "bg-green-500/20 text-green-400" :
                 swapTxStatus === "error" ? "bg-red-500/20 text-red-400" :
                 swapTxStatus === "confirming" ? "bg-blue-500/20 text-blue-400" :
+                swapTxStatus === "approving" ? "bg-orange-500/20 text-orange-400" :
+                swapTxStatus === "swapping" ? "bg-purple-500/20 text-purple-400" :
                 "bg-yellow-500/20 text-yellow-400"
               }`}>
                 {swapTxStatus === "success" && "🎉 Verkauf erfolgreich!"}
                 {swapTxStatus === "error" && "❌ Verkauf fehlgeschlagen!"}
                 {swapTxStatus === "confirming" && "⏳ Bestätigung läuft..."}
+                {swapTxStatus === "approving" && "🔐 Token-Berechtigung wird gesetzt..."}
+                {swapTxStatus === "swapping" && "🔄 Swap wird durchgeführt..."}
                 {swapTxStatus === "pending" && "📝 Transaktion wird vorbereitet..."}
               </div>
             )}
