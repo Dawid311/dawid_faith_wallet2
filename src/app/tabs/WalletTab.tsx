@@ -220,6 +220,10 @@ export default function WalletTab() {
       return;
     }
 
+    // Direkt auf Ladezustand setzen, damit keine alte Balance angezeigt wird
+    setDfaithBalance(null);
+    setDinvestBalance(null);
+
     try {
       // D.FAITH Balance abrufen
       const dfaithContract = getContract({
