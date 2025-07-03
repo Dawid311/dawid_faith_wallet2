@@ -145,12 +145,16 @@ export default function WalletTab() {
     symbol: "POL"
   };
 
+  // latestRequest muss außerhalb von useEffect liegen, damit fetchBalances darauf zugreifen kann
+  let latestRequest = 0;
+
   // EIN useEffect für alles:
   useEffect(() => {
     let isMounted = true;
 
     const load = async () => {
-      await fetchBalances();
+      const requestId = ++latestRequest;
+      await fetchBalances(requestId);
       await fetchDfaithPrice();
     };
 
@@ -199,7 +203,7 @@ export default function WalletTab() {
   const formatAddress = (address: string) => `${address.slice(0, 6)}...${address.slice(-4)}`;
 
   // Balance-Aktualisierung
-  const fetchBalances = async () => {
+  const fetchBalances = async (requestId?: number) => {
     if (!account?.address) {
       setDfaithBalance(null);
       setDinvestBalance(null);
@@ -236,13 +240,13 @@ export default function WalletTab() {
       const dfaithFormatted = Number(dfaithBalanceResult) / Math.pow(10, DFAITH_TOKEN.decimals);
       const dinvestFormatted = Number(dinvestBalanceResult) / Math.pow(10, DINVEST_TOKEN.decimals);
 
-      setDfaithBalance({ displayValue: dfaithFormatted.toFixed(2) });
-      setDinvestBalance({ displayValue: Math.floor(dinvestFormatted).toString() });
-
-      // **Jetzt erst den EUR-Wert mit dem NEUEN Wert berechnen**
-      await fetchDfaithEurValue(dfaithFormatted.toFixed(2));
+      // Nur übernehmen, wenn dies der letzte gestartete Request ist:
+      if (typeof requestId === "undefined" || requestId === latestRequest) {
+        setDfaithBalance({ displayValue: dfaithFormatted.toFixed(2) });
+        setDinvestBalance({ displayValue: Math.floor(dinvestFormatted).toString() });
+        await fetchDfaithEurValue(dfaithFormatted.toFixed(2));
+      }
     } catch (error) {
-      console.error("Fehler beim Abrufen der Balances:", error);
       setDfaithBalance({ displayValue: "0.00" });
       setDinvestBalance({ displayValue: "0" });
       setDfaithEurValue("0.00");
