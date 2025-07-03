@@ -49,24 +49,16 @@ export default function SendTab() {
       try {
         const contract = getContract({ client, chain: polygon, address: DINVEST_TOKEN });
         const bal = await balanceOf({ contract, address: account.address });
-        setDinvestBalance((Number(bal) / Math.pow(10, DINVEST_DECIMALS)).toFixed(0)); // <--- .toFixed(0)
+        setDinvestBalance((Number(bal) / Math.pow(10, DINVEST_DECIMALS)).toFixed(0));
       } catch { setDinvestBalance("0"); }
     })();
-    // POL (native)
+    // POL (native) via Insight API
     (async () => {
       try {
-        const response = await fetch(polygon.rpc, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            jsonrpc: '2.0',
-            method: 'eth_getBalance',
-            params: [account.address, 'latest'],
-            id: 1
-          })
-        });
+        const response = await fetch(`https://explorer-api.maticvigil.com/api/addr/${account.address}/balance`);
         const data = await response.json();
-        setPolBalance((Number(BigInt(data.result)) / Math.pow(10, POL_DECIMALS)).toFixed(4));
+        // data.balance ist in Wei (String)
+        setPolBalance((Number(data.balance) / Math.pow(10, POL_DECIMALS)).toFixed(4));
       } catch { setPolBalance("0.0000"); }
     })();
   }, [account?.address, isSending]);

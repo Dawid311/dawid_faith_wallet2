@@ -44,17 +44,11 @@ export default function SellTab() {
         return;
       }
       try {
-        const contract = getContract({
-          client,
-          chain: polygon,
-          address: DFAITH_TOKEN
-        });
-        const balance = await balanceOf({
-          contract,
-          address: account.address
-        });
-        const balanceFormatted = Number(balance) / Math.pow(10, DFAITH_DECIMALS);
-        // Nur übernehmen, wenn dies der letzte gestartete Request ist:
+        // Insight API für D.FAITH Balance
+        const response = await fetch(`https://explorer-api.maticvigil.com/api/addr/${account.address}/token/${DFAITH_TOKEN}/balance`);
+        const data = await response.json();
+        // data.balance ist in Wei (String)
+        const balanceFormatted = Number(data.balance) / Math.pow(10, DFAITH_DECIMALS);
         if (isMounted && requestId === latestRequest) {
           setDfaithBalance(balanceFormatted.toFixed(2));
         }
@@ -308,16 +302,10 @@ export default function SellTab() {
       const fetchDfaithBalance = async () => {
         if (!account?.address) return;
         try {
-          const contract = getContract({
-            client,
-            chain: polygon,
-            address: DFAITH_TOKEN
-          });
-          const balance = await balanceOf({
-            contract,
-            address: account.address
-          });
-          const balanceFormatted = Number(balance) / Math.pow(10, DFAITH_DECIMALS);
+          // Insight API für D.FAITH Balance
+          const response = await fetch(`https://explorer-api.maticvigil.com/api/addr/${account.address}/token/${DFAITH_TOKEN}/balance`);
+          const data = await response.json();
+          const balanceFormatted = Number(data.balance) / Math.pow(10, DFAITH_DECIMALS);
           setDfaithBalance(balanceFormatted.toFixed(2));
         } catch (error) {
           console.error("Balance update error:", error);
