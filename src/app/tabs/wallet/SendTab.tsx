@@ -18,8 +18,8 @@ export default function SendTab() {
   // Token-Konstanten mit neuen Adressen
   const DFAITH_TOKEN = "0xF051E3B0335eB332a7ef0dc308BB4F0c10301060";
   const DFAITH_DECIMALS = 2;
-  const DINVEST_TOKEN = "0x0000000000000000000000000000000000000000"; // Ersetze ggf. durch echte Adresse
-  const DINVEST_DECIMALS = 4;
+  const DINVEST_TOKEN = "0x90aCC32F7b0B1CACc3958a260c096c10CCfa0383";
+  const DINVEST_DECIMALS = 0;
   const POL_TOKEN = "0x0000000000000000000000000000000000001010";
   const POL_DECIMALS = 18;
 
@@ -32,24 +32,26 @@ export default function SendTab() {
   useEffect(() => {
     if (!account?.address) {
       setDfaithBalance("0.00");
-      setDinvestBalance("0.0000");
+      setDinvestBalance("0");
       setPolBalance("0.0000");
       return;
     }
     // D.FAITH
     (async () => {
       try {
-        const contract = getContract({ client, chain: polygon, address: DFAITH_TOKEN });
-        const bal = await balanceOf({ contract, address: account.address });
-        setDfaithBalance((Number(bal) / Math.pow(10, DFAITH_DECIMALS)).toFixed(2));
+        const res = await fetch(`https://insight.thirdweb.com/v1/tokens?chain_id=137&token_address=${DFAITH_TOKEN}&owner_address=${account.address}&include_native=true`);
+        const data = await res.json();
+        const bal = data?.data?.[0]?.balance ?? "0";
+        setDfaithBalance((Number(bal) / Math.pow(10, DFAITH_DECIMALS)).toFixed(DFAITH_DECIMALS));
       } catch { setDfaithBalance("0.00"); }
     })();
     // D.INVEST
     (async () => {
       try {
-        const contract = getContract({ client, chain: polygon, address: DINVEST_TOKEN });
-        const bal = await balanceOf({ contract, address: account.address });
-        setDinvestBalance((Number(bal) / Math.pow(10, DINVEST_DECIMALS)).toFixed(0));
+        const res = await fetch(`https://insight.thirdweb.com/v1/tokens?chain_id=137&token_address=${DINVEST_TOKEN}&owner_address=${account.address}&include_native=true`);
+        const data = await res.json();
+        const bal = data?.data?.[0]?.balance ?? "0";
+        setDinvestBalance(Math.floor(Number(bal)).toString());
       } catch { setDinvestBalance("0"); }
     })();
     // POL (native) via Insight API
@@ -57,7 +59,6 @@ export default function SendTab() {
       try {
         const response = await fetch(`https://explorer-api.maticvigil.com/api/addr/${account.address}/balance`);
         const data = await response.json();
-        // data.balance ist in Wei (String)
         setPolBalance((Number(data.balance) / Math.pow(10, POL_DECIMALS)).toFixed(4));
       } catch { setPolBalance("0.0000"); }
     })();

@@ -9,6 +9,8 @@ import { balanceOf, approve } from "thirdweb/extensions/erc20";
 
 const DFAITH_TOKEN = "0xF051E3B0335eB332a7ef0dc308BB4F0c10301060"; // Neue D.FAITH Token-Adresse
 const DFAITH_DECIMALS = 2; // Neue Dezimalstellen
+const DINVEST_TOKEN = "0x90aCC32F7b0B1CACc3958a260c096c10CCfa0383"; // D.INVEST Token Adresse
+const DINVEST_DECIMALS = 0; // D.INVEST hat keine Dezimalstellen
 const POL_TOKEN = "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270"; // POL (WMATIC)
 const POL_DECIMALS = 18;
 const UNISWAP_ROUTER = "0xa5E0829CaCEd8fFDD4De3c43696c57F7D7A678ff"; // QuickSwap Router auf Polygon
@@ -176,6 +178,37 @@ export default function BuyTab() {
     fetchPolBalance();
     const interval = setInterval(fetchPolBalance, 10000);
     return () => clearInterval(interval);
+  }, [account?.address]);
+
+  // D.FAITH Balance und D.INVEST Balance von der Insight API laden
+  const [dfaithBalance, setDfaithBalance] = useState("0.00");
+  const [dinvestBalance, setDinvestBalance] = useState("0");
+
+  // Balances laden
+  useEffect(() => {
+    if (!account?.address) {
+      setDfaithBalance("0.00");
+      setDinvestBalance("0");
+      return;
+    }
+    // D.FAITH
+    (async () => {
+      try {
+        const res = await fetch(`https://insight.thirdweb.com/v1/tokens?chain_id=137&token_address=${DFAITH_TOKEN}&owner_address=${account.address}&include_native=true`);
+        const data = await res.json();
+        const bal = data?.data?.[0]?.balance ?? "0";
+        setDfaithBalance((Number(bal) / Math.pow(10, DFAITH_DECIMALS)).toFixed(DFAITH_DECIMALS));
+      } catch { setDfaithBalance("0.00"); }
+    })();
+    // D.INVEST
+    (async () => {
+      try {
+        const res = await fetch(`https://insight.thirdweb.com/v1/tokens?chain_id=137&token_address=${DINVEST_TOKEN}&owner_address=${account.address}&include_native=true`);
+        const data = await res.json();
+        const bal = data?.data?.[0]?.balance ?? "0";
+        setDinvestBalance(Math.floor(Number(bal)).toString());
+      } catch { setDinvestBalance("0"); }
+    })();
   }, [account?.address]);
 
   // D.FAITH Swap Funktion mit Transaktionsbestätigung
@@ -440,6 +473,17 @@ export default function BuyTab() {
                   </div>
                   <div className="text-xs text-zinc-500 mt-1">
                     Native POL Token für Swaps
+                  </div>
+                </div>
+                
+                {/* D.FAITH Balance */}
+                <div className="mb-4 p-3 bg-zinc-800/50 rounded-lg">
+                  <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
+                    <span className="text-sm text-zinc-400">Ihr D.FAITH:</span>
+                    <span className="text-sm text-amber-400 font-bold">{dfaithBalance} D.FAITH</span>
+                  </div>
+                  <div className="text-xs text-zinc-500 mt-1">
+                    Aus Ihrer Wallet
                   </div>
                 </div>
                 

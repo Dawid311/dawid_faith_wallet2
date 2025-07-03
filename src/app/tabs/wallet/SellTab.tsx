@@ -9,10 +9,13 @@ import { balanceOf } from "thirdweb/extensions/erc20";
 
 const DFAITH_TOKEN = "0xF051E3B0335eB332a7ef0dc308BB4F0c10301060";
 const DFAITH_DECIMALS = 2;
+const DINVEST_TOKEN = "0x90aCC32F7b0B1CACc3958a260c096c10CCfa0383";
+const DINVEST_DECIMALS = 0;
 
 export default function SellTab() {
   const [sellAmount, setSellAmount] = useState("");
   const [dfaithBalance, setDfaithBalance] = useState("0");
+  const [dinvestBalance, setDinvestBalance] = useState("0");
   const [dfaithPrice, setDfaithPrice] = useState<number | null>(null);
   const [polPriceEur, setPolPriceEur] = useState<number | null>(null);
   const [showSellModal, setShowSellModal] = useState(false);
@@ -32,7 +35,7 @@ export default function SellTab() {
   // Neuer State für prozessschritte
   const [sellStep, setSellStep] = useState<'initial' | 'quoteFetched' | 'approved' | 'completed'>('initial');
   
-  // D.FAITH Balance laden
+  // D.FAITH & D.INVEST Balance laden
   useEffect(() => {
     let isMounted = true;
     let latestRequest = 0;
@@ -41,19 +44,30 @@ export default function SellTab() {
       const requestId = ++latestRequest;
       if (!account?.address) {
         if (isMounted) setDfaithBalance("0");
+        if (isMounted) setDinvestBalance("0");
         return;
       }
       try {
-        // Insight API für D.FAITH Balance
-        const response = await fetch(`https://explorer-api.maticvigil.com/api/addr/${account.address}/token/${DFAITH_TOKEN}/balance`);
-        const data = await response.json();
-        // data.balance ist in Wei (String)
-        const balanceFormatted = Number(data.balance) / Math.pow(10, DFAITH_DECIMALS);
+        // D.FAITH
+        const res = await fetch(`https://insight.thirdweb.com/v1/tokens?chain_id=137&token_address=${DFAITH_TOKEN}&owner_address=${account.address}&include_native=true`);
+        const data = await res.json();
+        const bal = data?.data?.[0]?.balance ?? "0";
         if (isMounted && requestId === latestRequest) {
-          setDfaithBalance(balanceFormatted.toFixed(2));
+          setDfaithBalance((Number(bal) / Math.pow(10, DFAITH_DECIMALS)).toFixed(DFAITH_DECIMALS));
         }
       } catch (error) {
         if (isMounted) setDfaithBalance("0");
+      }
+      try {
+        // D.INVEST
+        const res = await fetch(`https://insight.thirdweb.com/v1/tokens?chain_id=137&token_address=${DINVEST_TOKEN}&owner_address=${account.address}&include_native=true`);
+        const data = await res.json();
+        const bal = data?.data?.[0]?.balance ?? "0";
+        if (isMounted && requestId === latestRequest) {
+          setDinvestBalance(Math.floor(Number(bal)).toString());
+        }
+      } catch (error) {
+        if (isMounted) setDinvestBalance("0");
       }
     };
 

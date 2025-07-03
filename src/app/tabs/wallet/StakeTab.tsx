@@ -8,8 +8,10 @@ import { useSendTransaction } from "thirdweb/react";
 import { balanceOf, approve } from "thirdweb/extensions/erc20";
 
 const STAKING_CONTRACT = "0x651BACc1A1579f2FaaeDA2450CE59bB5E7D26e7d"; // Neue Staking Contract-Adresse
-const DINVEST_TOKEN = "0x90aCC32F7b0B1CACc3958a260c096c10CCfa0383"; // Neue D.INVEST Token-Adresse
-const DFAITH_TOKEN = "0xF051E3B0335eB332a7ef0dc308BB4F0c10301060"; // D.FAITH Token-Adresse
+const DFAITH_TOKEN = "0xF051E3B0335eB332a7ef0dc308BB4F0c10301060";
+const DFAITH_DECIMALS = 2;
+const DINVEST_TOKEN = "0x90aCC32F7b0B1CACc3958a260c096c10CCfa0383";
+const DINVEST_DECIMALS = 0;
 const client = createThirdwebClient({ clientId: process.env.NEXT_PUBLIC_TEMPLATE_CLIENT_ID! });
 
 export default function StakeTab() {
@@ -27,6 +29,8 @@ export default function StakeTab() {
   const [totalRewardsDistributed, setTotalRewardsDistributed] = useState("0");
   const [totalStakedTokens, setTotalStakedTokens] = useState("0");
   const [userCount, setUserCount] = useState(0);
+  const [dfaithBalance, setDfaithBalance] = useState("0.00");
+  const [dinvestBalance, setDinvestBalance] = useState("0");
 
   // Fetch balances und Contract-Status
   useEffect(() => {
@@ -119,6 +123,33 @@ export default function StakeTab() {
       }
     })();
   }, [account?.address, txStatus]);
+
+  // D.FAITH und D.INVEST Balances abrufen
+  useEffect(() => {
+    if (!account?.address) {
+      setDfaithBalance("0.00");
+      setDinvestBalance("0");
+      return;
+    }
+    // D.FAITH
+    (async () => {
+      try {
+        const res = await fetch(`https://insight.thirdweb.com/v1/tokens?chain_id=137&token_address=${DFAITH_TOKEN}&owner_address=${account.address}&include_native=true`);
+        const data = await res.json();
+        const bal = data?.data?.[0]?.balance ?? "0";
+        setDfaithBalance((Number(bal) / Math.pow(10, DFAITH_DECIMALS)).toFixed(DFAITH_DECIMALS));
+      } catch { setDfaithBalance("0.00"); }
+    })();
+    // D.INVEST
+    (async () => {
+      try {
+        const res = await fetch(`https://insight.thirdweb.com/v1/tokens?chain_id=137&token_address=${DINVEST_TOKEN}&owner_address=${account.address}&include_native=true`);
+        const data = await res.json();
+        const bal = data?.data?.[0]?.balance ?? "0";
+        setDinvestBalance(Math.floor(Number(bal)).toString());
+      } catch { setDinvestBalance("0"); }
+    })();
+  }, [account?.address]);
 
   // Stake Function
   const handleStake = async () => {
@@ -214,6 +245,12 @@ export default function StakeTab() {
           D.INVEST Staking
         </h2>
         <p className="text-zinc-400">Verdienen Sie wöchentlich D.FAITH Token durch Staking</p>
+      </div>
+
+      {/* Balance Anzeige */}
+      <div className="mb-4">
+        <div className="text-sm text-zinc-400">D.FAITH Balance: <span className="text-amber-400 font-bold">{dfaithBalance}</span></div>
+        <div className="text-sm text-zinc-400">D.INVEST Balance: <span className="text-amber-400 font-bold">{dinvestBalance}</span></div>
       </div>
 
       {/* Staking Overview: Verfügbar, Gestaked, Reward */}
