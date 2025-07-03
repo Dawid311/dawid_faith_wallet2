@@ -253,11 +253,13 @@ export default function BuyTab() {
         
         setSwapTxStatus("confirming");
         
-        // Warte auf Bestätigung
-        await new Promise(resolve => setTimeout(resolve, 5000));
+        // Sofortige Balance-Aktualisierung starten
+        updatePolBalance(true);
         
-        // Aktualisiere POL-Balance
-        await updatePolBalance();
+        // Nach kurzer Verzögerung noch einmal aktualisieren für genauere Balance
+        setTimeout(() => {
+          updatePolBalance(true);
+        }, 3000);
         
         setSwapTxStatus("success");
         setSwapAmountPol("");
@@ -289,26 +291,61 @@ export default function BuyTab() {
     }
   };
   
-  // Funktion zum Aktualisieren der POL-Balance
-  const updatePolBalance = async () => {
+  // Verbesserte Funktion zum Aktualisieren der POL-Balance mit mehreren Versuchen
+  const updatePolBalance = async (isPostSwap = false) => {
     if (!account?.address) return;
-    try {
-      const response = await fetch(polygon.rpc, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          jsonrpc: '2.0',
-          method: 'eth_getBalance',
-          params: [account.address, 'latest'],
-          id: 1
-        })
-      });
-      const data = await response.json();
-      const balance = BigInt(data.result);
-      const polFormatted = Number(balance) / Math.pow(10, 18);
-      setPolBalance(polFormatted.toFixed(3)); // Auf 3 Stellen
-    } catch (error) {
-      console.error("Balance update error:", error);
+    
+    // Bei Post-Swap-Updates mehrere Versuche durchführen
+    const maxAttempts = isPostSwap ? 3 : 1;
+    let attempts = 0;
+    let success = false;
+    
+    while (attempts < maxAttempts && !success) {
+      try {
+        console.log(`Balance-Update Versuch ${attempts + 1}/${maxAttempts}`);
+        
+        const response = await fetch(polygon.rpc, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            method: 'eth_getBalance',
+            params: [account.address, 'latest'],
+            id: 1
+          })
+        });
+        
+        if (!response.ok) {
+          throw new Error(`RPC Fehler: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        if (!data || !data.result) {
+          throw new Error("Ungültige RPC-Antwort");
+        }
+        
+        const balance = BigInt(data.result);
+        const polFormatted = Number(balance) / Math.pow(10, 18);
+        
+        console.log("Neue POL Balance:", polFormatted.toFixed(3));
+        setPolBalance(polFormatted.toFixed(3));
+        
+        success = true;
+      } catch (error) {
+        console.error(`Balance-Update Fehler (Versuch ${attempts + 1}):`, error);
+        attempts++;
+        
+        // Kurze Verzögerung vor dem nächsten Versuch
+        if (attempts < maxAttempts) {
+          await new Promise(r => setTimeout(r, 1000));
+        }
+      }
+    }
+    
+    // Wenn alle Versuche fehlgeschlagen sind und es ein Post-Swap-Update ist,
+    // einen weiteren verzögerten Versuch planen
+    if (!success && isPostSwap) {
+      setTimeout(() => updatePolBalance(false), 2000);
     }
   };
 

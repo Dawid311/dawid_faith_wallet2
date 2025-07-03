@@ -29,6 +29,9 @@ export default function SellTab() {
   const account = useActiveAccount();
   const { mutateAsync: sendTransaction } = useSendTransaction();
 
+  // Neuer State für prozessschritte
+  const [sellStep, setSellStep] = useState<'initial' | 'quoteFetched' | 'approved' | 'completed'>('initial');
+  
   // D.FAITH Balance laden
   useEffect(() => {
     let isMounted = true;
@@ -125,8 +128,10 @@ export default function SellTab() {
     setNeedsApproval(false);
     setQuoteError(null);
     setSwapTxStatus(null);
+    setSellStep('initial');
   };
 
+  // Funktion um eine Verkaufs-Quote zu erhalten
   const handleGetQuote = async () => {
     setSwapTxStatus("pending");
     setQuoteError(null);
@@ -137,6 +142,9 @@ export default function SellTab() {
     try {
       if (!sellAmount || parseFloat(sellAmount) <= 0 || !account?.address) return;
 
+      // Erster Schritt: Quote von OpenOcean API holen
+      console.log("1. Quote anfordern für", sellAmount, "D.FAITH");
+      
       const params = new URLSearchParams({
         chain: "polygon",
         inTokenAddress: DFAITH_TOKEN,
@@ -152,13 +160,17 @@ export default function SellTab() {
       const data = await response.json();
       if (!data || !data.data) throw new Error("OpenOcean: Keine Daten erhalten");
       const txData = data.data;
+      
+      console.log("Quote erhalten:", txData);
 
-      // Spenderadresse fest auf die gewünschte Adresse setzen
+      // Spenderadresse fest auf die OpenOcean Router Adresse setzen
       const spender = "0x6352a56caadC4F1E25CD6c75970Fa768A3304e64";
       setQuoteTxData(txData);
       setSpenderAddress(spender);
 
-      // Allowance prüfen
+      // Zweiter Schritt: Prüfen, ob Approval nötig ist
+      console.log("2. Prüfe Approval für", spender);
+      
       const allowanceParams = new URLSearchParams({
         chain: "polygon",
         account: account.address,
@@ -169,6 +181,8 @@ export default function SellTab() {
       let allowanceValue = "0";
       if (allowanceResponse.ok) {
         const allowanceData = await allowanceResponse.json();
+        console.log("Allowance Daten:", allowanceData);
+        
         if (allowanceData && allowanceData.data !== undefined && allowanceData.data !== null) {
           if (typeof allowanceData.data === "object") {
             if (Array.isArray(allowanceData.data)) {
@@ -185,6 +199,9 @@ export default function SellTab() {
             allowanceValue = allowanceData.data.toString();
           }
         }
+        
+        console.log("Aktuelle Allowance:", allowanceValue);
+        
         let currentAllowance: bigint;
         try {
           currentAllowance = BigInt(allowanceValue);
@@ -194,26 +211,38 @@ export default function SellTab() {
         const amountInWei = (parseFloat(sellAmount) * Math.pow(10, DFAITH_DECIMALS)).toFixed(0);
         const requiredAmount = BigInt(amountInWei);
 
+        console.log("Benötigte Allowance:", requiredAmount.toString());
+        console.log("Aktuelle Allowance:", currentAllowance.toString());
+        
         if (currentAllowance < requiredAmount) {
+          console.log("Approval nötig");
           setNeedsApproval(true);
         } else {
+          console.log("Approval bereits vorhanden");
           setNeedsApproval(false);
         }
       } else {
+        console.log("Fehler beim Abrufen der Allowance - setze Approval als nötig");
         setNeedsApproval(true);
       }
+      
+      setSellStep('quoteFetched');
       setSwapTxStatus(null);
     } catch (e: any) {
+      console.error("Quote Fehler:", e);
       setQuoteError(e.message || "Quote Fehler");
       setSwapTxStatus("error");
       setTimeout(() => setSwapTxStatus(null), 4000);
     }
   };
 
+  // Funktion um die Tokens für den Swap freizugeben (Approve)
   const handleApprove = async () => {
     if (!spenderAddress || !account?.address) return;
     setSwapTxStatus("approving");
     try {
+      console.log("3. Approve Transaktion starten für Spender:", spenderAddress);
+      
       const contract = getContract({
         client,
         chain: polygon,
@@ -221,28 +250,43 @@ export default function SellTab() {
       });
       const amountInWei = (parseFloat(sellAmount) * Math.pow(10, DFAITH_DECIMALS)).toFixed(0);
       const requiredAmountWithBuffer = BigInt(Math.floor(Number(amountInWei) * 1.1).toString());
+      
+      console.log("Approve-Betrag mit Buffer:", requiredAmountWithBuffer.toString());
+      
       const approveTransaction = prepareContractCall({
         contract,
         method: "function approve(address spender, uint256 amount) returns (bool)",
         params: [spenderAddress, requiredAmountWithBuffer]
       });
+      
+      console.log("Sending approve transaction...");
       const approveResult = await sendTransaction(approveTransaction);
+      console.log("Approve TX gesendet:", approveResult);
+      
       setSwapTxStatus("waiting_approval");
       const { waitForReceipt } = await import("thirdweb");
-      await waitForReceipt(approveResult);
+      const receipt = await waitForReceipt(approveResult);
+      console.log("Approve bestätigt:", receipt);
+      
       setNeedsApproval(false);
+      setSellStep('approved');
       setSwapTxStatus(null);
     } catch (e) {
+      console.error("Approve Fehler:", e);
       setSwapTxStatus("error");
       setTimeout(() => setSwapTxStatus(null), 4000);
     }
   };
 
+  // Funktion für den eigentlichen Token-Swap
   const handleSellSwap = async () => {
     if (!quoteTxData || !account?.address) return;
     setIsSwapping(true);
     setSwapTxStatus("swapping");
     try {
+      console.log("4. Swap Transaktion starten");
+      console.log("Swap TX Daten:", quoteTxData);
+      
       const { prepareTransaction } = await import("thirdweb");
       const tx = prepareTransaction({
         to: quoteTxData.to,
@@ -251,10 +295,16 @@ export default function SellTab() {
         chain: polygon,
         client
       });
-      await sendTransaction(tx);
+      
+      console.log("Sending swap transaction...");
+      const swapResult = await sendTransaction(tx);
+      console.log("Swap TX gesendet:", swapResult);
+      
       setSwapTxStatus("confirming");
       await new Promise(resolve => setTimeout(resolve, 8000));
+      
       // Balance nach Swap aktualisieren
+      console.log("5. Aktualisiere Balance nach Swap");
       const fetchDfaithBalance = async () => {
         if (!account?.address) return;
         try {
@@ -269,15 +319,20 @@ export default function SellTab() {
           });
           const balanceFormatted = Number(balance) / Math.pow(10, DFAITH_DECIMALS);
           setDfaithBalance(balanceFormatted.toFixed(2));
-        } catch {}
+        } catch (error) {
+          console.error("Balance update error:", error);
+        }
       };
+      
       await fetchDfaithBalance();
+      setSellStep('completed');
       setSwapTxStatus("success");
       setSellAmount("");
       setQuoteTxData(null);
       setSpenderAddress(null);
       setTimeout(() => setSwapTxStatus(null), 5000);
     } catch (error) {
+      console.error("Swap Fehler:", error);
       setSwapTxStatus("error");
       setTimeout(() => setSwapTxStatus(null), 5000);
     } finally {
@@ -285,24 +340,32 @@ export default function SellTab() {
     }
   };
 
+  // Alle Schritte in einer Funktion
   const handleSellAllInOne = async () => {
     if (!sellAmount || parseFloat(sellAmount) <= 0 || isSwapping || parseFloat(sellAmount) > parseFloat(dfaithBalance)) return;
-    setIsSwapping(true);
-    setSwapTxStatus("pending");
-    setQuoteError(null);
-
+    
     try {
-      // 1. Quote holen
-      await handleGetQuote();
-
-      // 2. Falls Approve nötig, Approve durchführen
-      if (needsApproval) {
+      // Erster Schritt
+      console.log("Start des Verkaufsprozesses");
+      
+      // Nur weitere Schritte ausführen, wenn Quote erfolgreich war
+      if (sellStep === 'initial') {
+        setIsSwapping(true);
+        await handleGetQuote();
+      }
+      
+      // Nur Approve ausführen, wenn nötig
+      if (sellStep === 'quoteFetched' && needsApproval) {
         await handleApprove();
       }
-
-      // 3. Swap durchführen
-      await handleSellSwap();
+      
+      // Swap ausführen wenn Quote vorhanden und Approve erledigt/nicht nötig
+      if ((sellStep === 'quoteFetched' && !needsApproval) || sellStep === 'approved') {
+        await handleSellSwap();
+      }
+      
     } catch (e: any) {
+      console.error("Verkaufsprozess Fehler:", e);
       setQuoteError(e.message || "Fehler beim Verkauf");
       setSwapTxStatus("error");
       setTimeout(() => setSwapTxStatus(null), 4000);
@@ -377,6 +440,19 @@ export default function SellTab() {
           <div className="bg-zinc-900 rounded-xl p-6 max-w-md w-full mx-4 border border-red-500 my-8">
             <div className="mb-6 text-red-400 text-2xl font-bold text-center">D.FAITH verkaufen</div>
             
+            {/* Prozessschritte anzeigen */}
+            <div className="mb-4 flex justify-between">
+              <div className={`text-xs ${sellStep !== 'initial' ? 'text-green-400' : 'text-zinc-500'}`}>
+                1. Quote ✓
+              </div>
+              <div className={`text-xs ${needsApproval === false ? 'text-green-400' : sellStep === 'approved' ? 'text-green-400' : 'text-zinc-500'}`}>
+                2. {needsApproval === false ? 'Approve ✓' : 'Approve'}
+              </div>
+              <div className={`text-xs ${sellStep === 'completed' ? 'text-green-400' : 'text-zinc-500'}`}>
+                3. Swap
+              </div>
+            </div>
+            
             {/* D.FAITH Balance */}
             <div className="mb-4 p-3 bg-zinc-800/50 rounded-lg">
               <div className="flex justify-between text-sm">
@@ -399,12 +475,12 @@ export default function SellTab() {
                   className="w-full bg-zinc-800 border border-zinc-600 rounded-xl py-3 px-4 text-lg font-bold text-amber-400 focus:border-red-500 focus:outline-none"
                   value={sellAmount}
                   onChange={(e) => setSellAmount(e.target.value)}
-                  disabled={isSwapping}
+                  disabled={isSwapping || sellStep !== 'initial'}
                 />
                 <button
                   className="absolute right-3 top-1/2 transform -translate-y-1/2 text-xs px-2 py-1 bg-amber-500/20 text-amber-400 rounded hover:bg-amber-500/30 transition"
                   onClick={() => setSellAmount((parseFloat(dfaithBalance) * 0.95).toFixed(2))}
-                  disabled={isSwapping || parseFloat(dfaithBalance) <= 0}
+                  disabled={isSwapping || parseFloat(dfaithBalance) <= 0 || sellStep !== 'initial'}
                 >
                   MAX
                 </button>
@@ -424,27 +500,27 @@ export default function SellTab() {
                   className="flex-1 bg-zinc-800 border border-zinc-600 rounded-xl py-2 px-3 text-sm text-zinc-300 focus:border-red-500 focus:outline-none"
                   value={slippage}
                   onChange={(e) => setSlippage(e.target.value)}
-                  disabled={isSwapping}
+                  disabled={isSwapping || sellStep !== 'initial'}
                 />
                 <div className="flex gap-1">
                   <button
                     className="text-xs px-2 py-1 bg-zinc-700/50 text-zinc-400 rounded hover:bg-zinc-600/50 transition"
                     onClick={() => setSlippage("0.5")}
-                    disabled={isSwapping}
+                    disabled={isSwapping || sellStep !== 'initial'}
                   >
                     0.5%
                   </button>
                   <button
                     className="text-xs px-2 py-1 bg-zinc-700/50 text-zinc-400 rounded hover:bg-zinc-600/50 transition"
                     onClick={() => setSlippage("1")}
-                    disabled={isSwapping}
+                    disabled={isSwapping || sellStep !== 'initial'}
                   >
                     1%
                   </button>
                   <button
                     className="text-xs px-2 py-1 bg-zinc-700/50 text-zinc-400 rounded hover:bg-zinc-600/50 transition"
                     onClick={() => setSlippage("3")}
-                    disabled={isSwapping}
+                    disabled={isSwapping || sellStep !== 'initial'}
                   >
                     3%
                   </button>
@@ -480,50 +556,113 @@ export default function SellTab() {
                 swapTxStatus === "swapping" ? "bg-purple-500/20 text-purple-400" :
                 "bg-yellow-500/20 text-yellow-400"
               }`}>
-                {swapTxStatus === "success" && "🎉 Verkauf erfolgreich!"}
-                {swapTxStatus === "error" && "❌ Verkauf fehlgeschlagen!"}
-                {swapTxStatus === "confirming" && "⏳ Bestätigung läuft..."}
-                {swapTxStatus === "approving" && "🔐 Token-Berechtigung wird gesetzt..."}
-                {swapTxStatus === "swapping" && "🔄 Swap wird durchgeführt..."}
-                {swapTxStatus === "pending" && "📝 Transaktion wird vorbereitet..."}
+                {swapTxStatus === "success" && (
+                  <>
+                    <div>🎉 Verkauf erfolgreich!</div>
+                    <div className="text-xs mt-1">Ihre D.FAITH wurden erfolgreich in POL getauscht</div>
+                  </>
+                )}
+                {swapTxStatus === "error" && (
+                  <>
+                    <div>❌ Verkauf fehlgeschlagen!</div>
+                    <div className="text-xs mt-1">{quoteError || "Ein Fehler ist aufgetreten"}</div>
+                  </>
+                )}
+                {swapTxStatus === "confirming" && (
+                  <>
+                    <div>⏳ Bestätigung läuft...</div>
+                    <div className="text-xs mt-1">Warte auf Blockchain-Bestätigung</div>
+                  </>
+                )}
+                {swapTxStatus === "approving" && (
+                  <>
+                    <div>🔐 Token-Berechtigung wird gesetzt...</div>
+                    <div className="text-xs mt-1">Bitte bestätigen Sie in Ihrem Wallet</div>
+                  </>
+                )}
+                {swapTxStatus === "waiting_approval" && (
+                  <>
+                    <div>⌛ Approval wird bestätigt...</div>
+                    <div className="text-xs mt-1">Warte auf Blockchain-Bestätigung</div>
+                  </>
+                )}
+                {swapTxStatus === "swapping" && (
+                  <>
+                    <div>🔄 Swap wird durchgeführt...</div>
+                    <div className="text-xs mt-1">Bitte bestätigen Sie in Ihrem Wallet</div>
+                  </>
+                )}
+                {swapTxStatus === "pending" && (
+                  <>
+                    <div>📝 Quote wird abgefragt...</div>
+                    <div className="text-xs mt-1">Bitte warten Sie einen Moment</div>
+                  </>
+                )}
               </div>
             )}
 
             {/* Buttons */}
             <div className="space-y-3">
-              {!quoteTxData && (
+              {/* Schritt 1: Quote anfordern */}
+              {sellStep === 'initial' && (
                 <Button
                   className="w-full bg-gradient-to-r from-red-500 to-red-600 text-white font-bold py-3 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50"
                   onClick={handleGetQuote}
                   disabled={!sellAmount || parseFloat(sellAmount) <= 0 || isSwapping || parseFloat(sellAmount) > parseFloat(dfaithBalance)}
                 >
                   <FaExchangeAlt className="inline mr-2" />
-                  {isSwapping ? "Lade Quote..." : `${sellAmount || "0"} D.FAITH verkaufen`}
+                  {isSwapping ? "Lade Quote..." : `Quote für ${sellAmount || "0"} D.FAITH holen`}
                 </Button>
               )}
-              {quoteError && (
-                <div className="text-red-400 text-sm text-center">{quoteError}</div>
-              )}
-              {quoteTxData && needsApproval && (
+              
+              {/* Schritt 2: Approve durchführen (wenn nötig) */}
+              {sellStep === 'quoteFetched' && needsApproval && (
                 <Button
                   className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 rounded-xl mb-2"
                   onClick={handleApprove}
                   disabled={isSwapping}
                 >
-                  <FaArrowDown className="inline mr-2" />
-                  D.FAITH Token für Verkauf freigeben (Approve)
+                  <FaExchangeAlt className="inline mr-2" />
+                  {isSwapping ? "Approval läuft..." : "D.FAITH Token für Verkauf freigeben"}
                 </Button>
               )}
-              {quoteTxData && !needsApproval && (
+              
+              {/* Schritt 3: Swap durchführen */}
+              {((sellStep === 'quoteFetched' && !needsApproval) || sellStep === 'approved') && (
                 <Button
                   className="w-full bg-gradient-to-r from-red-500 to-red-600 text-white font-bold py-3 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50"
-                  onClick={handleSellAllInOne}
-                  disabled={!sellAmount || parseFloat(sellAmount) <= 0 || isSwapping || parseFloat(sellAmount) > parseFloat(dfaithBalance)}
+                  onClick={handleSellSwap}
+                  disabled={isSwapping}
                 >
                   <FaExchangeAlt className="inline mr-2" />
-                  {isSwapping ? "Verkaufe..." : `${sellAmount || "0"} D.FAITH verkaufen`}
+                  {isSwapping ? "Verkaufe..." : `${sellAmount || "0"} D.FAITH jetzt verkaufen`}
                 </Button>
               )}
+              
+              {quoteError && (
+                <div className="text-red-400 text-sm text-center">{quoteError}</div>
+              )}
+              
+              {/* "Neuer Verkauf" Button wenn Verkauf abgeschlossen ist */}
+              {sellStep === 'completed' && (
+                <Button
+                  className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold py-3 rounded-xl hover:opacity-90 transition-opacity"
+                  onClick={() => {
+                    setSellStep('initial');
+                    setQuoteTxData(null);
+                    setSpenderAddress(null);
+                    setNeedsApproval(false);
+                    setQuoteError(null);
+                    setSellAmount("");
+                    setSwapTxStatus(null);
+                  }}
+                  disabled={isSwapping}
+                >
+                  Neuer Verkauf
+                </Button>
+              )}
+              
+              {/* Schließen Button */}
               <Button
                 className="w-full bg-zinc-600 hover:bg-zinc-700 text-white font-bold py-2 rounded-xl"
                 onClick={() => {
@@ -535,6 +674,7 @@ export default function SellTab() {
                   setSpenderAddress(null);
                   setNeedsApproval(false);
                   setQuoteError(null);
+                  setSellStep('initial');
                 }}
                 disabled={isSwapping}
               >
