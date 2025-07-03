@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { createThirdwebClient, getContract } from "thirdweb";
+// useBalance aus dem Import entfernen, da wir den alternativen API-Ansatz verwenden werden
 import { useActiveAccount, useActiveWalletConnectionStatus, useSendTransaction } from "thirdweb/react";
 import { ConnectButton } from "thirdweb/react";
 import { inAppWallet, createWallet } from "thirdweb/wallets";
@@ -113,10 +114,11 @@ export default function WalletTab() {
   const [dinvestBalance, setDinvestBalance] = useState<{ displayValue: string } | null>(null);
   const [dfaithEurValue, setDfaithEurValue] = useState<string>("0.00");
   const [dfaithPriceEur, setDfaithPriceEur] = useState<number>(0.001);
-  // Tracking für die aktuellste Anfrage als State hinzufügen
-  const [latestRequest, setLatestRequest] = useState(0);
-  // State für Refresh-Animation
+  // State für Loading und Refresh
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isLoadingBalances, setIsLoadingBalances] = useState(false);
+  // Tracking-ID für die aktuelle Abfrage
+  const requestIdRef = useRef(0);
 
   // Modal States
   const [showBuyModal, setShowBuyModal] = useState(false);
@@ -127,14 +129,14 @@ export default function WalletTab() {
   
   // Konstanten für Token mit echten Contract-Adressen
   const DFAITH_TOKEN = {
-    address: "0xF051E3B0335eB332a7ef0dc308BB4F0c10301060", // Neue D.FAITH Token-Contract-Adresse
-    decimals: 2, // Neue Dezimalstellen
+    address: "0xF051E3B0335eB332a7ef0dc308BB4F0c10301060", // D.FAITH Token-Contract-Adresse
+    decimals: 2, 
     symbol: "D.FAITH"
   };
 
   const DINVEST_TOKEN = {
-    address: "0x90aCC32F7b0B1CACc3958a260c096c10CCfa0383", // Neue D.INVEST Token-Contract-Adresse
-    decimals: 0, // Neue Dezimalstellen (0 statt 18)
+    address: "0x90aCC32F7b0B1CACc3958a260c096c10CCfa0383", // D.INVEST Token-Contract-Adresse
+    decimals: 0, 
     symbol: "D.INVEST"
   };
 
@@ -149,28 +151,83 @@ export default function WalletTab() {
     symbol: "POL"
   };
 
-  const requestIdRef = useRef(0);
-  const lastSuccessfulBalanceRef = useRef<{ 
-    dfaith: number | null, 
-    dinvest: number | null,
-    dfaithRaw: string | null,
-    dinvestRaw: string | null
-  }>({ 
-    dfaith: null, 
-    dinvest: null,
-    dfaithRaw: null,
-    dinvestRaw: null
-  });
+  // Neue Funktion zur direkten Abfrage der Token-Balance über ThirdWeb's Contract Read
+  const fetchTokenBalanceViaContract = async (
+    tokenAddress: string,
+    tokenDecimals: number,
+    accountAddress: string
+  ): Promise<string> => {
+    if (!accountAddress) return "0";
 
-  // Funktion für manuelle Aktualisierung der Balance
+    try {
+      const contract = getContract({
+        client,
+        chain: polygon,
+        address: tokenAddress,
+      });
+
+      const balanceResult = await balanceOf({
+        contract,
+        address: accountAddress
+      });
+
+      // Balance in lesbare Form umrechnen
+      return (Number(balanceResult) / Math.pow(10, tokenDecimals)).toString();
+    } catch (error) {
+      console.error(`Fehler beim Abrufen der Balance für ${tokenAddress}:`, error);
+      return "0";
+    }
+  };
+
+  // Zentrale Funktion zum Laden der Balances
+  const fetchTokenBalances = async () => {
+    if (!account?.address) return;
+    
+    setIsLoadingBalances(true);
+    const currentRequestId = ++requestIdRef.current;
+    
+    try {
+      console.log(`--- Starte Balance-Abruf (ID: ${currentRequestId}) ---`);
+      
+      // Beide Balances parallel abrufen
+      const [dfaithValue, dinvestValue] = await Promise.all([
+        fetchTokenBalanceViaContract(DFAITH_TOKEN.address, DFAITH_TOKEN.decimals, account.address),
+        fetchTokenBalanceViaContract(DINVEST_TOKEN.address, DINVEST_TOKEN.decimals, account.address)
+      ]);
+      
+      // Nur fortfahren, wenn dies immer noch die aktuelle Anfrage ist
+      if (currentRequestId !== requestIdRef.current) {
+        console.log(`Abfrage ID ${currentRequestId} verworfen (aktuell: ${requestIdRef.current})`);
+        return;
+      }
+      
+      console.log("D.FAITH Balance:", dfaithValue);
+      console.log("D.INVEST Balance:", dinvestValue);
+      
+      // Bei D.FAITH die Dezimalstellen formatieren, bei D.INVEST auf ganze Zahl abrunden
+      setDfaithBalance({ displayValue: Number(dfaithValue).toFixed(2) });
+      setDinvestBalance({ displayValue: Math.floor(Number(dinvestValue)).toString() });
+      
+      // EUR-Wert für D.FAITH berechnen
+      fetchDfaithEurValue(dfaithValue);
+      
+    } catch (error) {
+      console.error("Fehler beim Abrufen der Token-Balances:", error);
+    } finally {
+      if (currentRequestId === requestIdRef.current) {
+        setIsLoadingBalances(false);
+      }
+    }
+  };
+
+  // Funktion für manuelle Aktualisierung der Balance mit Animation
   const refreshBalances = async () => {
     if (!account?.address || isRefreshing) return;
     
     setIsRefreshing(true);
     
     try {
-      const myRequestId = ++requestIdRef.current;
-      await fetchBalances(myRequestId);
+      await fetchTokenBalances();
       await fetchDfaithPrice();
     } finally {
       // Nach einer kurzen Verzögerung den Refresh-Status zurücksetzen (Animation)
@@ -178,29 +235,22 @@ export default function WalletTab() {
     }
   };
 
-  // EIN useEffect für alles:
+  // UseEffect für initiales Laden und periodische Aktualisierung
   useEffect(() => {
     let isMounted = true;
-
-    const load = async () => {
-      const myRequestId = ++requestIdRef.current;
-      if (isMounted) {
-        await fetchBalances(myRequestId);
-        await fetchDfaithPrice();
-      }
+    
+    const loadData = async () => {
+      if (!account?.address || !isMounted) return;
+      
+      await fetchTokenBalances();
+      await fetchDfaithPrice();
     };
-
-    if (account?.address) {
-      load();
-    }
-
-    // Aktualisierung alle 15 Sekunden
-    const interval = setInterval(() => {
-      if (account?.address) {
-        load();
-      }
-    }, 15000); // 15 Sekunden
-
+    
+    loadData();
+    
+    // Regelmäßige Aktualisierung (alle 60 Sekunden)
+    const interval = setInterval(loadData, 60000);
+    
     return () => {
       isMounted = false;
       clearInterval(interval);
@@ -241,157 +291,7 @@ export default function WalletTab() {
 
   const formatAddress = (address: string) => `${address.slice(0, 6)}...${address.slice(-4)}`;
 
-  // Balance-Aktualisierung mit Konsistenzprüfung
-  const fetchBalances = async (myRequestId?: number) => {
-    if (!account?.address) {
-      setDfaithBalance(null);
-      setDinvestBalance(null);
-      setDfaithEurValue("0.00");
-      return;
-    }
-
-    console.log("=== Starte fetchBalances ===");
-    console.log("Request ID:", myRequestId);
-    console.log("Account:", account.address);
-    console.log("Zeit:", new Date().toISOString());
-
-    try {
-      // D.FAITH Balance abrufen
-      const dfaithContract = getContract({
-        client,
-        chain: polygon,
-        address: DFAITH_TOKEN.address
-      });
-
-      console.log("Rufe D.FAITH Contract an:", DFAITH_TOKEN.address);
-      const dfaithBalanceResult = await balanceOf({
-        contract: dfaithContract,
-        address: account.address
-      });
-      console.log("D.FAITH Rohe Balance:", dfaithBalanceResult.toString());
-      console.log(`D.FAITH Vorherige Rohe Balance: ${lastSuccessfulBalanceRef.current.dfaithRaw || 'keine'}`);
-      console.log("D.FAITH Contract-Adresse:", DFAITH_TOKEN.address);
-      console.log("D.FAITH Wallet-Adresse:", account.address);
-      console.log("D.FAITH Rohwert-Typ:", typeof dfaithBalanceResult, "Wert-Länge:", dfaithBalanceResult.toString().length);
-      
-      if (myRequestId !== requestIdRef.current) {
-        console.log("Request abgebrochen - nicht mehr aktuell");
-        return;
-      }
-
-      // D.INVEST Balance abrufen
-      const dinvestContract = getContract({
-        client,
-        chain: polygon,
-        address: DINVEST_TOKEN.address
-      });
-
-      console.log("Rufe D.INVEST Contract an:", DINVEST_TOKEN.address);
-      const dinvestBalanceResult = await balanceOf({
-        contract: dinvestContract,
-        address: account.address
-      });
-      console.log("D.INVEST Rohe Balance:", dinvestBalanceResult.toString());
-      console.log(`D.INVEST Vorherige Rohe Balance: ${lastSuccessfulBalanceRef.current.dinvestRaw || 'keine'}`);
-      console.log("D.INVEST Contract-Adresse:", DINVEST_TOKEN.address);
-      console.log("D.INVEST Wallet-Adresse:", account.address);
-      console.log("D.INVEST Rohwert-Typ:", typeof dinvestBalanceResult, "Wert-Länge:", dinvestBalanceResult.toString().length);
-      
-      if (myRequestId !== requestIdRef.current) {
-        console.log("Request abgebrochen - nicht mehr aktuell");
-        return;
-      }
-
-      // Balances formatieren
-      const dfaithFormatted = Number(dfaithBalanceResult) / Math.pow(10, DFAITH_TOKEN.decimals);
-      const dinvestFormatted = Number(dinvestBalanceResult) / Math.pow(10, DINVEST_TOKEN.decimals);
-
-      console.log("D.FAITH Rohe Balance als BigInt:", dfaithBalanceResult.toString());
-      console.log("D.FAITH Formatierte Balance:", dfaithFormatted.toFixed(2));
-      console.log("D.INVEST Rohe Balance als BigInt:", dinvestBalanceResult.toString());
-      console.log("D.INVEST Formatierte Balance:", Math.floor(dinvestFormatted).toString());
-      
-      // Konsistenzprüfung: Nur aktualisieren, wenn die neuen Werte signifikant vom letzten Wert abweichen
-      // oder wir noch keine gespeicherten Werte haben
-      const lastDfaith = lastSuccessfulBalanceRef.current.dfaith;
-      const lastDinvest = lastSuccessfulBalanceRef.current.dinvest;
-      
-      // Prüfe, ob wir die Werte aktualisieren sollten
-      let shouldUpdateDfaith = true;
-      let shouldUpdateDinvest = true;
-      
-      if (lastDfaith !== null) {
-        // 1. Stabilität durch direkte BigInt-Vergleiche - verwende die unformatierten BigInt-Werte
-        // für absolute Konsistenz, da Fließkommazahlen zu Rundungsfehlern führen können
-        if (dfaithBalanceResult.toString() === lastSuccessfulBalanceRef.current.dfaithRaw) {
-          shouldUpdateDfaith = false;
-          console.log("D.FAITH: Keine Änderung der Rohdaten - keine Aktualisierung nötig");
-        } else {
-          // 2. Nur aktualisieren, wenn der Unterschied bedeutsam ist
-          // Bei sehr kleinen Balances (< 10 Tokens) ist jede Änderung relevant
-          const percentDiff = Math.abs((dfaithFormatted - lastDfaith) / (lastDfaith || 1)) * 100;
-          const minimalDiff = dfaithFormatted < 10 ? 0 : 0.5; // Bei kleinen Beträgen genauer sein
-          
-          shouldUpdateDfaith = percentDiff > minimalDiff;
-          console.log(`D.FAITH Änderung: ${percentDiff.toFixed(3)}%, Aktualisieren: ${shouldUpdateDfaith}`);
-        }
-      }
-      
-      if (lastDinvest !== null) {
-        // Ähnlicher Check für D.INVEST mit direktem BigInt-Vergleich
-        if (dinvestBalanceResult.toString() === lastSuccessfulBalanceRef.current.dinvestRaw) {
-          shouldUpdateDinvest = false;
-          console.log("D.INVEST: Keine Änderung der Rohdaten - keine Aktualisierung nötig");
-        } else {
-          // Bei D.INVEST ist jede ganze Einheit relevant
-          const absoluteDiff = Math.abs(dinvestFormatted - lastDinvest);
-          shouldUpdateDinvest = absoluteDiff >= 1;
-          console.log(`D.INVEST Änderung: ${absoluteDiff} Einheiten, Aktualisieren: ${shouldUpdateDinvest}`);
-        }
-      }
-
-      // Setze neue Werte, wenn es signifikante Änderungen gibt
-      if (shouldUpdateDfaith) {
-        setDfaithBalance({ displayValue: dfaithFormatted.toFixed(2) });
-        lastSuccessfulBalanceRef.current.dfaith = dfaithFormatted;
-        lastSuccessfulBalanceRef.current.dfaithRaw = dfaithBalanceResult.toString();
-        fetchDfaithEurValue(dfaithFormatted.toFixed(2));
-      }
-      
-      if (shouldUpdateDinvest) {
-        setDinvestBalance({ displayValue: Math.floor(dinvestFormatted).toString() });
-        lastSuccessfulBalanceRef.current.dinvest = dinvestFormatted;
-        lastSuccessfulBalanceRef.current.dinvestRaw = dinvestBalanceResult.toString();
-      }
-      
-      // Beim allerersten Laden oder manuellem Refresh beide Werte setzen
-      if (lastDfaith === null || lastDinvest === null || myRequestId === requestIdRef.current) {
-        setDfaithBalance({ displayValue: dfaithFormatted.toFixed(2) });
-        setDinvestBalance({ displayValue: Math.floor(dinvestFormatted).toString() });
-        lastSuccessfulBalanceRef.current = {
-          dfaith: dfaithFormatted,
-          dinvest: dinvestFormatted,
-          dfaithRaw: dfaithBalanceResult.toString(),
-          dinvestRaw: dinvestBalanceResult.toString()
-        };
-        fetchDfaithEurValue(dfaithFormatted.toFixed(2));
-      }
-      
-      console.log("=== Ende fetchBalances ===");
-    } catch (error) {
-      console.error("Fehler beim Abrufen der Balances:", error);
-      if (myRequestId === requestIdRef.current) {
-        // Bei Fehler keine Änderung, wenn wir bereits Werte haben
-        if (!lastSuccessfulBalanceRef.current.dfaith && !lastSuccessfulBalanceRef.current.dinvest) {
-          setDfaithBalance({ displayValue: "0.00" });
-          setDinvestBalance({ displayValue: "0" });
-          setDfaithEurValue("0.00");
-        }
-      }
-    }
-  };
-
-  // Funktion: D.FAITH Wert in EUR live berechnen
+  // D.FAITH Wert in EUR live berechnen
   const fetchDfaithEurValue = async (balance: string) => {
     try {
       // 1. OpenOcean Quote: Wie viel POL bekomme ich für 1 D.FAITH?
@@ -415,8 +315,46 @@ export default function WalletTab() {
       const totalEur = Number(balance) * dfaithToPol * polEur;
       setDfaithEurValue(totalEur.toFixed(2));
     } catch (e) {
-      setDfaithEurValue("0.00");
+      console.error("Fehler bei der EUR-Wertberechnung:", e);
+      // Fallback: ungefähre Berechnung mit statischem Preis
+      const totalEur = Number(balance) * dfaithPriceEur;
+      setDfaithEurValue(totalEur.toFixed(2));
     }
+  };
+
+  // Analyse-Funktion für Balance-Schwankungen (für Debugging)
+  const analyzeBalanceIssue = async () => {
+    if (!account?.address) return;
+    
+    console.log("===== BALANCE ANALYSE =====");
+    console.log("D.FAITH Balance:", dfaithBalance);
+    console.log("D.INVEST Balance:", dinvestBalance);
+    
+    try {
+      // Direkter Test mit den Contracts
+      console.log("Direkter Contract-Test:");
+      const dfaithValue = await fetchTokenBalanceViaContract(
+        DFAITH_TOKEN.address, 
+        DFAITH_TOKEN.decimals, 
+        account.address
+      );
+      console.log("D.FAITH direkt:", dfaithValue);
+      
+      const dinvestValue = await fetchTokenBalanceViaContract(
+        DINVEST_TOKEN.address, 
+        DINVEST_TOKEN.decimals, 
+        account.address
+      );
+      console.log("D.INVEST direkt:", dinvestValue);
+      
+    } catch (e) {
+      console.error("Fehler bei der direkten Balance-Abfrage:", e);
+    }
+    
+    console.log("===== ANALYSE BEENDET =====");
+    
+    // Balances neu laden
+    await fetchTokenBalances();
   };
 
   if (status !== "connected" || !account?.address) {
@@ -471,13 +409,11 @@ export default function WalletTab() {
 
   // D.INVEST und Staking-Bereich Funktion definieren
   const renderDinvestSection = () => {
-    console.log("Rendere D.INVEST Sektion:", dinvestBalance);
-    
     return (
       <div className="flex flex-col items-center p-4 bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl border border-zinc-700 w-full">
         <div className="uppercase text-xs tracking-widest text-amber-500/80 mb-2">D.INVEST</div>
         <div className="text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 mb-2">
-          {Math.floor(Number(dinvestBalance?.displayValue || 0))}
+          {isLoadingBalances ? "..." : Math.floor(Number(dinvestBalance?.displayValue || 0))}
         </div>
         <button 
           onClick={() => setShowStakeModal(true)}
@@ -492,70 +428,6 @@ export default function WalletTab() {
         </div>
       </div>
     );
-  };
-
-  // Analyse-Funktion für Balance-Schwankungen
-  const analyzeBalanceIssue = async () => {
-    if (!account?.address) return;
-    
-    console.log("===== BALANCE SCHWANKUNGS-ANALYSE BEGINNT =====");
-    console.log("Zeit:", new Date().toISOString());
-    
-    try {
-      // Mehrere Anfragen nacheinander senden, um Schwankungen zu beobachten
-      const results = [];
-      const dfaithContract = getContract({
-        client,
-        chain: polygon,
-        address: DFAITH_TOKEN.address
-      });
-      
-      // 5 Abfragen hintereinander ausführen
-      for (let i = 0; i < 5; i++) {
-        console.log(`Abfrage #${i+1} startet...`);
-        const startTime = performance.now();
-        
-        const balanceResult = await balanceOf({
-          contract: dfaithContract,
-          address: account.address
-        });
-        
-        const endTime = performance.now();
-        const formattedBalance = Number(balanceResult) / Math.pow(10, DFAITH_TOKEN.decimals);
-        
-        results.push({
-          raw: balanceResult.toString(),
-          formatted: formattedBalance.toFixed(2),
-          responseTime: (endTime - startTime).toFixed(2) + 'ms'
-        });
-        
-        console.log(`Abfrage #${i+1}: Rohe Balance: ${balanceResult.toString()}, Formatiert: ${formattedBalance.toFixed(2)}`);
-        
-        // Kurze Pause zwischen Anfragen
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
-      
-      // Analysiere die Ergebnisse
-      let allSame = true;
-      const firstRaw = results[0].raw;
-      
-      for (let i = 1; i < results.length; i++) {
-        if (results[i].raw !== firstRaw) {
-          allSame = false;
-          break;
-        }
-      }
-      
-      console.log("===== ANALYSE-ERGEBNISSE =====");
-      console.log("Alle 5 Ergebnisse identisch?", allSame ? "JA" : "NEIN");
-      console.log("Details:", results);
-      console.log("===== ANALYSE BEENDET =====");
-      
-      return {allSame, results};
-    } catch (error) {
-      console.error("Fehler bei der Balance-Analyse:", error);
-      return null;
-    }
   };
 
   return (
@@ -608,11 +480,11 @@ export default function WalletTab() {
                 </button>
                 <button
                   onClick={refreshBalances}
-                  disabled={isRefreshing}
-                  className={`p-2 rounded-lg ${isRefreshing ? 'bg-amber-600/20' : 'bg-zinc-700 hover:bg-zinc-600'} text-zinc-200 text-sm font-medium transition-all duration-200`}
+                  disabled={isRefreshing || isLoadingBalances}
+                  className={`p-2 rounded-lg ${isRefreshing || isLoadingBalances ? 'bg-amber-600/20' : 'bg-zinc-700 hover:bg-zinc-600'} text-zinc-200 text-sm font-medium transition-all duration-200`}
                   title="Aktualisieren"
                 >
-                  <FaSync className={`text-amber-400 ${isRefreshing ? 'animate-spin' : ''}`} />
+                  <FaSync className={`text-amber-400 ${isRefreshing || isLoadingBalances ? 'animate-spin' : ''}`} />
                 </button>
                 <button
                   onClick={copyWalletAddress}
@@ -628,7 +500,7 @@ export default function WalletTab() {
             <div className="flex flex-col items-center p-4 bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl border border-zinc-700 w-full mb-6">
               <span className="uppercase text-xs tracking-widest text-amber-500/80 mb-2">D.FAITH</span>
               <div className="text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 drop-shadow-sm">
-                {dfaithBalance ? Number(dfaithBalance.displayValue).toFixed(2) : "0.00"}
+                {isLoadingBalances ? "..." : (dfaithBalance ? dfaithBalance.displayValue : "0.00")}
               </div>
               
               <div className="w-full h-px bg-gradient-to-r from-transparent via-zinc-700/50 to-transparent my-3"></div>
