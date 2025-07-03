@@ -80,9 +80,11 @@ export default function WalletTab() {
     dfaith?: number;
     dfaithEur?: number;
     polEur?: number;
+    totalValue?: number;
     timestamp?: number;
   }>({});
   const [priceError, setPriceError] = useState<string | null>(null);
+  const [totalWalletValue, setTotalWalletValue] = useState<string>("0.00");
   // State für Loading und Refresh
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLoadingBalances, setIsLoadingBalances] = useState(false);
@@ -195,13 +197,26 @@ export default function WalletTab() {
       setDinvestBalance({ displayValue: Math.floor(Number(dinvestValue)).toString() });
       // Optional: State für POL-Balance hinzufügen, falls du sie anzeigen möchtest
       // setPolBalance({ displayValue: ... });
-      fetchDfaithEurValue(dfaithDisplay);
+      
+      // Berechne Gesamtwert
+      calculateTotalWalletValue(dfaithDisplay);
 
       // Debug-Ausgabe für D.INVEST API-Antwort
       console.debug("DINVEST Insight API Wert (raw):", dinvestValue);
       // Optional: Hier könntest du auch fetchDinvestEurValue(dinvestValue) aufrufen, wenn du einen EUR-Wert anzeigen willst.
     } catch (error) {
-      // Fehlerbehandlung
+      console.error("Fehler beim Laden der Balances:", error);
+      
+      // Fallback: Verwende letzten bekannten Gesamtwert wenn verfügbar
+      if (lastKnownPrices.totalValue && lastKnownPrices.totalValue > 0) {
+        setTotalWalletValue(lastKnownPrices.totalValue.toFixed(2));
+        setDfaithEurValue(lastKnownPrices.totalValue.toFixed(2));
+      } else {
+        setDfaithBalance({ displayValue: "0.00" });
+        setDinvestBalance({ displayValue: "0" });
+        setTotalWalletValue("0.00");
+        setDfaithEurValue("0.00");
+      }
     } finally {
       if (currentRequestId === requestIdRef.current) {
         setIsLoadingBalances(false);
@@ -223,6 +238,23 @@ export default function WalletTab() {
       setTimeout(() => setIsRefreshing(false), 800);
     }
   };
+
+  // UseEffect für initiales Laden des Gesamtwerts
+  useEffect(() => {
+    // Lade gespeicherten Gesamtwert beim Start
+    try {
+      const stored = localStorage.getItem('dawid_faith_prices');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed.totalValue && parsed.totalValue > 0) {
+          setTotalWalletValue(parsed.totalValue.toFixed(2));
+          setDfaithEurValue(parsed.totalValue.toFixed(2));
+        }
+      }
+    } catch (e) {
+      console.log('Fehler beim Laden des gespeicherten Gesamtwerts:', e);
+    }
+  }, []);
 
   // UseEffect für initiales Laden und periodische Aktualisierung (alle 30 Sekunden)
   useEffect(() => {
@@ -364,6 +396,11 @@ export default function WalletTab() {
           console.log('Fehler beim Speichern der Preise:', e);
         }
         setPriceError(null);
+        
+        // Aktualisiere Gesamtwert mit neuen Preisen
+        if (dfaithBalance?.displayValue) {
+          calculateTotalWalletValue(dfaithBalance.displayValue);
+        }
       } else {
         setPriceError(errorMsg || "Preise nicht verfügbar");
       }
@@ -392,22 +429,51 @@ export default function WalletTab() {
 
   const formatAddress = (address: string) => `${address.slice(0, 6)}...${address.slice(-4)}`;
 
-  // D.FAITH Wert in EUR berechnen basierend auf aktuellen Preisen
-  const fetchDfaithEurValue = async (balance: string) => {
+  // D.FAITH Wert in EUR berechnen und Gesamtwert aktualisieren
+  const calculateTotalWalletValue = (dfaithBalance: string) => {
     try {
-      const balanceFloat = parseFloat(balance);
-      if (balanceFloat <= 0) {
+      const balanceFloat = parseFloat(dfaithBalance);
+      
+      // Verwende aktuellen Preis oder Fallback
+      const priceToUse = dfaithPriceEur || lastKnownPrices.dfaithEur || 0.001;
+      
+      let totalValue = 0;
+      
+      if (balanceFloat > 0 && priceToUse > 0) {
+        // Aktueller D.FAITH Wert
+        totalValue = balanceFloat * priceToUse;
+        setDfaithEurValue(totalValue.toFixed(2));
+      } else {
         setDfaithEurValue("0.00");
-        return;
       }
-
-      // Verwende den aktuellen D.FAITH EUR Preis
-      const eurValue = balanceFloat * dfaithPriceEur;
-      setDfaithEurValue(eurValue.toFixed(2));
+      
+      // Gesamtwert setzen (momentan nur D.FAITH, kann später um andere Token erweitert werden)
+      setTotalWalletValue(totalValue.toFixed(2));
+      
+      // Speichere den berechneten Gesamtwert als Fallback
+      const currentPrices = {
+        ...lastKnownPrices,
+        totalValue: totalValue,
+        timestamp: Date.now()
+      };
+      setLastKnownPrices(currentPrices);
+      try {
+        localStorage.setItem('dawid_faith_prices', JSON.stringify(currentPrices));
+      } catch (e) {
+        console.log('Fehler beim Speichern des Gesamtwerts:', e);
+      }
       
     } catch (error) {
-      console.error("Fehler beim Berechnen des D.FAITH EUR-Wertes:", error);
-      setDfaithEurValue("0.00");
+      console.error("Fehler beim Berechnen des Gesamtwerts:", error);
+      
+      // Fallback auf letzten bekannten Gesamtwert
+      if (lastKnownPrices.totalValue && lastKnownPrices.totalValue > 0) {
+        setTotalWalletValue(lastKnownPrices.totalValue.toFixed(2));
+        setDfaithEurValue(lastKnownPrices.totalValue.toFixed(2));
+      } else {
+        setDfaithEurValue("0.00");
+        setTotalWalletValue("0.00");
+      }
     }
   };
 
@@ -545,17 +611,19 @@ export default function WalletTab() {
               </div>
             </div>
 
-            {/* DFAITH Token-Karte - jetzt mit D.FAITH */}
+            {/* Gesamtwert Wallet-Karte */}
             <div className="flex flex-col items-center p-4 bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl border border-zinc-700 w-full mb-6">
-              <span className="uppercase text-xs tracking-widest text-amber-500/80 mb-2">D.FAITH</span>
+              <span className="uppercase text-xs tracking-widest text-amber-500/80 mb-2">Gesamtwert</span>
               <div className="text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 drop-shadow-sm">
-                {isLoadingBalances ? "..." : (dfaithBalance ? dfaithBalance.displayValue : "0.00")}
+                {isLoadingBalances ? "..." : `${totalWalletValue}€`}
               </div>
               
               <div className="w-full h-px bg-gradient-to-r from-transparent via-zinc-700/50 to-transparent my-3"></div>
               
-              <div className="text-xs text-zinc-500 space-y-1">
-                <div>≈ {dfaithEurValue} EUR</div>
+              <div className="text-xs text-zinc-500 space-y-1 text-center">
+                <div className="text-sm text-zinc-400">
+                  D.FAITH: {isLoadingBalances ? "..." : (dfaithBalance ? dfaithBalance.displayValue : "0.00")}
+                </div>
                 <div className="text-[10px] text-zinc-600">
                   Preis: {dfaithPriceEur.toFixed(3)}€/D.FAITH
                   {priceError && (
@@ -568,6 +636,11 @@ export default function WalletTab() {
                     <span className="text-yellow-400 ml-1">(cached)</span>
                   )}
                 </div>
+                {priceError && totalWalletValue !== "0.00" && (
+                  <div className="text-[10px] text-yellow-400 mt-2 px-2 py-1 bg-yellow-500/10 rounded">
+                    💾 Letzter bekannter Wert wird angezeigt
+                  </div>
+                )}
               </div>
             </div>
 
