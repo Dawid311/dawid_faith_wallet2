@@ -1,14 +1,13 @@
 import { useEffect, useState, useRef } from "react";
 import { createThirdwebClient, getContract } from "thirdweb";
-// useBalance aus dem Import entfernen, da wir den alternativen API-Ansatz verwenden werden
 import { useActiveAccount, useActiveWalletConnectionStatus, useSendTransaction } from "thirdweb/react";
 import { ConnectButton } from "thirdweb/react";
 import { inAppWallet, createWallet } from "thirdweb/wallets";
 import { polygon } from "thirdweb/chains";
-import { balanceOf, approve, allowance } from "thirdweb/extensions/erc20";
 import { Card, CardContent } from "../../../components/ui/card";
 import { Button } from "../../../components/ui/button";
 import { FaRegCopy, FaCoins, FaArrowDown, FaArrowUp, FaPaperPlane, FaLock, FaHistory, FaTimes, FaSync } from "react-icons/fa";
+import { balanceOf } from "thirdweb/extensions/erc20";
 
 // Import Subtabs
 import BuyTab from "./wallet/BuyTab";
@@ -70,8 +69,10 @@ export default function WalletTab() {
   const status = useActiveWalletConnectionStatus();
   const { mutate: sendTransaction, data: transactionResult, isPending: isTransactionPending } = useSendTransaction();
 
+  // Entferne useBalance und nutze wieder eigenen State:
   const [dfaithBalance, setDfaithBalance] = useState<{ displayValue: string } | null>(null);
   const [dinvestBalance, setDinvestBalance] = useState<{ displayValue: string } | null>(null);
+
   const [dfaithEurValue, setDfaithEurValue] = useState<string>("0.00");
   const [dfaithPriceEur, setDfaithPriceEur] = useState<number>(0.001);
   // State für Loading und Refresh
@@ -111,32 +112,23 @@ export default function WalletTab() {
     symbol: "POL"
   };
 
-  // Vereinfachte Token-Balance-Abfrage ohne 5-fache Verifizierung
-  const fetchTokenBalanceViaContract = async (
+  // Neue Funktion für Balance via Thirdweb Insight API
+  const fetchTokenBalanceViaInsightApi = async (
     tokenAddress: string,
-    tokenDecimals: number,
     accountAddress: string
   ): Promise<string> => {
     if (!accountAddress) return "0";
-
     try {
-      const contract = getContract({
-        client,
-        chain: polygon,
-        address: tokenAddress,
-      });
-
-      const balanceResult = await balanceOf({
-        contract,
-        address: accountAddress
-      });
-
-      // Balance in lesbare Form umrechnen
-      const balance = (Number(balanceResult) / Math.pow(10, tokenDecimals)).toString();
-      console.log(`Balance für ${tokenAddress}:`, balance);
+      const res = await fetch(
+        `https://insight.thirdweb.com/v1/tokens?chain_id=137&token_address=${tokenAddress}&owner_address=${accountAddress}`
+      );
+      if (!res.ok) throw new Error("API Error");
+      const data = await res.json();
+      // Die API liefert ein Array, nimm das erste Element
+      const balance = data?.data?.[0]?.balance ?? "0";
       return balance;
-    } catch (error) {
-      console.error(`Balance-Abfrage fehlgeschlagen für ${tokenAddress}:`, error);
+    } catch (e) {
+      console.error("Insight API Fehler:", e);
       return "0";
     }
   };
@@ -146,37 +138,27 @@ export default function WalletTab() {
     if (!account?.address) return;
 
     setIsLoadingBalances(true);
-    setDfaithBalance(null);      // <--- Balance auf null setzen
-    setDinvestBalance(null);     // <--- dito
+    setDfaithBalance(null);
+    setDinvestBalance(null);
     const currentRequestId = ++requestIdRef.current;
     
     try {
-      console.log(`--- Starte Balance-Abruf (ID: ${currentRequestId}) ---`);
-      
-      // Beide Balances parallel abrufen
-      const [dfaithValue, dinvestValue] = await Promise.all([
-        fetchTokenBalanceViaContract(DFAITH_TOKEN.address, DFAITH_TOKEN.decimals, account.address),
-        fetchTokenBalanceViaContract(DINVEST_TOKEN.address, DINVEST_TOKEN.decimals, account.address)
+      // Alle Token-Balances via Insight API laden
+      const [dfaithValue, dinvestValue, polValue] = await Promise.all([
+        fetchTokenBalanceViaInsightApi(DFAITH_TOKEN.address, account.address),
+        fetchTokenBalanceViaInsightApi(DINVEST_TOKEN.address, account.address),
+        fetchTokenBalanceViaInsightApi(POL_TOKEN.address, account.address)
       ]);
       
-      // Nur fortfahren, wenn dies immer noch die aktuelle Anfrage ist
-      if (currentRequestId !== requestIdRef.current) {
-        console.log(`Abfrage ID ${currentRequestId} verworfen (aktuell: ${requestIdRef.current})`);
-        return;
-      }
+      if (currentRequestId !== requestIdRef.current) return;
       
-      console.log("D.FAITH Balance:", dfaithValue);
-      console.log("D.INVEST Balance:", dinvestValue);
-      
-      // Bei D.FAITH die Dezimalstellen formatieren, bei D.INVEST auf ganze Zahl abrunden
       setDfaithBalance({ displayValue: Number(dfaithValue).toFixed(2) });
       setDinvestBalance({ displayValue: Math.floor(Number(dinvestValue)).toString() });
-      
-      // EUR-Wert für D.FAITH berechnen
+      // Optional: State für POL-Balance hinzufügen, falls du sie anzeigen möchtest
+      // setPolBalance({ displayValue: ... });
       fetchDfaithEurValue(dfaithValue);
-      
     } catch (error) {
-      console.error("Fehler beim Abrufen der Token-Balances:", error);
+      // Fehlerbehandlung
     } finally {
       if (currentRequestId === requestIdRef.current) {
         setIsLoadingBalances(false);
@@ -297,6 +279,8 @@ export default function WalletTab() {
     }
   };
 
+  // Entferne fetchTokenBalanceViaContract komplett (nicht mehr benötigt)
+
   if (status !== "connected" || !account?.address) {
     return (
       <div className="flex flex-col items-center min-h-[70vh] justify-center bg-black py-8">
@@ -353,7 +337,7 @@ export default function WalletTab() {
       <div className="flex flex-col items-center p-4 bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl border border-zinc-700 w-full">
         <div className="uppercase text-xs tracking-widest text-amber-500/80 mb-2">D.INVEST</div>
         <div className="text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 mb-2">
-          {isLoadingBalances ? "..." : Math.floor(Number(dinvestBalance?.displayValue || 0))}
+          {dinvestBalance?.displayValue}
         </div>
         <button 
           onClick={() => setShowStakeModal(true)}
