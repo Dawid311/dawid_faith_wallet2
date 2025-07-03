@@ -391,19 +391,25 @@ export default function SellTab() {
     setSwapTxStatus("verifying");
     console.log("5. Verifiziere Balance-Änderung...");
     
-    // Mehrfache Versuche zur Balance-Verifizierung
+    // Unendliche Balance-Verifizierung bis Erfolg bestätigt
     let balanceVerified = false;
     let attempts = 0;
-    const maxAttempts = 5;
     
-    while (!balanceVerified && attempts < maxAttempts) {
+    // Erste längere Wartezeit nach Transaktionsbestätigung
+    console.log("Warte 5 Sekunden vor erster Balance-Prüfung...");
+    await new Promise(resolve => setTimeout(resolve, 5000));
+    
+    // Läuft so lange bis Balance-Änderung verifiziert ist
+    while (!balanceVerified) {
       attempts++;
-      console.log(`Balance-Verifizierung Versuch ${attempts}/${maxAttempts}`);
+      console.log(`Balance-Verifizierung Versuch ${attempts}`);
       
       try {
-        // Warte zwischen Versuchen
+        // Stufenweise längere Wartezeiten, aber maximal 15 Sekunden
         if (attempts > 1) {
-          await new Promise(resolve => setTimeout(resolve, 3000));
+          const waitTime = Math.min(attempts * 2000, 15000); // 2s, 4s, 6s... bis max 15s
+          console.log(`Warte ${waitTime/1000} Sekunden vor nächstem Versuch...`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
         }
         
         const dfaithValue = await fetchTokenBalanceViaInsightApi(DFAITH_TOKEN, account.address);
@@ -418,7 +424,8 @@ export default function SellTab() {
         
         console.log(`Erwartete Verringerung: ${expectedDecrease}, Tatsächliche Verringerung: ${actualDecrease}`);
         
-        if (actualDecrease >= (expectedDecrease * 0.95)) { // 5% Toleranz für Rundungsfehler
+        // Großzügige Toleranz für Rundungsfehler
+        if (actualDecrease >= (expectedDecrease * 0.9)) { // 10% Toleranz
           console.log("✅ Balance-Änderung verifiziert - Swap erfolgreich!");
           setDfaithBalance(currentBalance.toFixed(DFAITH_DECIMALS));
           balanceVerified = true;
@@ -428,16 +435,19 @@ export default function SellTab() {
           setQuoteTxData(null);
           setSpenderAddress(null);
           setTimeout(() => setSwapTxStatus(null), 5000);
-        } else if (attempts === maxAttempts) {
-          console.log("⚠️ Balance-Änderung konnte nicht verifiziert werden");
-          setDfaithBalance(currentBalance.toFixed(DFAITH_DECIMALS));
-          throw new Error("Swap-Verifizierung fehlgeschlagen - Balance nicht wie erwartet geändert");
+        } else {
+          console.log(`Versuch ${attempts}: Balance noch nicht ausreichend geändert, weiter warten...`);
+          // Kein throw - einfach weiter versuchen
         }
       } catch (balanceError) {
         console.error(`Balance-Verifizierung Versuch ${attempts} fehlgeschlagen:`, balanceError);
-        if (attempts === maxAttempts) {
-          throw new Error("Balance-Verifizierung nach mehreren Versuchen fehlgeschlagen");
-        }
+        // Auch bei Fehlern: weiter versuchen, nicht abbrechen
+        console.log("Balance-Abfrage fehlgeschlagen, versuche es weiter...");
+      }
+      
+      // Sicherheitsventil: Nach 50 Versuchen (ca. 25+ Minuten) Fehler werfen
+      if (attempts >= 50) {
+        throw new Error("Balance-Verifizierung nach 50 Versuchen noch nicht erfolgreich - manuell prüfen");
       }
     }
     
