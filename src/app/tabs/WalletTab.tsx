@@ -220,6 +220,11 @@ export default function WalletTab() {
       return;
     }
 
+    console.log("=== Starte fetchBalances ===");
+    console.log("Request ID:", myRequestId);
+    console.log("Account:", account.address);
+    console.log("Zeit:", new Date().toISOString());
+
     try {
       // D.FAITH Balance abrufen
       const dfaithContract = getContract({
@@ -228,11 +233,16 @@ export default function WalletTab() {
         address: DFAITH_TOKEN.address
       });
 
+      console.log("Rufe D.FAITH Contract an:", DFAITH_TOKEN.address);
       const dfaithBalanceResult = await balanceOf({
         contract: dfaithContract,
         address: account.address
       });
-      if (myRequestId !== requestIdRef.current) return;
+      console.log("D.FAITH Rohe Balance:", dfaithBalanceResult.toString());
+      if (myRequestId !== requestIdRef.current) {
+        console.log("Request abgebrochen - nicht mehr aktuell");
+        return;
+      }
 
       // D.INVEST Balance abrufen
       const dinvestContract = getContract({
@@ -241,20 +251,30 @@ export default function WalletTab() {
         address: DINVEST_TOKEN.address
       });
 
+      console.log("Rufe D.INVEST Contract an:", DINVEST_TOKEN.address);
       const dinvestBalanceResult = await balanceOf({
         contract: dinvestContract,
         address: account.address
       });
-      if (myRequestId !== requestIdRef.current) return;
+      console.log("D.INVEST Rohe Balance:", dinvestBalanceResult.toString());
+      if (myRequestId !== requestIdRef.current) {
+        console.log("Request abgebrochen - nicht mehr aktuell");
+        return;
+      }
 
       // Balances formatieren und setzen
       const dfaithFormatted = Number(dfaithBalanceResult) / Math.pow(10, DFAITH_TOKEN.decimals);
       const dinvestFormatted = Number(dinvestBalanceResult) / Math.pow(10, DINVEST_TOKEN.decimals);
 
+      console.log("D.FAITH Formatierte Balance:", dfaithFormatted.toFixed(2));
+      console.log("D.INVEST Formatierte Balance:", Math.floor(dinvestFormatted).toString());
+
       setDfaithBalance({ displayValue: dfaithFormatted.toFixed(2) });
       setDinvestBalance({ displayValue: Math.floor(dinvestFormatted).toString() });
       fetchDfaithEurValue(dfaithFormatted.toFixed(2));
+      console.log("=== Ende fetchBalances ===");
     } catch (error) {
+      console.error("Fehler beim Abrufen der Balances:", error);
       if (myRequestId === requestIdRef.current) {
         setDfaithBalance({ displayValue: "0.00" });
         setDinvestBalance({ displayValue: "0" });
