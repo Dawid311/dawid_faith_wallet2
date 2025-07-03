@@ -31,9 +31,13 @@ export default function SellTab() {
 
   // D.FAITH Balance laden
   useEffect(() => {
+    let isMounted = true;
+    let latestRequest = 0;
+
     const fetchDfaithBalance = async () => {
+      const requestId = ++latestRequest;
       if (!account?.address) {
-        setDfaithBalance("0");
+        if (isMounted) setDfaithBalance("0");
         return;
       }
       try {
@@ -47,15 +51,21 @@ export default function SellTab() {
           address: account.address
         });
         const balanceFormatted = Number(balance) / Math.pow(10, DFAITH_DECIMALS);
-        setDfaithBalance(balanceFormatted.toFixed(2));
+        // Nur übernehmen, wenn dies der letzte gestartete Request ist:
+        if (isMounted && requestId === latestRequest) {
+          setDfaithBalance(balanceFormatted.toFixed(2));
+        }
       } catch (error) {
-        console.error("Fehler beim Laden der D.FAITH Balance:", error);
-        setDfaithBalance("0");
+        if (isMounted) setDfaithBalance("0");
       }
     };
+
     fetchDfaithBalance();
     const interval = setInterval(fetchDfaithBalance, 10000);
-    return () => clearInterval(interval);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, [account?.address]);
 
   // Preis laden (umgekehrte Richtung - D.FAITH zu POL)

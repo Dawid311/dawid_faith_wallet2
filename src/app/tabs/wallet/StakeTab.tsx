@@ -217,7 +217,7 @@ export default function StakeTab() {
       </div>
 
       {/* Staking Overview: Verfügbar, Gestaked, Reward */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-3 gap-4 mb-6"> {/* <-- immer 3 Spalten, auch mobil */}
         <div className="bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl p-4 border border-zinc-700 text-center">
           <div className="text-sm text-zinc-500 mb-1">Verfügbar</div>
           <div className="text-xl font-bold text-amber-400">
@@ -329,6 +329,7 @@ export default function StakeTab() {
             <FaLock className="inline mr-2" />
             {!stakeAmount || parseInt(stakeAmount) <= 0 ? "Betrag eingeben" : `${stakeAmount} D.INVEST staken`}
           </Button>
+          {/* Erfolgsmeldung NUR beim Stake */}
           {txStatus === "success" && (
             <div className="mt-2 text-green-400 text-sm text-center">Transaktion erfolgreich!</div>
           )}
@@ -409,9 +410,7 @@ export default function StakeTab() {
           <FaCoins className="inline mr-2" />
           {isPending ? "Wird ausgeführt..." : "Belohnungen einfordern"}
         </Button>
-        {txStatus === "success" && (
-          <div className="mt-2 text-green-400 text-sm text-center">Transaktion erfolgreich!</div>
-        )}
+        {/* Erfolgsmeldung hier ENTFERNT */}
         {txStatus === "error" && (
           <div className="mt-2 text-red-400 text-sm text-center">Transaktion fehlgeschlagen!</div>
         )}
