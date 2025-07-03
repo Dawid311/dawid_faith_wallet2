@@ -128,14 +128,14 @@ export default function SellTab() {
     setSwapTxStatus("pending");
     
     try {
-      // Betrag in kleinste Einheit umrechnen (D.FAITH hat 2 Decimals)
-      const amountInWei = (parseFloat(sellAmount) * Math.pow(10, DFAITH_DECIMALS)).toString();
-      
+      // Betrag OHNE Dezimalumrechnung verwenden (OpenOcean API erwartet den Betrag direkt)
+      const amountForApi = sellAmount; // Direkt den eingegebenen Betrag verwenden
+    
       console.log("=== OpenOcean Sell Swap Request ===");
       console.log("Chain:", "polygon");
       console.log("InToken (D.FAITH):", DFAITH_TOKEN);
       console.log("OutToken (POL):", "0x0000000000000000000000000000000000001010");
-      console.log("Amount (D.FAITH):", amountInWei);
+      console.log("Amount (D.FAITH):", amountForApi); // Ohne Dezimalumrechnung
       console.log("Slippage:", slippage);
       console.log("GasPrice:", "50");
       console.log("Account:", account.address);
@@ -144,7 +144,7 @@ export default function SellTab() {
         chain: "polygon",
         inTokenAddress: DFAITH_TOKEN,
         outTokenAddress: "0x0000000000000000000000000000000000001010",
-        amount: amountInWei,
+        amount: amountForApi, // Hier ohne Dezimalumrechnung
         slippage: slippage,
         gasPrice: "50",
         account: account.address,
@@ -235,6 +235,8 @@ export default function SellTab() {
         console.error("Fehler beim Parsen der Allowance als BigInt:", allowanceValue, e);
         currentAllowance = BigInt(0);
       }
+      // Für die Allowance-Prüfung benötigen wir trotzdem den korrekten Wert mit Dezimalstellen
+      const amountInWei = (parseFloat(sellAmount) * Math.pow(10, DFAITH_DECIMALS)).toString();
       const requiredAmount = BigInt(amountInWei);
 
       console.log("Current Allowance:", currentAllowance.toString());
