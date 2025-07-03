@@ -128,32 +128,69 @@ export default function SellTab() {
     setSwapTxStatus("pending");
     
     try {
-      // Hier würde die OpenOcean Swap-Logik für D.FAITH -> POL kommen
-      // Ähnlich wie im BuyTab, aber umgekehrte Richtung
+      // Betrag in kleinste Einheit umrechnen (D.FAITH hat 2 Decimals)
+      const amountInWei = (parseFloat(sellAmount) * Math.pow(10, DFAITH_DECIMALS)).toString();
+      
+      console.log("=== OpenOcean Sell Swap Request ===");
+      console.log("Chain:", "polygon");
+      console.log("InToken (D.FAITH):", DFAITH_TOKEN);
+      console.log("OutToken (POL):", "0x0000000000000000000000000000000000001010");
+      console.log("Amount (D.FAITH):", amountInWei);
+      console.log("Slippage:", slippage);
+      console.log("GasPrice:", "50");
+      console.log("Account:", account.address);
       
       const params = new URLSearchParams({
         chain: "polygon",
         inTokenAddress: DFAITH_TOKEN,
         outTokenAddress: "0x0000000000000000000000000000000000001010",
-        amount: (parseFloat(sellAmount) * Math.pow(10, DFAITH_DECIMALS)).toString(),
+        amount: amountInWei,
         slippage: slippage,
         gasPrice: "50",
         account: account.address,
       });
       
-      const response = await fetch(`https://open-api.openocean.finance/v3/polygon/swap_quote?${params}`);
+      const url = `https://open-api.openocean.finance/v3/polygon/swap_quote?${params}`;
+      console.log("Full URL:", url);
+      
+      const response = await fetch(url);
+      console.log("Response Status:", response.status);
       
       if (!response.ok) {
         throw new Error(`OpenOcean API Fehler: ${response.status}`);
       }
       
       const data = await response.json();
+      console.log("=== OpenOcean Sell Swap Response ===");
+      console.log("Full Response:", JSON.stringify(data, null, 2));
       
-      if (data.code !== 200 || !data.data) {
-        throw new Error('Swap nicht möglich');
+      if (!data) {
+        throw new Error('OpenOcean: Keine Response erhalten');
+      }
+      
+      if (data.code !== 200) {
+        throw new Error(`OpenOcean: API Error Code ${data.code} - ${JSON.stringify(data)}`);
+      }
+      
+      if (!data.data) {
+        throw new Error('OpenOcean: Keine data in Response');
       }
       
       const txData = data.data;
+      console.log("=== Transaction Data Structure ===");
+      console.log("to:", txData.to);
+      console.log("data:", txData.data);
+      console.log("value:", txData.value);
+      console.log("gasPrice:", txData.gasPrice);
+      console.log("estimatedGas:", txData.estimatedGas);
+      console.log("outAmount:", txData.outAmount);
+      console.log("inAmount:", txData.inAmount);
+      
+      // Überprüfen ob alle notwendigen Felder vorhanden sind
+      if (!txData.to || !txData.data) {
+        console.error("Fehlende tx data in response:", txData);
+        throw new Error('OpenOcean: Unvollständige Transaktionsdaten');
+      }
       
       const { prepareTransaction } = await import("thirdweb");
       const tx = prepareTransaction({
@@ -164,10 +201,40 @@ export default function SellTab() {
         client
       });
 
+      console.log("Prepared transaction:", tx);
+      console.log("Sending transaction...");
+      
       const transactionResult = await sendTransaction(tx);
+      console.log("Transaction sent:", transactionResult);
       
       setSwapTxStatus("confirming");
+      
+      // Warten auf Bestätigung
       await new Promise(resolve => setTimeout(resolve, 5000));
+      
+      // Balance nach Swap aktualisieren
+      const fetchDfaithBalance = async () => {
+        if (!account?.address) return;
+        try {
+          const contract = getContract({
+            client,
+            chain: polygon,
+            address: DFAITH_TOKEN
+          });
+          
+          const balance = await balanceOf({
+            contract,
+            address: account.address
+          });
+          
+          const balanceFormatted = Number(balance) / Math.pow(10, DFAITH_DECIMALS);
+          setDfaithBalance(balanceFormatted.toFixed(2));
+        } catch (error) {
+          console.error("Balance update error:", error);
+        }
+      };
+      
+      await fetchDfaithBalance();
       
       setSwapTxStatus("success");
       setSellAmount("");
