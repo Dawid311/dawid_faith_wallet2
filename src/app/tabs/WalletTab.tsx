@@ -147,34 +147,45 @@ export default function WalletTab() {
     symbol: "POL"
   };
 
-  // EIN useEffect für alles, aber ohne latestRequest als Dependency:
+  // EIN useEffect für alles:
   useEffect(() => {
     let isMounted = true;
-
+    
+    // Direkter Aufruf ohne setState-Callback, um zirkuläre Abhängigkeiten zu vermeiden
     const load = async () => {
-      // Funktionales Update verwenden, um Endlosschleifen zu vermeiden
-      setLatestRequest(prev => {
-        const newRequestId = prev + 1;
-        if (isMounted) {
-          // Sofort den fetchBalances und fetchDfaithPrice mit der neuen ID aufrufen
-          fetchBalances(newRequestId);
-          fetchDfaithPrice();
-        }
-        return newRequestId;
-      });
+      if (isMounted) {
+        const newRequestId = latestRequest + 1;
+        setLatestRequest(newRequestId);
+        
+        // Warten bis der State aktualisiert ist
+        setTimeout(async () => {
+          if (isMounted) {
+            console.log("Lade Balances mit Request ID:", newRequestId);
+            await fetchBalances(newRequestId);
+            await fetchDfaithPrice();
+          }
+        }, 0);
+      }
     };
 
-    // Initial laden
-    load();
+    // Initial direkt laden
+    if (account?.address) {
+      console.log("Account geändert, lade Daten neu...");
+      load();
+    }
 
     // Intervall-Updates
-    const interval = setInterval(load, 30000);
+    const interval = setInterval(() => {
+      if (account?.address) {
+        load();
+      }
+    }, 30000);
 
     return () => {
       isMounted = false;
       clearInterval(interval);
     };
-  }, [account?.address]); // latestRequest aus den Dependencies entfernt!
+  }, [account?.address]); // Nur bei Account-Änderung neu laden
 
   // D.FAITH EUR-Preis holen (basierend auf POL-Preis)
   const fetchDfaithPrice = async () => {
@@ -212,6 +223,8 @@ export default function WalletTab() {
 
   // Balance-Aktualisierung
   const fetchBalances = async (requestId?: number) => {
+    console.log(`fetchBalances gestartet mit requestId: ${requestId}, aktuelle latestRequest: ${latestRequest}`);
+    
     if (!account?.address) {
       setDfaithBalance(null);
       setDinvestBalance(null);
@@ -248,15 +261,12 @@ export default function WalletTab() {
       const dfaithFormatted = Number(dfaithBalanceResult) / Math.pow(10, DFAITH_TOKEN.decimals);
       const dinvestFormatted = Number(dinvestBalanceResult) / Math.pow(10, DINVEST_TOKEN.decimals);
 
-      // Nur übernehmen, wenn dies der letzte gestartete Request ist:
-      if (typeof requestId === "undefined" || requestId === latestRequest) {
-        console.log(`Aktualisiere Balance mit Request ID ${requestId}, DFAITH: ${dfaithFormatted.toFixed(2)}`);
-        setDfaithBalance({ displayValue: dfaithFormatted.toFixed(2) });
-        setDinvestBalance({ displayValue: Math.floor(dinvestFormatted).toString() });
-        fetchDfaithEurValue(dfaithFormatted.toFixed(2)); // await entfernt, um async-Probleme zu vermeiden
-      } else {
-        console.log(`Ignoriere veraltete Balance von Request ID ${requestId}, aktuelle ID: ${latestRequest}`);
-      }
+      console.log(`Erhaltene Balances - D.FAITH: ${dfaithFormatted.toFixed(2)}, D.INVEST: ${Math.floor(dinvestFormatted)}`);
+
+      // Immer aktualisieren, da wir die Request ID logik entfernt haben
+      setDfaithBalance({ displayValue: dfaithFormatted.toFixed(2) });
+      setDinvestBalance({ displayValue: Math.floor(dinvestFormatted).toString() });
+      fetchDfaithEurValue(dfaithFormatted.toFixed(2));
     } catch (error) {
       console.error("Fehler beim Abrufen der Balances:", error);
       setDfaithBalance({ displayValue: "0.00" });
@@ -342,6 +352,31 @@ export default function WalletTab() {
       </div>
     );
   }
+
+  // D.INVEST und Staking-Bereich Funktion definieren
+  const renderDinvestSection = () => {
+    console.log("Rendere D.INVEST Sektion:", dinvestBalance);
+    
+    return (
+      <div className="flex flex-col items-center p-4 bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl border border-zinc-700 w-full">
+        <div className="uppercase text-xs tracking-widest text-amber-500/80 mb-2">D.INVEST</div>
+        <div className="text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 mb-2">
+          {Math.floor(Number(dinvestBalance?.displayValue || 0))}
+        </div>
+        <button 
+          onClick={() => setShowStakeModal(true)}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-amber-500/20 to-amber-600/20 text-amber-400 hover:from-amber-500/30 hover:to-amber-600/30 transition-all border border-amber-500/20 mt-2"
+        >
+          <FaLock size={14} />
+          <span className="text-sm font-medium">Staken & Verdienen</span>
+        </button>
+        {/* Gestaked Anzeige */}
+        <div className="text-xs text-zinc-500 mt-2">
+          Gestaked: <span className="text-amber-400/80">0</span>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="flex justify-center min-h-[70vh] items-center py-8 bg-black">
@@ -445,33 +480,8 @@ export default function WalletTab() {
               </Button>
             </div>
             
-            {/* D.INVEST immer anzeigen wenn Balance definiert ist */}
-            {(() => {
-              console.log("D.INVEST Render Check:", {
-                dinvestBalance,
-                displayValue: dinvestBalance?.displayValue,
-                asNumber: dinvestBalance ? Number(dinvestBalance.displayValue) : 'undefined'
-              });
-              return dinvestBalance;
-            })() && (
-              <div className="flex flex-col items-center p-4 bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl border border-zinc-700 w-full">
-                <div className="uppercase text-xs tracking-widest text-amber-500/80 mb-2">D.INVEST</div>
-                <div className="text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 mb-2">
-                  {Math.floor(Number(dinvestBalance?.displayValue || 0))}
-                </div>
-                <button 
-                  onClick={() => setShowStakeModal(true)}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-amber-500/20 to-amber-600/20 text-amber-400 hover:from-amber-500/30 hover:to-amber-600/30 transition-all border border-amber-500/20 mt-2"
-                >
-                  <FaLock size={14} />
-                  <span className="text-sm font-medium">Staken & Verdienen</span>
-                </button>
-                {/* Gestaked Anzeige */}
-                <div className="text-xs text-zinc-500 mt-2">
-                  Gestaked: <span className="text-amber-400/80">0</span>
-                </div>
-              </div>
-            )}
+            {/* D.INVEST immer anzeigen */}
+            {renderDinvestSection()}
 
             {/* Modale für die verschiedenen Funktionen */}
             <Modal open={showBuyModal} onClose={() => setShowBuyModal(false)} title="Kaufen">
