@@ -23,7 +23,7 @@ export default function SellTab() {
   const [priceError, setPriceError] = useState<string | null>(null);
   
   const account = useActiveAccount();
-  const { mutate: sendTransaction } = useSendTransaction();
+  const { mutateAsync: sendTransaction } = useSendTransaction();
 
   // D.FAITH Balance laden
   useEffect(() => {

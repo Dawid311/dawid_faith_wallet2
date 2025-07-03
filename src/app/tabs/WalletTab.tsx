@@ -74,7 +74,7 @@ function Modal({ open, onClose, title, children }: { open: boolean, onClose: () 
         <div className="flex items-center justify-between p-4 sm:p-6 border-b border-zinc-700 sticky top-0 bg-zinc-900 z-10">
           <h3 className="font-bold text-lg sm:text-xl text-amber-400 truncate pr-4">{title}</h3>
           <button 
-            className="p-2 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 rounded-lg transition-all flex-shrink-0 touch-manipulation"
+            className="p-2 text-amber-400 hover:text-yellow-300 hover:bg-zinc-800 rounded-lg transition-all flex-shrink-0 touch-manipulation"
             onClick={onClose}
           >
             <FaTimes size={16} />
