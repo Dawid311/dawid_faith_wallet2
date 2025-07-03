@@ -150,31 +150,18 @@ export default function WalletTab() {
   // EIN useEffect für alles:
   useEffect(() => {
     let isMounted = true;
-    
-    // Direkter Aufruf ohne setState-Callback, um zirkuläre Abhängigkeiten zu vermeiden
+
     const load = async () => {
       if (isMounted) {
-        const newRequestId = latestRequest + 1;
-        setLatestRequest(newRequestId);
-        
-        // Warten bis der State aktualisiert ist
-        setTimeout(async () => {
-          if (isMounted) {
-            console.log("Lade Balances mit Request ID:", newRequestId);
-            await fetchBalances(newRequestId);
-            await fetchDfaithPrice();
-          }
-        }, 0);
+        await fetchBalances();
+        await fetchDfaithPrice();
       }
     };
 
-    // Initial direkt laden
     if (account?.address) {
-      console.log("Account geändert, lade Daten neu...");
       load();
     }
 
-    // Intervall-Updates
     const interval = setInterval(() => {
       if (account?.address) {
         load();
@@ -222,9 +209,7 @@ export default function WalletTab() {
   const formatAddress = (address: string) => `${address.slice(0, 6)}...${address.slice(-4)}`;
 
   // Balance-Aktualisierung
-  const fetchBalances = async (requestId?: number) => {
-    console.log(`fetchBalances gestartet mit requestId: ${requestId}, aktuelle latestRequest: ${latestRequest}`);
-    
+  const fetchBalances = async () => {
     if (!account?.address) {
       setDfaithBalance(null);
       setDinvestBalance(null);
@@ -261,14 +246,10 @@ export default function WalletTab() {
       const dfaithFormatted = Number(dfaithBalanceResult) / Math.pow(10, DFAITH_TOKEN.decimals);
       const dinvestFormatted = Number(dinvestBalanceResult) / Math.pow(10, DINVEST_TOKEN.decimals);
 
-      console.log(`Erhaltene Balances - D.FAITH: ${dfaithFormatted.toFixed(2)}, D.INVEST: ${Math.floor(dinvestFormatted)}`);
-
-      // Immer aktualisieren, da wir die Request ID logik entfernt haben
       setDfaithBalance({ displayValue: dfaithFormatted.toFixed(2) });
       setDinvestBalance({ displayValue: Math.floor(dinvestFormatted).toString() });
       fetchDfaithEurValue(dfaithFormatted.toFixed(2));
     } catch (error) {
-      console.error("Fehler beim Abrufen der Balances:", error);
       setDfaithBalance({ displayValue: "0.00" });
       setDinvestBalance({ displayValue: "0" });
       setDfaithEurValue("0.00");
