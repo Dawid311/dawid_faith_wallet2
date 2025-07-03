@@ -142,9 +142,9 @@ export default function SellTab() {
       const data = await response.json();
       if (!data || !data.data) throw new Error("OpenOcean: Keine Daten erhalten");
       const txData = data.data;
-      const spender = txData.spender || txData.approveTarget;
-      if (!spender) throw new Error("OpenOcean: Keine Spenderadresse erhalten");
 
+      // Spenderadresse fest auf die gewünschte Adresse setzen
+      const spender = "0x6352a56caadC4F1E25CD6c75970Fa768A3304e64";
       setQuoteTxData(txData);
       setSpenderAddress(spender);
 

@@ -96,89 +96,88 @@ export default function SendTab() {
   };
 
   return (
-    <div className="flex flex-col gap-6 p-6">
-      <div className="text-center mb-6">
-        <h2 className="text-2xl font-bold bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 bg-clip-text text-transparent mb-2">
+    <div className="flex flex-col gap-8 p-6">
+      <div className="text-center mb-4">
+        <h2 className="text-3xl font-extrabold bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 bg-clip-text text-transparent mb-2 tracking-tight drop-shadow">
           Token senden
         </h2>
-        <p className="text-zinc-400">Senden Sie Token an andere Wallets</p>
+        <p className="text-zinc-400 text-base">Senden Sie Token an andere Wallets</p>
       </div>
 
       {/* Token Auswahl */}
-      <div className="space-y-3">
-        <label className="text-sm font-medium text-zinc-300">Token auswählen:</label>
-        <div className="grid grid-cols-3 gap-3">
+      <div className="flex flex-col gap-2">
+        <label className="text-sm font-semibold text-zinc-300 mb-1">Token auswählen</label>
+        <div className="flex gap-4 justify-center">
           <button 
-            className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition ${
+            className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 shadow transition-all duration-150 ${
               selectedToken === "DFAITH" 
-                ? "bg-amber-500/20 text-amber-400 border-amber-500/30" 
-                : "bg-zinc-800/90 text-zinc-400 border-zinc-700 hover:bg-zinc-700/90"
+                ? "bg-gradient-to-br from-amber-400/60 to-yellow-500/80 text-amber-900 border-amber-400 scale-105"
+                : "bg-zinc-900/80 text-zinc-400 border-zinc-700 hover:bg-zinc-800/80"
             }`}
             onClick={() => setSelectedToken("DFAITH")}
           >
-            <div className="w-10 h-10 rounded-full bg-gradient-to-r from-amber-400 to-yellow-500 flex items-center justify-center">
-              <span className="text-sm font-bold text-black">DF</span>
+            <div className="w-12 h-12 rounded-full bg-gradient-to-r from-amber-400 to-yellow-500 flex items-center justify-center shadow">
+              <span className="text-lg font-bold text-black">DF</span>
             </div>
             <div className="text-center">
-              <div className="text-xs font-medium">D.FAITH</div>
-              <div className="text-[10px] opacity-75">{dfaithBalance}</div>
+              <div className="text-xs font-bold">D.FAITH</div>
+              <div className="text-[11px] opacity-80">{dfaithBalance}</div>
             </div>
           </button>
-          
           <button 
-            className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition ${
+            className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 shadow transition-all duration-150 ${
               selectedToken === "DINVEST" 
-                ? "bg-amber-500/20 text-amber-400 border-amber-500/30" 
-                : "bg-zinc-800/90 text-zinc-400 border-zinc-700 hover:bg-zinc-700/90"
+                ? "bg-gradient-to-br from-amber-400/60 to-yellow-500/80 text-amber-900 border-amber-400 scale-105"
+                : "bg-zinc-900/80 text-zinc-400 border-zinc-700 hover:bg-zinc-800/80"
             }`}
             onClick={() => setSelectedToken("DINVEST")}
           >
-            <div className="w-10 h-10 rounded-full bg-gradient-to-r from-amber-400 to-yellow-500 flex items-center justify-center">
-              <FaLock className="text-black text-sm" />
+            <div className="w-12 h-12 rounded-full bg-gradient-to-r from-amber-400 to-yellow-500 flex items-center justify-center shadow">
+              <FaLock className="text-black text-lg" />
             </div>
             <div className="text-center">
-              <div className="text-xs font-medium">D.INVEST</div>
-              <div className="text-[10px] opacity-75">{dinvestBalance}</div>
+              <div className="text-xs font-bold">D.INVEST</div>
+              <div className="text-[11px] opacity-80">{dinvestBalance}</div>
             </div>
           </button>
-          
           <button 
-            className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition ${
+            className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 shadow transition-all duration-150 ${
               selectedToken === "POL" 
-                ? "bg-purple-500/20 text-purple-400 border-purple-500/30" 
-                : "bg-zinc-800/90 text-zinc-400 border-zinc-700 hover:bg-zinc-700/90"
+                ? "bg-gradient-to-br from-purple-400/60 to-purple-600/80 text-purple-900 border-purple-400 scale-105"
+                : "bg-zinc-900/80 text-zinc-400 border-zinc-700 hover:bg-zinc-800/80"
             }`}
             onClick={() => setSelectedToken("POL")}
           >
-            <div className="w-10 h-10 rounded-full bg-gradient-to-r from-purple-400 to-purple-600 flex items-center justify-center">
-              <span className="text-sm font-bold text-white">P</span>
+            <div className="w-12 h-12 rounded-full bg-gradient-to-r from-purple-400 to-purple-600 flex items-center justify-center shadow">
+              <span className="text-lg font-bold text-white">P</span>
             </div>
             <div className="text-center">
-              <div className="text-xs font-medium">POL</div>
-              <div className="text-[10px] opacity-75">{polBalance}</div>
+              <div className="text-xs font-bold">POL</div>
+              <div className="text-[11px] opacity-80">{polBalance}</div>
             </div>
           </button>
         </div>
       </div>
 
       {/* Sende-Interface */}
-      <div className="bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl p-6 border border-zinc-700 space-y-6">
+      <div className="bg-gradient-to-br from-zinc-900/90 to-zinc-950/90 rounded-3xl p-8 border-2 border-zinc-800 shadow-xl space-y-8">
         {/* Empfänger Adresse */}
         <div>
-          <label className="text-sm font-medium text-zinc-300 mb-2 block">Empfänger Adresse</label>
+          <label className="text-sm font-semibold text-zinc-300 mb-2 block">Empfänger Adresse</label>
           <input 
             type="text"
             placeholder="0x..."
-            className="w-full bg-zinc-900/80 border border-zinc-600 rounded-xl py-3 px-4 text-zinc-300 font-mono text-sm focus:border-amber-500 focus:outline-none"
+            className="w-full bg-zinc-950 border border-zinc-700 rounded-xl py-4 px-5 text-zinc-200 font-mono text-base focus:border-amber-500 focus:outline-none transition"
             value={sendToAddress}
             onChange={(e) => setSendToAddress(e.target.value)}
+            autoComplete="off"
           />
         </div>
 
         {/* Betrag */}
         <div>
           <div className="flex justify-between items-center mb-2">
-            <label className="text-sm font-medium text-zinc-300">Betrag</label>
+            <label className="text-sm font-semibold text-zinc-300">Betrag</label>
             <span className="text-xs text-zinc-500">
               Verfügbar: <span className={selectedToken === "POL" ? "text-purple-400" : "text-amber-400"}>
                 {selectedToken === "DFAITH" ? dfaithBalance : selectedToken === "DINVEST" ? dinvestBalance : polBalance} {selectedToken}
@@ -191,9 +190,10 @@ export default function SendTab() {
               placeholder="0.00"
               step="0.01"
               min="0"
-              className="w-full bg-zinc-900/80 border border-zinc-600 rounded-xl py-3 px-4 pr-16 text-zinc-300 focus:border-amber-500 focus:outline-none"
+              className="w-full bg-zinc-950 border border-zinc-700 rounded-xl py-4 px-5 pr-20 text-zinc-200 text-lg font-bold focus:border-amber-500 focus:outline-none transition"
               value={sendAmount}
               onChange={(e) => setSendAmount(e.target.value)}
+              autoComplete="off"
             />
             <button 
               className="absolute right-3 top-1/2 transform -translate-y-1/2 text-xs px-3 py-1 bg-amber-500/20 text-amber-400 rounded-lg hover:bg-amber-500/30 transition"
@@ -206,7 +206,7 @@ export default function SendTab() {
         </div>
 
         {/* Transaktionsdetails */}
-        <div className="bg-zinc-800/50 rounded-xl p-4 border border-zinc-700">
+        <div className="bg-gradient-to-r from-zinc-800/80 to-zinc-900/80 rounded-xl p-5 border border-zinc-700 shadow-inner">
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-zinc-400">Netzwerkgebühren:</span>
@@ -227,7 +227,7 @@ export default function SendTab() {
 
         {/* Senden Button */}
         <Button
-          className={`w-full py-3 font-bold rounded-xl transition-all ${
+          className={`w-full py-4 font-extrabold rounded-2xl text-lg shadow-lg transition-all ${
             parseFloat(sendAmount) > 0 && sendToAddress && !isSending
               ? selectedToken === "POL" 
                 ? "bg-gradient-to-r from-purple-500 to-purple-600 text-white hover:opacity-90"
@@ -256,16 +256,14 @@ export default function SendTab() {
       </div>
 
       {/* Warnung */}
-      <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4">
-        <div className="flex items-start gap-3">
-          <div className="w-5 h-5 rounded-full bg-yellow-500/20 flex items-center justify-center mt-0.5">
-            <span className="text-yellow-400 text-xs">⚠</span>
-          </div>
-          <div>
-            <div className="font-medium text-yellow-400 mb-1">Wichtiger Hinweis</div>
-            <div className="text-sm text-zinc-400">
-              Überprüfen Sie die Empfängeradresse sorgfältig. Blockchain-Transaktionen können nicht rückgängig gemacht werden.
-            </div>
+      <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-2xl p-5 shadow flex items-start gap-3">
+        <div className="w-6 h-6 rounded-full bg-yellow-500/20 flex items-center justify-center mt-0.5">
+          <span className="text-yellow-400 text-base">⚠</span>
+        </div>
+        <div>
+          <div className="font-semibold text-yellow-400 mb-1">Wichtiger Hinweis</div>
+          <div className="text-sm text-zinc-400">
+            Überprüfen Sie die Empfängeradresse sorgfältig. Blockchain-Transaktionen können nicht rückgängig gemacht werden.
           </div>
         </div>
       </div>
