@@ -216,43 +216,28 @@ export default function StakeTab() {
         <p className="text-zinc-400">Verdienen Sie wöchentlich D.FAITH Token durch Staking</p>
       </div>
 
-      {/* Staking Overview */}
-      <div className="grid grid-cols-2 gap-4 mb-6">
+      {/* Staking Overview: Verfügbar, Gestaked, Reward */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         <div className="bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl p-4 border border-zinc-700 text-center">
-          <div className="text-center">
-            <div className="text-sm text-zinc-500 mb-1">Verfügbar</div>
-            <div className="text-xl font-bold text-amber-400">
-              {loading ? "Laden..." : available}
-            </div>
-            <div className="text-xs text-zinc-500">D.INVEST</div>
+          <div className="text-sm text-zinc-500 mb-1">Verfügbar</div>
+          <div className="text-xl font-bold text-amber-400">
+            {loading ? "Laden..." : available}
           </div>
+          <div className="text-xs text-zinc-500">D.INVEST</div>
         </div>
         <div className="bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl p-4 border border-zinc-700 text-center">
-          <div className="text-center">
-            <div className="text-sm text-zinc-500 mb-1">Gestaked</div>
-            <div className="text-xl font-bold text-purple-400">
-              {loading ? "Laden..." : staked}
-            </div>
-            <div className="text-xs text-zinc-500">D.INVEST</div>
+          <div className="text-sm text-zinc-500 mb-1">Gestaked</div>
+          <div className="text-xl font-bold text-purple-400">
+            {loading ? "Laden..." : staked}
           </div>
+          <div className="text-xs text-zinc-500">D.INVEST</div>
         </div>
-      </div>
-
-      {/* Kompakte Rewards-Übersicht */}
-      <div className="grid grid-cols-2 gap-4 mb-6">
         <div className="bg-gradient-to-br from-green-900/60 to-green-800/60 rounded-xl p-4 border border-green-700/40 text-center">
           <div className="text-xs text-zinc-400 mb-1">Ihr aktueller Reward/Woche</div>
-          <div className="text-2xl font-bold text-green-400 mb-1">
+          <div className="text-xl font-bold text-green-400 mb-1">
             {getUserWeeklyReward()} D.FAITH
           </div>
           <div className="text-xs text-zinc-500">bei {staked} gestaked</div>
-        </div>
-        <div className="bg-gradient-to-br from-amber-900/60 to-amber-800/60 rounded-xl p-4 border border-amber-700/40 text-center">
-          <div className="text-xs text-zinc-400 mb-1">Verfügbare Rewards</div>
-          <div className="text-2xl font-bold text-amber-400 mb-1">
-            {loading ? "Laden..." : claimableRewards} D.FAITH
-          </div>
-          <div className="text-xs text-zinc-500">sofort einforderbar</div>
         </div>
       </div>
 
@@ -324,14 +309,14 @@ export default function StakeTab() {
             />
           </div>
 
-          {/* Reward Stages Erklärung */}
+          {/* Reward Vorschau für Eingabe */}
           {stakeAmount && parseInt(stakeAmount) > 0 && (
             <div className="bg-zinc-800/50 rounded-xl p-4 border border-zinc-700">
               <div className="text-xs text-zinc-400 mb-1">
                 Ihr wöchentlicher Reward (Stufe {currentStage}):
               </div>
               <div className="text-lg font-bold text-amber-400">
-                {parseInt(stakeAmount) * (currentRewardRate / 100)} D.FAITH
+                {(parseInt(stakeAmount) * (currentRewardRate / 100)).toFixed(2)} D.FAITH
               </div>
             </div>
           )}
@@ -344,6 +329,15 @@ export default function StakeTab() {
             <FaLock className="inline mr-2" />
             {!stakeAmount || parseInt(stakeAmount) <= 0 ? "Betrag eingeben" : `${stakeAmount} D.INVEST staken`}
           </Button>
+          {txStatus === "success" && (
+            <div className="mt-2 text-green-400 text-sm text-center">Transaktion erfolgreich!</div>
+          )}
+          {txStatus === "error" && (
+            <div className="mt-2 text-red-400 text-sm text-center">Transaktion fehlgeschlagen!</div>
+          )}
+          {txStatus === "pending" && (
+            <div className="mt-2 text-yellow-400 text-sm text-center">Transaktion läuft...</div>
+          )}
         </div>
       )}
 

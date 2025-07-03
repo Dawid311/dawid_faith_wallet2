@@ -49,8 +49,8 @@ export default function SendTab() {
       try {
         const contract = getContract({ client, chain: polygon, address: DINVEST_TOKEN });
         const bal = await balanceOf({ contract, address: account.address });
-        setDinvestBalance((Number(bal) / Math.pow(10, DINVEST_DECIMALS)).toFixed(4));
-      } catch { setDinvestBalance("0.0000"); }
+        setDinvestBalance((Number(bal) / Math.pow(10, DINVEST_DECIMALS)).toFixed(0)); // <--- .toFixed(0)
+      } catch { setDinvestBalance("0"); }
     })();
     // POL (native)
     (async () => {
@@ -134,10 +134,14 @@ export default function SendTab() {
           type="number"
           placeholder="Betrag"
           min="0"
-          step="0.01"
+          step={selectedToken === "DINVEST" ? "1" : "0.01"}
           className="flex-1 bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-zinc-200"
           value={sendAmount}
-          onChange={e => setSendAmount(e.target.value)}
+          onChange={e => {
+            let val = e.target.value.replace(",", "."); // Komma durch Punkt ersetzen
+            if (selectedToken === "DINVEST") val = val.replace(/\..*$/, ""); // Nur ganze Zahlen
+            setSendAmount(val);
+          }}
         />
         <button
           className="bg-amber-500/20 text-amber-400 px-2 rounded hover:bg-amber-500/30"

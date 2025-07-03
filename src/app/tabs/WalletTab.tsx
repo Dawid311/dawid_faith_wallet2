@@ -147,7 +147,7 @@ export default function WalletTab() {
 
   // EIN useEffect für alles:
   useEffect(() => {
-    let isMounted = true; // Flag, um nur das aktuellste Ergebnis zu setzen
+    let isMounted = true;
 
     const load = async () => {
       await fetchBalances();
