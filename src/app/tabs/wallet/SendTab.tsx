@@ -36,13 +36,42 @@ export default function SendTab() {
       setPolBalance("0.0000");
       return;
     }
-    // D.FAITH
+    // D.FAITH - mit stabilen mehrfachen Abfragen (MetaMask-Methode)
     (async () => {
       try {
-        const contract = getContract({ client, chain: polygon, address: DFAITH_TOKEN });
-        const bal = await balanceOf({ contract, address: account.address });
-        setDfaithBalance((Number(bal) / Math.pow(10, DFAITH_DECIMALS)).toFixed(2));
-      } catch { setDfaithBalance("0.00"); }
+        // Mehrere Abfragen durchführen für stabilere Ergebnisse
+        const contract = getContract({ 
+          client, 
+          chain: { ...polygon, rpc: "https://polygon-rpc.com" }, 
+          address: DFAITH_TOKEN 
+        });
+        
+        // Mehrere Abfragen durchführen
+        const balances: bigint[] = [];
+        
+        for (let i = 0; i < 3; i++) {
+          try {
+            const bal = await balanceOf({ contract, address: account.address });
+            balances.push(bal);
+          } catch (e) {
+            console.error(`D.FAITH Balance-Abfrage #${i+1} fehlgeschlagen:`, e);
+          }
+        }
+        
+        // Stabilsten Wert verwenden
+        const result = balances.length > 0 
+          ? (balances.length > 1 
+              ? balances.sort((a, b) => 
+                  balances.filter(v => v === a).length - balances.filter(v => v === b).length
+                )[balances.length - 1] 
+              : balances[0])
+          : BigInt(0);
+        
+        setDfaithBalance((Number(result) / Math.pow(10, DFAITH_DECIMALS)).toFixed(2));
+      } catch (e) { 
+        console.error("Fehler beim Abrufen der D.FAITH Balance:", e);
+        setDfaithBalance("0.00"); 
+      }
     })();
     // D.INVEST
     (async () => {
