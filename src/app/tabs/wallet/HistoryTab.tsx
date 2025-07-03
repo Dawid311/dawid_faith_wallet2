@@ -1,72 +1,26 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "../../../../components/ui/button";
 import { FaPaperPlane, FaArrowDown, FaExchangeAlt, FaCoins, FaLock } from "react-icons/fa";
 
+type Transaction = {
+  id: string | number;
+  type: string;
+  token: string;
+  amount: string;
+  address: string;
+  hash: string;
+  time: string;
+  status: string;
+};
+
 export default function HistoryTab() {
   const [activeFilter, setActiveFilter] = useState("all");
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
 
-  const transactions = [
-    {
-      id: 1,
-      type: "send",
-      token: "D.FAITH",
-      amount: "-250.0000",
-      address: "0x8A7b...C4d9",
-      hash: "0xa1b2...c3d4",
-      time: "vor 45 Minuten",
-      status: "success"
-    },
-    {
-      id: 2,
-      type: "bridge",
-      token: "D.INVEST",
-      amount: "+75",
-      address: "Thirdweb Bridge",
-      hash: "0x5e6f...7890",
-      time: "vor 3 Stunden",
-      status: "success"
-    },
-    {
-      id: 3,
-      type: "stake",
-      token: "D.INVEST",
-      amount: "100",
-      address: "Staking Contract",
-      hash: "0xe730...8A",
-      time: "vor 18 Stunden",
-      status: "success"
-    },
-    {
-      id: 4,
-      type: "receive",
-      token: "D.FAITH",
-      amount: "+500.0000",
-      address: "0x2B4c...E8f1",
-      hash: "0xdef0...1234",
-      time: "vor 1 Tag",
-      status: "success"
-    },
-    {
-      id: 5,
-      type: "swap",
-      token: "POL → D.FAITH",
-      amount: "1.2 POL → 150.0000 D.FAITH",
-      address: "Uniswap",
-      hash: "0x9abc...def0",
-      time: "vor 2 Tagen",
-      status: "success"
-    },
-    {
-      id: 6,
-      type: "reward",
-      token: "D.INVEST",
-      amount: "+25",
-      address: "Staking Reward",
-      hash: "0x3456...789a",
-      time: "vor 3 Tagen",
-      status: "success"
-    }
-  ];
+  useEffect(() => {
+    const history = JSON.parse(localStorage.getItem("walletHistory") || "[]");
+    setTransactions(history);
+  }, []);
 
   const getTransactionIcon = (type: string) => {
     switch (type) {
@@ -244,3 +198,22 @@ export default function HistoryTab() {
     </div>
   );
 }
+
+// Hilfsfunktion zum Speichern
+function saveTransaction(tx: Transaction) {
+  const history = JSON.parse(localStorage.getItem("walletHistory") || "[]");
+  history.unshift(tx); // Neueste zuerst
+  localStorage.setItem("walletHistory", JSON.stringify(history));
+}
+
+// Beispiel-Aufruf nach erfolgreicher Aktion:
+// saveTransaction({
+//   id: Date.now(),
+//   type: "send",
+//   token: "D.FAITH",
+//   amount: "-250.0000",
+//   address: "0x8A7b...C4d9",
+//   hash: "0xa1b2...c3d4",
+//   time: "gerade eben",
+//   status: "success"
+// });

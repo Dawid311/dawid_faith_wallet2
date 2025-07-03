@@ -111,8 +111,9 @@ export default function WalletTab() {
 
   const [dfaithBalance, setDfaithBalance] = useState<{ displayValue: string } | null>(null);
   const [dinvestBalance, setDinvestBalance] = useState<{ displayValue: string } | null>(null);
-  const [dfaithPriceEur, setDfaithPriceEur] = useState<number | null>(null);
-  
+  const [dfaithEurValue, setDfaithEurValue] = useState<string>("0.00");
+  const [dfaithPriceEur, setDfaithPriceEur] = useState<number>(0.001);
+
   // Modal States
   const [showBuyModal, setShowBuyModal] = useState(false);
   const [showSellModal, setShowSellModal] = useState(false);
@@ -230,6 +231,47 @@ export default function WalletTab() {
     }
   };
 
+  // Funktion: D.FAITH Wert in EUR live berechnen
+  const fetchDfaithEurValue = async (balance: string) => {
+    try {
+      // 1. OpenOcean Quote: Wie viel POL bekomme ich für 1 D.FAITH?
+      const params = new URLSearchParams({
+        chain: "polygon",
+        inTokenAddress: "0xF051E3B0335eB332a7ef0dc308BB4F0c10301060", // D.FAITH
+        outTokenAddress: "0x0000000000000000000000000000000000001010", // POL (MATIC)
+        amount: "1",
+        gasPrice: "50",
+      });
+      const quoteRes = await fetch(`https://open-api.openocean.finance/v3/polygon/quote?${params}`);
+      const quoteData = await quoteRes.json();
+      const dfaithToPol = Number(quoteData.data.outAmount) / Math.pow(10, 18); // POL hat 18 Dezimalstellen
+
+      // 2. POL/EUR Preis holen (z.B. von CoinGecko)
+      const polRes = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=polygon-ecosystem-token&vs_currencies=eur');
+      const polData = await polRes.json();
+      const polEur = polData["polygon-ecosystem-token"].eur;
+
+      // 3. D.FAITH Gesamtwert in EUR berechnen
+      const totalEur = Number(balance) * dfaithToPol * polEur;
+      setDfaithEurValue(totalEur.toFixed(2));
+    } catch (e) {
+      setDfaithEurValue("0.00");
+    }
+  };
+
+  // Balance und EUR-Wert regelmäßig aktualisieren
+  useEffect(() => {
+    const update = async () => {
+      await fetchBalances();
+      if (dfaithBalance) {
+        await fetchDfaithEurValue(dfaithBalance.displayValue);
+      }
+    };
+    update();
+    const interval = setInterval(update, 30000);
+    return () => clearInterval(interval);
+  }, [account?.address, dfaithBalance?.displayValue]);
+
   if (status !== "connected" || !account?.address) {
     return (
       <div className="flex flex-col items-center min-h-[70vh] justify-center bg-black py-8">
@@ -338,10 +380,7 @@ export default function WalletTab() {
               <div className="w-full h-px bg-gradient-to-r from-transparent via-zinc-700/50 to-transparent my-3"></div>
               
               <div className="text-xs text-zinc-500">
-                ≈ {dfaithBalance && dfaithPriceEur 
-                  ? `${(Number(dfaithBalance.displayValue) * dfaithPriceEur).toFixed(2)} EUR`
-                  : "0.00 EUR"
-                }
+                ≈ {dfaithEurValue} EUR
               </div>
             </div>
 
