@@ -339,19 +339,37 @@ export default function SellTab() {
     const initialBalance = parseFloat(dfaithBalance);
     
     try {
-      console.log("4. Swap Transaktion starten");
-      console.log("Swap TX Daten:", quoteTxData);
+      console.log("4. Swap Transaktion starten - aktualisiere Quote...");
+      
+      // Quote vor Swap aktualisieren (für frische Daten)
+      const params = new URLSearchParams({
+        chain: "polygon",
+        inTokenAddress: DFAITH_TOKEN,
+        outTokenAddress: "0x0000000000000000000000000000000000001010",
+        amount: sellAmount,
+        slippage: slippage,
+        gasPrice: "50",
+        account: account.address,
+      });
+      
+      const response = await fetch(`https://open-api.openocean.finance/v3/polygon/swap_quote?${params}`);
+      if (!response.ok) throw new Error(`Quote refresh failed: ${response.status}`);
+      
+      const data = await response.json();
+      const freshTxData = data.data;
+      
+      console.log("Frische Quote-Daten:", freshTxData);
       
       const { prepareTransaction } = await import("thirdweb");
       const tx = prepareTransaction({
-        to: quoteTxData.to,
-        data: quoteTxData.data,
-        value: BigInt(quoteTxData.value || "0"),
+        to: freshTxData.to,
+        data: freshTxData.data,
+        value: BigInt(freshTxData.value || "0"),
         chain: polygon,
         client
       });
       
-      console.log("Sending swap transaction...");
+      console.log("Sending swap transaction mit frischen Daten...");
       const swapResult = await sendTransaction(tx);
       console.log("Swap TX gesendet:", swapResult);
       
@@ -365,7 +383,13 @@ export default function SellTab() {
       
       // Prüfe ob Transaktion erfolgreich war
       if (receipt.status !== "success") {
-        throw new Error("Transaktion fehlgeschlagen - Status: " + receipt.status);
+        console.error("Transaktion Details:", {
+          status: receipt.status,
+          gasUsed: receipt.gasUsed?.toString(),
+          logs: receipt.logs,
+          transactionHash: receipt.transactionHash
+        });
+        throw new Error(`Transaktion fehlgeschlagen - Status: ${receipt.status}. Hash: ${receipt.transactionHash}`);
       }
       
       setSwapTxStatus("verifying");
