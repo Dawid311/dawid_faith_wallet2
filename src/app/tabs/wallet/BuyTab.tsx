@@ -198,8 +198,36 @@ export default function BuyTab() {
     setShowInvestModal(true);
   };
 
+  // POL kaufen Modal Handler
+  const handlePolBuy = async () => {
+    if (account?.address) {
+      await navigator.clipboard.writeText(account.address);
+      setCopied(true);
+    }
+    setShowPolBuyModal(true);
+  };
+
+  const handlePolContinue = (option: string) => {
+    setShowPolBuyModal(false);
+    
+    if (option === 'transak') {
+      // Transak URL mit POL und Wallet-Adresse
+      const transakUrl = `https://global.transak.com/?apiKey=YOUR_API_KEY&defaultCryptoCurrency=POL&walletAddress=${account?.address}&disableWalletAddressForm=true&network=polygon`;
+      window.open(transakUrl, '_blank');
+    } else if (option === 'moonpay') {
+      // MoonPay URL für POL
+      const moonpayUrl = `https://buy.moonpay.com/?apiKey=YOUR_API_KEY&currencyCode=pol&walletAddress=${account?.address}`;
+      window.open(moonpayUrl, '_blank');
+    } else if (option === 'ramp') {
+      // Ramp URL für POL
+      const rampUrl = `https://buy.ramp.network/?hostApiKey=YOUR_API_KEY&swapAsset=MATIC_POL&userAddress=${account?.address}`;
+      window.open(rampUrl, '_blank');
+    }
+  };
+
   const handleInvestContinue = () => {
     setShowInvestModal(false);
+    setCopied(false); // Reset für nächstes Mal
     window.open('https://dein-stripe-link.de', '_blank');
   };
 
@@ -979,46 +1007,12 @@ export default function BuyTab() {
             </div>
           </div>
           
-          <div className="w-full mt-4">
-            {showPolBuyModal ? (
-              <div
-                className="fixed inset-0 z-50 flex items-center justify-center min-h-screen bg-black/60 overflow-y-auto"
-              >
-                <div
-                  ref={polBuyModalRef}
-                  className="bg-zinc-900 rounded-xl p-4 max-w-full w-full sm:max-w-xs border border-purple-500 text-center flex flex-col items-center justify-center my-4"
-                >
-                  <div className="mb-4 text-purple-400 text-2xl font-bold">POL kaufen</div>
-                  <div className="w-full flex-1 flex items-center justify-center">
-                    <BuyWidget
-                      client={client}
-                      tokenAddress={NATIVE_TOKEN_ADDRESS}
-                      chain={polygon}
-                      amount="1"
-                      theme="dark"
-                      className="w-full"
-                    />
-                  </div>
-                  <Button
-                    className="w-full bg-zinc-600 hover:bg-zinc-700 text-white font-bold py-2 rounded-xl mt-4"
-                    onClick={() => setShowPolBuyModal(false)}
-                  >
-                    Schließen
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <Button
-                className="w-full bg-gradient-to-r from-purple-500 to-purple-700 text-white font-bold py-3 rounded-xl hover:opacity-90 transition-opacity"
-                onClick={() => {
-                  setShowPolBuyModal(true);
-                  // Das Scrollen übernimmt jetzt der useEffect
-                }}
-              >
-                POL kaufen
-              </Button>
-            )}
-          </div>
+          <Button
+            className="w-full bg-gradient-to-r from-purple-500 to-purple-700 text-white font-bold py-3 rounded-xl hover:opacity-90 transition-opacity"
+            onClick={handlePolBuy}
+          >
+            POL kaufen
+          </Button>
         </div>
       </div>
 
@@ -1035,6 +1029,100 @@ export default function BuyTab() {
           </div>
         </div>
       </div>
+
+      {/* POL Kauf Modal - Neue Version mit Fiat-Optionen */}
+      {showPolBuyModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center min-h-screen bg-black/60 overflow-y-auto">
+          <div
+            ref={polBuyModalRef}
+            className="bg-zinc-900 rounded-xl p-6 w-full max-w-sm mx-4 border border-purple-500 text-center flex flex-col my-4"
+          >
+            <div className="mb-4 text-purple-400 text-2xl font-bold">POL kaufen</div>
+            
+            {copied ? (
+              <div className="mb-4 text-green-400 text-sm bg-green-500/10 border border-green-500/30 rounded-lg p-3">
+                ✅ Wallet-Adresse kopiert!
+                <div className="text-xs text-zinc-400 mt-1">
+                  Deine Adresse wurde in die Zwischenablage kopiert
+                </div>
+              </div>
+            ) : (
+              <div className="mb-4 text-zinc-300 text-sm">
+                Wähle einen Anbieter um POL mit Fiat-Währung zu kaufen:
+              </div>
+            )}
+
+            {/* Anbieter-Optionen */}
+            <div className="space-y-3 mb-6">
+              {/* Transak */}
+              <button
+                className="w-full p-4 bg-gradient-to-r from-blue-600/20 to-blue-700/20 border border-blue-500/30 rounded-xl hover:from-blue-600/30 hover:to-blue-700/30 transition-all"
+                onClick={() => handlePolContinue('transak')}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="text-left">
+                    <div className="font-bold text-blue-400">Transak</div>
+                    <div className="text-xs text-zinc-400">Kreditkarte, Banküberweisung</div>
+                  </div>
+                  <div className="text-blue-400 text-xl">🏦</div>
+                </div>
+              </button>
+
+              {/* MoonPay */}
+              <button
+                className="w-full p-4 bg-gradient-to-r from-purple-600/20 to-purple-700/20 border border-purple-500/30 rounded-xl hover:from-purple-600/30 hover:to-purple-700/30 transition-all"
+                onClick={() => handlePolContinue('moonpay')}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="text-left">
+                    <div className="font-bold text-purple-400">MoonPay</div>
+                    <div className="text-xs text-zinc-400">Kreditkarte, Apple Pay, Google Pay</div>
+                  </div>
+                  <div className="text-purple-400 text-xl">🌙</div>
+                </div>
+              </button>
+
+              {/* Ramp */}
+              <button
+                className="w-full p-4 bg-gradient-to-r from-green-600/20 to-green-700/20 border border-green-500/30 rounded-xl hover:from-green-600/30 hover:to-green-700/30 transition-all"
+                onClick={() => handlePolContinue('ramp')}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="text-left">
+                    <div className="font-bold text-green-400">Ramp</div>
+                    <div className="text-xs text-zinc-400">Schnelle Verifizierung</div>
+                  </div>
+                  <div className="text-green-400 text-xl">⚡</div>
+                </div>
+              </button>
+            </div>
+
+            {/* Hinweis */}
+            <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg text-xs text-left">
+              <div className="flex items-start gap-2">
+                <span className="text-yellow-400">💡</span>
+                <div>
+                  <div className="font-medium text-yellow-400 mb-1">Hinweis:</div>
+                  <div className="text-zinc-400">
+                    Die Anbieter unterstützen verschiedene Zahlungsmethoden und Länder. 
+                    Wähle den für dich passenden Anbieter.
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <Button
+              className="w-full bg-zinc-600 hover:bg-zinc-700 text-white font-bold py-2 rounded-xl"
+              onClick={() => {
+                setShowPolBuyModal(false);
+                setCopied(false);
+              }}
+            >
+              Schließen
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Info Modal für D.INVEST */}
       {showInvestModal && (
