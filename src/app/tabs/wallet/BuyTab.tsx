@@ -634,7 +634,7 @@ export default function BuyTab() {
                   <div className={` ${buyStep === 'completed' ? 'text-green-400' : 'text-zinc-500'}`}>3. Swap {buyStep === 'completed' ? '✓' : ''}</div>
                 </div>
 
-                {/* Kompakte Inputzeile: POL-Balance als Badge, Input, Slippage */}
+                {/* Kompakte Inputzeile: POL-Balance als Badge, Input */}
                 <div className="flex gap-2 items-center mb-3 w-full">
                   {/* POL-Balance Badge */}
                   <div className="flex items-center gap-1 bg-purple-900/60 border border-purple-500 rounded-lg px-3 py-2 text-purple-300 font-bold text-sm whitespace-nowrap">
@@ -660,18 +660,6 @@ export default function BuyTab() {
                     disabled={isSwapping || parseFloat(polBalance) <= 0 || buyStep !== 'initial'}
                     style={{ minWidth: 'unset' }}
                   >MAX</button>
-                  {/* Slippage Input - jetzt kleiner */}
-                  <input
-                    type="number"
-                    min="0.1"
-                    max="50"
-                    step="0.1"
-                    placeholder="%"
-                    className="w-14 bg-zinc-800 border border-zinc-600 rounded-lg py-3 px-1 text-sm text-zinc-300 focus:border-amber-500 focus:outline-none text-center"
-                    value={slippage}
-                    onChange={e => setSlippage(e.target.value)}
-                    disabled={isSwapping || buyStep !== 'initial'}
-                  />
                 </div>
                 <div className="flex justify-between text-xs text-zinc-500 mb-3">
                   <span>Verfügbar: <span className="text-purple-400 font-bold">{polBalance} POL</span></span>
@@ -687,7 +675,7 @@ export default function BuyTab() {
                     </div>
                     <div className="flex justify-between mb-1">
                       <span className="text-zinc-400">~Wert:</span>
-                      <span className="text-green-400 font-bold">{(parseFloat(swapAmountPol) * dfaithPrice * dfaithPriceEur).toFixed(3)}€</span>
+                      <span className="text-green-400 font-bold">{(parseFloat(swapAmountPol) * dfaithPrice * dfaithPriceEur).toFixed(2)}€</span>
                     </div>
                   </div>
                 )}

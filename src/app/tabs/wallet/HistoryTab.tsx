@@ -340,10 +340,10 @@ export default function HistoryTab() {
             <div className="text-xs text-zinc-500">Erfolgreich</div>
           </div>
           <div className="bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl p-4 border border-zinc-700 text-center">
-            <div className="text-2xl font-bold text-blue-400 mb-1">
-              {new Set(transactions.map(tx => tx.token)).size}
+            <div className="text-2xl font-bold text-red-400 mb-1">
+              {transactions.filter(tx => tx.status === "failed").length}
             </div>
-            <div className="text-xs text-zinc-500">Token</div>
+            <div className="text-xs text-zinc-500">Fehlgeschlagen</div>
           </div>
         </div>
       )}

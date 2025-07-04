@@ -74,9 +74,15 @@ export default function SendTab() {
 
   // MAX-Button Logik
   const handleMax = () => {
-    if (selectedToken === "DFAITH") setSendAmount(dfaithBalance);
-    else if (selectedToken === "DINVEST") setSendAmount(dinvestBalance);
-    else if (selectedToken === "POL") setSendAmount(polBalance);
+    let maxValue = "";
+    if (selectedToken === "DFAITH") {
+      maxValue = dfaithBalance.replace(",", ".");
+    } else if (selectedToken === "DINVEST") {
+      maxValue = dinvestBalance.replace(",", ".");
+    } else if (selectedToken === "POL") {
+      maxValue = polBalance.replace(",", ".");
+    }
+    setSendAmount(maxValue);
   };
 
   const tokenOptions = [
