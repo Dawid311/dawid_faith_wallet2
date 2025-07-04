@@ -602,12 +602,12 @@ export default function BuyTab() {
             <div className="fixed inset-0 z-50 flex items-center justify-center min-h-screen bg-black/60 overflow-y-auto">
               <div
                 ref={dfaithBuyModalRef}
-                className="bg-zinc-900 rounded-xl p-2 sm:p-4 max-w-xs w-full mx-2 border border-amber-400 my-2 max-h-[85vh] overflow-y-auto flex flex-col"
+                className="bg-zinc-900 rounded-xl p-4 sm:p-6 max-w-sm w-full mx-2 border border-amber-400 my-4 max-h-[90vh] overflow-y-auto flex flex-col"
                 style={{ boxSizing: 'border-box' }}
               >
                 {/* Header mit Close Button */}
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-base sm:text-lg font-bold text-amber-400">D.FAITH kaufen</h3>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-lg sm:text-2xl font-bold text-amber-400">D.FAITH kaufen</h3>
                   <button
                     onClick={() => {
                       setShowDfaithBuyModal(false);
@@ -620,59 +620,67 @@ export default function BuyTab() {
                       setNeedsApproval(false);
                       setQuoteError(null);
                     }}
-                    className="p-1 text-amber-400 hover:text-yellow-300 hover:bg-zinc-800 rounded-lg transition-all flex-shrink-0"
+                    className="p-2 text-amber-400 hover:text-yellow-300 hover:bg-zinc-800 rounded-lg transition-all flex-shrink-0"
                     disabled={isSwapping}
                   >
-                    <span className="text-base">✕</span>
+                    <span className="text-lg">✕</span>
                   </button>
                 </div>
                 
                 {/* Prozessschritte anzeigen */}
-                <div className="mb-2 flex justify-between text-[11px]">
+                <div className="mb-3 flex justify-between text-xs">
                   <div className={` ${buyStep !== 'initial' ? 'text-green-400' : 'text-zinc-500'}`}>1. Quote {buyStep !== 'initial' ? '✓' : ''}</div>
                   <div className={` ${buyStep === 'approved' || buyStep === 'completed' ? 'text-green-400' : 'text-zinc-500'}`}>2. Approve {buyStep === 'approved' || buyStep === 'completed' ? '✓' : needsApproval ? '' : '(nötig)'}</div>
                   <div className={` ${buyStep === 'completed' ? 'text-green-400' : 'text-zinc-500'}`}>3. Swap {buyStep === 'completed' ? '✓' : ''}</div>
                 </div>
 
-                {/* Kompakte Inputzeile: POL-Balance, Input, Slippage */}
-                <div className="flex gap-1 items-center mb-2 w-full">
+                {/* Kompakte Inputzeile: POL-Balance als Badge, Input, Slippage */}
+                <div className="flex gap-2 items-center mb-3 w-full">
+                  {/* POL-Balance Badge */}
+                  <div className="flex items-center gap-1 bg-purple-900/60 border border-purple-500 rounded-lg px-3 py-2 text-purple-300 font-bold text-sm whitespace-nowrap">
+                    <span className="text-purple-400 text-base">🔷</span>
+                    <span>{polBalance}</span>
+                    <span className="text-xs font-normal ml-1">POL</span>
+                  </div>
+                  {/* POL Input */}
                   <input
                     type="number"
                     min="0"
                     step="0.001"
-                    placeholder={`POL: ${polBalance}`}
-                    className="flex-1 bg-zinc-800 border border-zinc-600 rounded-lg py-2 px-2 text-sm font-bold text-purple-400 focus:border-amber-500 focus:outline-none"
+                    placeholder="Betrag"
+                    className="flex-1 bg-zinc-800 border border-zinc-600 rounded-lg py-3 px-3 text-base font-bold text-purple-400 focus:border-amber-500 focus:outline-none"
                     value={swapAmountPol}
                     onChange={e => setSwapAmountPol(e.target.value)}
                     disabled={isSwapping || buyStep !== 'initial'}
                     style={{ minWidth: 0 }}
                   />
                   <button
-                    className="text-xs px-2 py-1 bg-purple-500/20 text-purple-400 rounded hover:bg-purple-500/30 transition"
+                    className="text-xs px-2 py-2 bg-purple-500/20 text-purple-400 rounded hover:bg-purple-500/30 transition font-bold"
                     onClick={() => setSwapAmountPol((parseFloat(polBalance) * 0.95).toFixed(3))}
                     disabled={isSwapping || parseFloat(polBalance) <= 0 || buyStep !== 'initial'}
                     style={{ minWidth: 'unset' }}
                   >MAX</button>
+                  {/* Slippage Input */}
                   <input
                     type="number"
                     min="0.1"
                     max="50"
                     step="0.1"
                     placeholder="Slippage %"
-                    className="w-16 bg-zinc-800 border border-zinc-600 rounded-lg py-2 px-2 text-xs text-zinc-300 focus:border-amber-500 focus:outline-none"
+                    className="w-20 bg-zinc-800 border border-zinc-600 rounded-lg py-3 px-2 text-sm text-zinc-300 focus:border-amber-500 focus:outline-none"
                     value={slippage}
                     onChange={e => setSlippage(e.target.value)}
                     disabled={isSwapping || buyStep !== 'initial'}
                   />
                 </div>
-                <div className="flex justify-between text-[10px] text-zinc-500 mb-2">
-                  <span>Verfügbar: {polBalance} POL</span>
+                <div className="flex justify-between text-xs text-zinc-500 mb-3">
+                  <span>Verfügbar: <span className="text-purple-400 font-bold">{polBalance} POL</span></span>
                   <span>Slippage: {slippage}%</span>
                 </div>
 
                 {/* Estimated Output */}
                 {swapAmountPol && parseFloat(swapAmountPol) > 0 && dfaithPrice && dfaithPriceEur && (
-                  <div className="mb-2 p-2 bg-zinc-800/50 rounded text-xs">
+                  <div className="mb-3 p-3 bg-zinc-800/50 rounded text-sm">
                     <div className="flex justify-between mb-1">
                       <span className="text-zinc-400">~D.FAITH:</span>
                       <span className="text-amber-400 font-bold">{(parseFloat(swapAmountPol) * dfaithPrice).toFixed(2)}</span>
@@ -686,7 +694,7 @@ export default function BuyTab() {
 
                 {/* Status/Fehler kompakt */}
                 {swapTxStatus && (
-                  <div className={`mb-2 p-2 rounded text-center text-xs ${
+                  <div className={`mb-3 p-2 rounded text-center text-xs ${
                     swapTxStatus === "success" ? "bg-green-500/20 text-green-400" :
                     swapTxStatus === "error" ? "bg-red-500/20 text-red-400" :
                     swapTxStatus === "confirming" ? "bg-blue-500/20 text-blue-400" :
@@ -709,7 +717,7 @@ export default function BuyTab() {
                 <div className="space-y-2">
                   {buyStep === 'initial' && (
                     <Button
-                      className="w-full bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-2 rounded-lg text-sm"
+                      className="w-full bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-3 rounded-xl text-base"
                       onClick={handleGetQuote}
                       disabled={
                         !swapAmountPol || 
@@ -726,7 +734,7 @@ export default function BuyTab() {
                   )}
                   {buyStep === 'quoteFetched' && needsApproval && (
                     <Button
-                      className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 rounded-lg text-sm"
+                      className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 rounded-xl text-base"
                       onClick={handleApprove}
                       disabled={isSwapping}
                     >
@@ -736,7 +744,7 @@ export default function BuyTab() {
                   )}
                   {((buyStep === 'quoteFetched' && !needsApproval) || buyStep === 'approved') && (
                     <Button
-                      className="w-full bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-2 rounded-lg text-sm"
+                      className="w-full bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-3 rounded-xl text-base"
                       onClick={handleBuySwap}
                       disabled={isSwapping}
                     >
@@ -746,7 +754,7 @@ export default function BuyTab() {
                   )}
                   {buyStep === 'completed' && (
                     <Button
-                      className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold py-2 rounded-lg text-sm"
+                      className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold py-3 rounded-xl text-base"
                       onClick={() => {
                         setBuyStep('initial');
                         setQuoteTxData(null);
@@ -766,7 +774,7 @@ export default function BuyTab() {
                     <div className="text-red-400 text-xs text-center">{quoteError}</div>
                   )}
                   <Button
-                    className="w-full bg-zinc-600 hover:bg-zinc-700 text-white font-bold py-1 rounded-lg text-xs"
+                    className="w-full bg-zinc-600 hover:bg-zinc-700 text-white font-bold py-2 rounded-lg text-xs"
                     onClick={() => {
                       setShowDfaithBuyModal(false);
                       setSwapAmountPol("");
@@ -786,7 +794,7 @@ export default function BuyTab() {
 
                 {/* Validation kompakt */}
                 {parseFloat(swapAmountPol) > parseFloat(polBalance) && (
-                  <div className="mb-2 p-2 bg-red-500/10 border border-red-500/30 rounded text-xs">
+                  <div className="mb-3 p-2 bg-red-500/10 border border-red-500/30 rounded text-xs">
                     <div className="flex items-center gap-1">
                       <span className="text-red-400">❌</span>
                       <span>Nicht genügend POL</span>
@@ -795,7 +803,7 @@ export default function BuyTab() {
                   </div>
                 )}
                 {parseFloat(swapAmountPol) > 0 && parseFloat(swapAmountPol) < 0.001 && (
-                  <div className="mb-2 p-2 bg-yellow-500/10 border border-yellow-500/30 rounded text-xs">
+                  <div className="mb-3 p-2 bg-yellow-500/10 border border-yellow-500/30 rounded text-xs">
                     <div className="flex items-center gap-1">
                       <span className="text-yellow-400">⚠️</span>
                       <span>Minimum: 0.001 POL</span>
