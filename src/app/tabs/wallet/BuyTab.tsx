@@ -372,12 +372,12 @@ export default function BuyTab() {
         tokenAddress: NATIVE_TOKEN_ADDRESS, // Native POL Token
         receiver: account.address, // Empfänger-Adresse
         amount: toWei(polPurchaseAmount), // Gewünschte POL-Menge
-        currency: "EUR", // Euro als Fiat-Währung
+        currency: "USD", // USD als Fiat-Währung (universell unterstützt)
         // Explizit POL als Ziel-Token angeben
         onrampTokenAddress: NATIVE_TOKEN_ADDRESS, // Stelle sicher, dass POL gekauft wird
         onrampChainId: polygon.id, // Direkt auf Polygon kaufen
         // Optional: country code hinzufügen wenn verfügbar
-        // country: "DE"
+        // country: "US"
       });
 
       console.log("Onramp prepared:", onrampPrepare);
@@ -1081,13 +1081,13 @@ export default function BuyTab() {
               <span className="text-sm text-purple-400 font-bold">
                 {polPriceEur ? (
                   <span>
-                    {polPriceEur.toFixed(2)}€ pro POL
+                    ${(polPriceEur * 1.1).toFixed(2)} pro POL
                     {priceError && (
                       <span className="text-xs text-yellow-400 ml-1">(cached)</span>
                     )}
                   </span>
                 ) : (
-                  "~0.50€ pro POL"
+                  "~$0.65 pro POL"
                 )}
               </span>
             </div>
@@ -1188,6 +1188,19 @@ export default function BuyTab() {
                     </div>
                   )}
 
+                  {/* USD Währungshinweis */}
+                  <div className="mb-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded text-xs">
+                    <div className="flex items-start gap-2">
+                      <span className="text-blue-400 mt-0.5">💱</span>
+                      <div>
+                        <div className="font-medium text-blue-400 mb-1">Währung: USD</div>
+                        <div className="text-zinc-400">
+                          Alle Transaktionen werden in USD abgewickelt, da EUR von den meisten Anbietern nicht unterstützt wird. Die Preise werden automatisch konvertiert.
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
                   {/* POL Amount Input */}
                   <div className="mb-4">
                     <label className="block text-sm font-medium text-zinc-300 mb-2">POL Menge</label>
@@ -1234,7 +1247,7 @@ export default function BuyTab() {
                       <div className="flex justify-between">
                         <span className="text-zinc-400">Geschätzte Kosten:</span>
                         <span className="text-green-400 font-bold">
-                          ~{(parseFloat(polPurchaseAmount) * polPriceEur).toFixed(2)}€
+                          ~${(parseFloat(polPurchaseAmount) * polPriceEur * 1.1).toFixed(2)}
                         </span>
                       </div>
                     </div>
