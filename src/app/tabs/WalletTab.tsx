@@ -223,35 +223,49 @@ export default function WalletTab() {
       // Gestakte Balance aus Staking Contract abrufen
       await fetchStakedBalance();
       
-      // EUR-Wert sofort berechnen mit aktuellen Preisen
-      if (dfaithPriceEur > 0) {
-        const balanceFloat = parseFloat(dfaithDisplay);
-        if (balanceFloat > 0) {
-          const eurValue = balanceFloat * dfaithPriceEur;
+      // EUR-Wert sofort berechnen mit aktuellen oder gespeicherten Preisen
+      const balanceFloat = parseFloat(dfaithDisplay);
+      if (balanceFloat > 0) {
+        let priceToUse = dfaithPriceEur;
+        
+        // Falls kein aktueller Preis verfügbar, versuche gespeicherte Preise
+        if (priceToUse <= 0) {
+          // Verwende lastKnownPrices wenn verfügbar
+          if (lastKnownPrices.dfaithEur && lastKnownPrices.dfaithEur > 0) {
+            priceToUse = lastKnownPrices.dfaithEur;
+            console.log('Verwende lastKnownPrices für EUR-Berechnung:', priceToUse);
+          } else {
+            // Fallback: direkt aus localStorage lesen
+            try {
+              const stored = localStorage.getItem('dawid_faith_prices');
+              if (stored) {
+                const parsed = JSON.parse(stored);
+                if (parsed.dfaithEur && parsed.dfaithEur > 0) {
+                  priceToUse = parsed.dfaithEur;
+                  console.log('Verwende localStorage Preis für EUR-Berechnung:', priceToUse);
+                }
+              }
+            } catch (e) {
+              console.log('Fehler beim Lesen des localStorage Preises:', e);
+            }
+          }
+        }
+        
+        if (priceToUse > 0) {
+          const eurValue = balanceFloat * priceToUse;
           setDfaithEurValue(eurValue.toFixed(2));
           console.log('EUR-Wert nach Balance-Update berechnet:', { 
             balance: dfaithDisplay, 
-            price: dfaithPriceEur,
+            priceUsed: priceToUse,
+            source: dfaithPriceEur > 0 ? 'current' : 'stored',
             eurValue: eurValue 
           });
         } else {
           setDfaithEurValue("0.00");
+          console.log('Kein Preis verfügbar für EUR-Berechnung');
         }
       } else {
-        console.log('Kein D.FAITH Preis verfügbar für EUR-Berechnung:', dfaithPriceEur);
-        // Versuche gespeicherte Preise zu verwenden
-        if (lastKnownPrices.dfaithEur && lastKnownPrices.dfaithEur > 0) {
-          const balanceFloat = parseFloat(dfaithDisplay);
-          if (balanceFloat > 0) {
-            const eurValue = balanceFloat * lastKnownPrices.dfaithEur;
-            setDfaithEurValue(eurValue.toFixed(2));
-            console.log('EUR-Wert mit gespeichertem Preis berechnet:', { 
-              balance: dfaithDisplay, 
-              storedPrice: lastKnownPrices.dfaithEur,
-              eurValue: eurValue 
-            });
-          }
-        }
+        setDfaithEurValue("0.00");
       }
 
       // Debug-Ausgabe für D.INVEST API-Antwort
@@ -633,28 +647,47 @@ export default function WalletTab() {
         // Verwende aktuellen Preis oder gespeicherten Preis als Fallback
         let priceToUse = dfaithPriceEur;
         
-        if (priceToUse <= 0 && lastKnownPrices.dfaithEur && lastKnownPrices.dfaithEur > 0) {
-          priceToUse = lastKnownPrices.dfaithEur;
-          console.log('Verwende gespeicherten Preis für EUR-Berechnung:', priceToUse);
+        // Falls kein aktueller Preis verfügbar, versuche alle verfügbaren Quellen
+        if (priceToUse <= 0) {
+          // 1. Versuche lastKnownPrices
+          if (lastKnownPrices.dfaithEur && lastKnownPrices.dfaithEur > 0) {
+            priceToUse = lastKnownPrices.dfaithEur;
+            console.log('useEffect: Verwende lastKnownPrices für EUR-Berechnung:', priceToUse);
+          } else {
+            // 2. Fallback: direkt aus localStorage lesen
+            try {
+              const stored = localStorage.getItem('dawid_faith_prices');
+              if (stored) {
+                const parsed = JSON.parse(stored);
+                if (parsed.dfaithEur && parsed.dfaithEur > 0) {
+                  priceToUse = parsed.dfaithEur;
+                  console.log('useEffect: Verwende localStorage Preis für EUR-Berechnung:', priceToUse);
+                }
+              }
+            } catch (e) {
+              console.log('useEffect: Fehler beim Lesen des localStorage Preises:', e);
+            }
+          }
         }
         
         if (priceToUse > 0) {
           const eurValue = balanceFloat * priceToUse;
           setDfaithEurValue(eurValue.toFixed(2));
-          console.log('EUR-Wert neu gesetzt:', { 
+          console.log('useEffect: EUR-Wert neu gesetzt:', { 
             balance: dfaithBalance.displayValue, 
             priceUsed: priceToUse,
+            source: dfaithPriceEur > 0 ? 'current' : 'stored',
             eurValue: eurValue.toFixed(2)
           });
         } else {
           setDfaithEurValue("0.00");
-          console.log('Kein Preis verfügbar für EUR-Berechnung');
+          console.log('useEffect: Kein Preis verfügbar für EUR-Berechnung');
         }
       } else {
         setDfaithEurValue("0.00");
       }
     } else {
-      console.log('EUR-Wert Update übersprungen - keine Balance verfügbar');
+      console.log('useEffect: EUR-Wert Update übersprungen - keine Balance verfügbar');
     }
   }, [dfaithPriceEur, dfaithBalance?.displayValue, lastKnownPrices.dfaithEur]);
 
@@ -811,10 +844,9 @@ export default function WalletTab() {
                   <span className="ml-2 text-xs text-amber-500/60 animate-pulse">↻</span>
                 )}
               </div>
-              {/* EUR-Wert anzeigen, wenn sowohl Balance als auch Preis vorhanden sind */}
+              {/* EUR-Wert anzeigen, wenn sowohl Balance als auch ein EUR-Wert vorhanden sind */}
               {dfaithBalance?.displayValue && 
                parseFloat(dfaithBalance.displayValue) > 0 && 
-               dfaithPriceEur > 0 && 
                parseFloat(dfaithEurValue) > 0 && (
                 <div className="text-xs text-zinc-500 mt-2">
                   ≈ {dfaithEurValue} EUR
