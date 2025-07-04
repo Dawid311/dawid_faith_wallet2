@@ -22,13 +22,13 @@ function Modal({ open, onClose, title, children }: { open: boolean, onClose: () 
   
   return (
     <div 
-      className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 backdrop-blur-sm pt-8 sm:pt-12" // <-- items-start & pt-8/pt-12 für Abstand nach oben
+      className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 backdrop-blur-sm pt-8 sm:pt-12"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div 
-        className="bg-zinc-900 rounded-xl w-full sm:min-w-[340px] sm:max-w-2xl sm:w-auto sm:mx-4 max-h-[90vh] overflow-y-auto shadow-2xl relative border border-zinc-700 transition-all duration-300 m-4"
+        className="bg-zinc-900 rounded-xl w-full sm:min-w-[340px] sm:max-w-4xl sm:w-auto sm:mx-4 max-h-[90vh] overflow-y-auto shadow-2xl relative border border-zinc-700 transition-all duration-300 m-4"
       >
-        {/* Header - Mobile optimiert */}
+        {/* Header */}
         <div className="flex items-center justify-between p-4 sm:p-6 border-b border-zinc-700 sticky top-0 bg-zinc-900 z-10">
           <h3 className="font-bold text-lg sm:text-xl text-amber-400 truncate pr-4">{title}</h3>
           <button 
@@ -39,12 +39,10 @@ function Modal({ open, onClose, title, children }: { open: boolean, onClose: () 
           </button>
         </div>
         
-        {/* Content - Mobile optimiert */}
-        <div className="p-4 sm:p-6 pb-8 overflow-y-auto">
+        {/* Content - Kein zusätzliches Padding für StakeTab */}
+        <div className={`${title === "Staking" ? "" : "p-4 sm:p-6 pb-8"} overflow-y-auto`}>
           {children}
         </div>
-        
-        {/* Footer mit Schließen-Button wurde bereits entfernt */}
       </div>
     </div>
   );
@@ -626,8 +624,11 @@ export default function WalletTab() {
               <HistoryTab />
             </Modal>
 
+            {/* Staking Modal mit verbesserter Integration */}
             <Modal open={showStakeModal} onClose={() => setShowStakeModal(false)} title="Staking">
-              <StakeTab />
+              <div className="min-h-[400px]">
+                <StakeTab />
+              </div>
             </Modal>
           </CardContent>
         </Card>
