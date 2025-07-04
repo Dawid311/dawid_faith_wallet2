@@ -1,9 +1,9 @@
 import { useEffect, useState, useRef } from "react";
 import { Button } from "../../../../components/ui/button";
 import { FaCoins, FaLock, FaExchangeAlt, FaSync, FaRegCopy } from "react-icons/fa";
-import { useActiveAccount, useSendTransaction, BuyWidget } from "thirdweb/react";
+import { useActiveAccount, useSendTransaction } from "thirdweb/react";
 import { polygon } from "thirdweb/chains";
-import { NATIVE_TOKEN_ADDRESS, getContract, prepareContractCall, sendAndConfirmTransaction, readContract } from "thirdweb";
+import { NATIVE_TOKEN_ADDRESS, getContract, prepareContractCall, sendAndConfirmTransaction, readContract, toWei, Bridge } from "thirdweb";
 import { client } from "../../client";
 import { balanceOf, approve } from "thirdweb/extensions/erc20";
 
@@ -30,6 +30,11 @@ export default function BuyTab() {
   const [showInvestModal, setShowInvestModal] = useState(false);
   const [showBuyModal, setShowBuyModal] = useState(false);
   const [showPolBuyModal, setShowPolBuyModal] = useState(false);
+  const [polOnrampStatus, setPolOnrampStatus] = useState<string | null>(null);
+  const [polOnrampLoading, setPolOnrampLoading] = useState(false);
+  const [polPurchaseAmount, setPolPurchaseAmount] = useState("1");
+  const [onrampSession, setOnrampSession] = useState<any>(null);
+  const [selectedProvider, setSelectedProvider] = useState<"stripe" | "coinbase" | "transak">("stripe");
   const [copied, setCopied] = useState(false);
   const [priceError, setPriceError] = useState<string | null>(null);
   const [swapAmount, setSwapAmount] = useState("");
@@ -348,6 +353,111 @@ export default function BuyTab() {
     const interval = setInterval(loadBalances, 30000);
     return () => clearInterval(interval);
   }, [account?.address]);
+
+  // POL Onramp Funktion
+  const handlePolOnramp = async () => {
+    if (!account?.address) {
+      alert('Bitte Wallet verbinden!');
+      return;
+    }
+
+    setPolOnrampLoading(true);
+    setPolOnrampStatus("preparing");
+
+    try {
+      const onrampPrepare = await Bridge.Onramp.prepare({
+        client,
+        onramp: selectedProvider, // Stripe, Coinbase oder Transak
+        chainId: polygon.id, // Polygon Chain ID
+        tokenAddress: NATIVE_TOKEN_ADDRESS, // Native POL Token
+        receiver: account.address, // Empfänger-Adresse
+        amount: toWei(polPurchaseAmount), // Gewünschte POL-Menge
+        currency: "EUR", // Euro als Fiat-Währung
+        // Optional: country code hinzufügen wenn verfügbar
+        // country: "DE"
+      });
+
+      console.log("Onramp prepared:", onrampPrepare);
+      console.log(`Kosten: ${onrampPrepare.currencyAmount} ${onrampPrepare.currency}`);
+      
+      setOnrampSession(onrampPrepare);
+      setPolOnrampStatus("ready");
+      
+      // Benutzer zur Provider-Seite weiterleiten
+      window.open(onrampPrepare.link, '_blank');
+      
+    } catch (error) {
+      console.error("Onramp Fehler:", error);
+      setPolOnrampStatus("error");
+      setTimeout(() => setPolOnrampStatus(null), 5000);
+    } finally {
+      setPolOnrampLoading(false);
+    }
+  };
+
+  // Onramp Status prüfen
+  const checkOnrampStatus = async (sessionId: string) => {
+    try {
+      const status = await Bridge.Onramp.status({
+        id: sessionId,
+        client,
+      });
+
+      console.log("Onramp Status:", status);
+      
+      switch (status.status) {
+        case "COMPLETED":
+          setPolOnrampStatus("completed");
+          console.log("POL Onramp abgeschlossen!");
+          // POL Balance aktualisieren
+          setTimeout(() => {
+            const fetchPolBalance = async () => {
+              if (!account?.address) return;
+              try {
+                const response = await fetch(polygon.rpc, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    jsonrpc: '2.0',
+                    method: 'eth_getBalance',
+                    params: [account.address, 'latest'],
+                    id: 1
+                  })
+                });
+                const data = await response.json();
+                const balance = data?.result ? BigInt(data.result) : BigInt(0);
+                const polFormatted = Number(balance) / Math.pow(10, 18);
+                setPolBalance(polFormatted.toFixed(3));
+              } catch (error) {
+                console.error("Fehler beim Aktualisieren der POL Balance:", error);
+              }
+            };
+            fetchPolBalance();
+          }, 2000);
+          break;
+        case "PENDING":
+          setPolOnrampStatus("pending");
+          console.log("POL Onramp noch in Bearbeitung...");
+          break;
+        case "CREATED":
+          setPolOnrampStatus("created");
+          console.log("POL Onramp Session erstellt");
+          break;
+        case "FAILED":
+          setPolOnrampStatus("failed");
+          console.log("POL Onramp fehlgeschlagen");
+          break;
+        default:
+          setPolOnrampStatus("unknown");
+      }
+      
+      return status;
+    } catch (error) {
+      console.error("Fehler beim Prüfen des Onramp Status:", error);
+      setPolOnrampStatus("error");
+      return null;
+    }
+  };
 
   // D.FAITH Swap Funktion mit mehrstufigem Prozess wie im SellTab
   const handleGetQuote = async () => {
@@ -981,30 +1091,248 @@ export default function BuyTab() {
           
           <div className="w-full mt-4">
             {showPolBuyModal ? (
-              <div
-                className="fixed inset-0 z-50 flex items-center justify-center min-h-screen bg-black/60 overflow-y-auto"
-              >
+              <div className="fixed inset-0 z-50 flex items-center justify-center min-h-screen bg-black/60 overflow-y-auto">
                 <div
                   ref={polBuyModalRef}
-                  className="bg-zinc-900 rounded-xl p-4 max-w-full w-full sm:max-w-xs border border-purple-500 text-center flex flex-col items-center justify-center my-4"
+                  className="bg-zinc-900 rounded-xl p-6 max-w-sm w-full mx-4 border border-purple-500 my-4"
                 >
-                  <div className="mb-4 text-purple-400 text-2xl font-bold">POL kaufen</div>
-                  <div className="w-full flex-1 flex items-center justify-center">
-                    <BuyWidget
-                      client={client}
-                      tokenAddress={NATIVE_TOKEN_ADDRESS}
-                      chain={polygon}
-                      amount="1"
-                      theme="dark"
-                      className="w-full"
-                    />
+                  {/* Header */}
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-xl font-bold text-purple-400">POL kaufen</h3>
+                    <button
+                      onClick={() => {
+                        setShowPolBuyModal(false);
+                        setPolPurchaseAmount("1");
+                        setPolOnrampStatus(null);
+                        setOnrampSession(null);
+                        setSelectedProvider("stripe");
+                      }}
+                      className="p-2 text-purple-400 hover:text-purple-300 hover:bg-zinc-800 rounded-lg transition-all"
+                      disabled={polOnrampLoading}
+                    >
+                      <span className="text-lg">✕</span>
+                    </button>
                   </div>
-                  <Button
-                    className="w-full bg-zinc-600 hover:bg-zinc-700 text-white font-bold py-2 rounded-xl mt-4"
-                    onClick={() => setShowPolBuyModal(false)}
-                  >
-                    Schließen
-                  </Button>
+
+                  {/* Provider Auswahl */}
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-zinc-300 mb-2">Payment Provider</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      <button
+                        className={`p-3 rounded-xl border transition-all text-sm font-medium ${
+                          selectedProvider === "stripe" 
+                            ? "border-purple-500 bg-purple-500/20 text-purple-300" 
+                            : "border-zinc-600 bg-zinc-800 text-zinc-400 hover:border-zinc-500"
+                        }`}
+                        onClick={() => setSelectedProvider("stripe")}
+                        disabled={polOnrampLoading}
+                      >
+                        <div className="text-center">
+                          <div className="text-lg mb-1">💳</div>
+                          <div>Stripe</div>
+                        </div>
+                      </button>
+                      <button
+                        className={`p-3 rounded-xl border transition-all text-sm font-medium ${
+                          selectedProvider === "coinbase" 
+                            ? "border-purple-500 bg-purple-500/20 text-purple-300" 
+                            : "border-zinc-600 bg-zinc-800 text-zinc-400 hover:border-zinc-500"
+                        }`}
+                        onClick={() => setSelectedProvider("coinbase")}
+                        disabled={polOnrampLoading}
+                      >
+                        <div className="text-center">
+                          <div className="text-lg mb-1">🔵</div>
+                          <div>Coinbase</div>
+                        </div>
+                      </button>
+                      <button
+                        className={`p-3 rounded-xl border transition-all text-sm font-medium ${
+                          selectedProvider === "transak" 
+                            ? "border-purple-500 bg-purple-500/20 text-purple-300" 
+                            : "border-zinc-600 bg-zinc-800 text-zinc-400 hover:border-zinc-500"
+                        }`}
+                        onClick={() => setSelectedProvider("transak")}
+                        disabled={polOnrampLoading}
+                      >
+                        <div className="text-center">
+                          <div className="text-lg mb-1">🔶</div>
+                          <div>Transak</div>
+                        </div>
+                      </button>
+                    </div>
+                    {/* Provider Info */}
+                    <div className="mt-2 p-2 bg-zinc-800/50 rounded text-xs text-zinc-400">
+                      {selectedProvider === "stripe" && "Kreditkarte, Debitkarte, Banking"}
+                      {selectedProvider === "coinbase" && "Coinbase Konto, Banking, Karte"}
+                      {selectedProvider === "transak" && "Global verfügbar, Banking, Karte"}
+                    </div>
+                  </div>
+
+                  {/* POL Amount Input */}
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-zinc-300 mb-2">POL Menge</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="number"
+                        min="0.1"
+                        step="0.1"
+                        placeholder="1.0"
+                        className="flex-1 bg-zinc-800 border border-zinc-600 rounded-xl py-3 px-4 text-purple-400 font-bold focus:border-purple-500 focus:outline-none"
+                        value={polPurchaseAmount}
+                        onChange={(e) => setPolPurchaseAmount(e.target.value)}
+                        disabled={polOnrampLoading}
+                      />
+                      <div className="flex gap-1">
+                        <button
+                          className="text-xs px-2 py-1 bg-purple-500/20 text-purple-400 rounded hover:bg-purple-500/30 transition"
+                          onClick={() => setPolPurchaseAmount("1")}
+                          disabled={polOnrampLoading}
+                        >
+                          1
+                        </button>
+                        <button
+                          className="text-xs px-2 py-1 bg-purple-500/20 text-purple-400 rounded hover:bg-purple-500/30 transition"
+                          onClick={() => setPolPurchaseAmount("5")}
+                          disabled={polOnrampLoading}
+                        >
+                          5
+                        </button>
+                        <button
+                          className="text-xs px-2 py-1 bg-purple-500/20 text-purple-400 rounded hover:bg-purple-500/30 transition"
+                          onClick={() => setPolPurchaseAmount("10")}
+                          disabled={polOnrampLoading}
+                        >
+                          10
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Preisschätzung */}
+                  {polPurchaseAmount && parseFloat(polPurchaseAmount) > 0 && polPriceEur && (
+                    <div className="mb-4 p-3 bg-zinc-800/50 rounded text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-zinc-400">Geschätzte Kosten:</span>
+                        <span className="text-green-400 font-bold">
+                          ~{(parseFloat(polPurchaseAmount) * polPriceEur).toFixed(2)}€
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Onramp Session Info */}
+                  {onrampSession && (
+                    <div className="mb-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded text-sm">
+                      <div className="flex justify-between mb-1">
+                        <span className="text-zinc-400">Kosten:</span>
+                        <span className="text-blue-400 font-bold">
+                          {onrampSession.currencyAmount} {onrampSession.currency}
+                        </span>
+                      </div>
+                      {onrampSession.id && (
+                        <div className="flex justify-between">
+                          <span className="text-zinc-400">Session ID:</span>
+                          <span className="text-blue-400 text-xs font-mono">
+                            {onrampSession.id.substring(0, 8)}...
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Status Anzeige */}
+                  {polOnrampStatus && (
+                    <div className={`mb-4 p-3 rounded text-center text-sm ${
+                      polOnrampStatus === "completed" ? "bg-green-500/20 text-green-400" :
+                      polOnrampStatus === "failed" || polOnrampStatus === "error" ? "bg-red-500/20 text-red-400" :
+                      polOnrampStatus === "pending" ? "bg-blue-500/20 text-blue-400" :
+                      polOnrampStatus === "ready" ? "bg-purple-500/20 text-purple-400" :
+                      "bg-yellow-500/20 text-yellow-400"
+                    }`}>
+                      {polOnrampStatus === "preparing" && <div><b>🔄 Vorbereitung...</b></div>}
+                      {polOnrampStatus === "ready" && <div><b>✅ Bereit!</b><div className="mt-1">{selectedProvider.charAt(0).toUpperCase() + selectedProvider.slice(1)}-Tab wurde geöffnet</div></div>}
+                      {polOnrampStatus === "completed" && <div><b>🎉 Erfolgreich!</b><div className="mt-1">POL erhalten</div></div>}
+                      {polOnrampStatus === "pending" && <div><b>⏳ In Bearbeitung...</b></div>}
+                      {polOnrampStatus === "created" && <div><b>📝 Session erstellt</b></div>}
+                      {polOnrampStatus === "failed" && <div><b>❌ Fehlgeschlagen</b></div>}
+                      {polOnrampStatus === "error" && <div><b>❌ Fehler</b><div className="mt-1">Bitte erneut versuchen</div></div>}
+                    </div>
+                  )}
+
+                  {/* Action Buttons */}
+                  <div className="space-y-2">
+                    {!onrampSession ? (
+                      <Button
+                        className="w-full bg-gradient-to-r from-purple-500 to-purple-700 text-white font-bold py-3 rounded-xl"
+                        onClick={handlePolOnramp}
+                        disabled={
+                          polOnrampLoading || 
+                          !polPurchaseAmount || 
+                          parseFloat(polPurchaseAmount) <= 0 || 
+                          !account?.address
+                        }
+                      >
+                        <FaCoins className="inline mr-2" />
+                        {polOnrampLoading ? "Vorbereitung..." : `${polPurchaseAmount || "0"} POL kaufen`}
+                      </Button>
+                    ) : (
+                      <div className="space-y-2">
+                        <Button
+                          className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold py-3 rounded-xl"
+                          onClick={() => window.open(onrampSession.link, '_blank')}
+                        >
+                          <FaExchangeAlt className="inline mr-2" />
+                          Zu {selectedProvider.charAt(0).toUpperCase() + selectedProvider.slice(1)}
+                        </Button>
+                        {onrampSession.id && (
+                          <Button
+                            className="w-full bg-zinc-700 hover:bg-zinc-600 text-white font-bold py-2 rounded-xl text-sm"
+                            onClick={() => checkOnrampStatus(onrampSession.id)}
+                            disabled={polOnrampLoading}
+                          >
+                            <FaSync className="inline mr-2" />
+                            Status prüfen
+                          </Button>
+                        )}
+                        <Button
+                          className="w-full bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 font-bold py-2 rounded-xl text-sm"
+                          onClick={() => {
+                            setOnrampSession(null);
+                            setPolOnrampStatus(null);
+                            setPolPurchaseAmount("1");
+                            setSelectedProvider("stripe");
+                          }}
+                        >
+                          Neuer Kauf
+                        </Button>
+                      </div>
+                    )}
+                    
+                    <Button
+                      className="w-full bg-zinc-600 hover:bg-zinc-700 text-white font-bold py-2 rounded-xl text-sm"
+                      onClick={() => {
+                        setShowPolBuyModal(false);
+                        setPolPurchaseAmount("1");
+                        setPolOnrampStatus(null);
+                        setOnrampSession(null);
+                        setSelectedProvider("stripe");
+                      }}
+                      disabled={polOnrampLoading}
+                    >
+                      Schließen
+                    </Button>
+                  </div>
+
+                  {/* Validation */}
+                  {parseFloat(polPurchaseAmount) > 0 && parseFloat(polPurchaseAmount) < 0.1 && (
+                    <div className="mt-3 p-2 bg-yellow-500/10 border border-yellow-500/30 rounded text-xs">
+                      <div className="flex items-center gap-1">
+                        <span className="text-yellow-400">⚠️</span>
+                        <span>Minimum: 0.1 POL</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             ) : (
@@ -1012,7 +1340,6 @@ export default function BuyTab() {
                 className="w-full bg-gradient-to-r from-purple-500 to-purple-700 text-white font-bold py-3 rounded-xl hover:opacity-90 transition-opacity"
                 onClick={() => {
                   setShowPolBuyModal(true);
-                  // Das Scrollen übernimmt jetzt der useEffect
                 }}
               >
                 POL kaufen
