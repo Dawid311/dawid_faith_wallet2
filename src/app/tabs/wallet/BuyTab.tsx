@@ -1,9 +1,9 @@
 import { useEffect, useState, useRef } from "react";
 import { Button } from "../../../../components/ui/button";
-import { FaCoins, FaLock, FaExchangeAlt, FaSync, FaRegCopy } from "react-icons/fa";
+import { FaCoins, FaLock, FaExchangeAlt, FaSync, FaRegCopy, FaLink } from "react-icons/fa";
 import { useActiveAccount, useSendTransaction, BuyWidget } from "thirdweb/react";
-import { polygon } from "thirdweb/chains";
-import { NATIVE_TOKEN_ADDRESS, getContract, prepareContractCall, sendAndConfirmTransaction, readContract } from "thirdweb";
+import { polygon, ethereum, optimism } from "thirdweb/chains";
+import { NATIVE_TOKEN_ADDRESS, getContract, prepareContractCall, sendAndConfirmTransaction, readContract, Bridge, toWei } from "thirdweb";
 import { client } from "../../client";
 import { balanceOf, approve } from "thirdweb/extensions/erc20";
 
@@ -45,6 +45,15 @@ export default function BuyTab() {
   const [quoteTxData, setQuoteTxData] = useState<any>(null);
   const [spenderAddress, setSpenderAddress] = useState<string | null>(null);
   const [quoteError, setQuoteError] = useState<string | null>(null);
+
+  // Bridge-Kauf States
+  const [showBridgeBuyModal, setShowBridgeBuyModal] = useState(false);
+  const [bridgeQuote, setBridgeQuote] = useState<any>(null);
+  const [bridgeLoading, setBridgeLoading] = useState(false);
+  const [bridgeError, setBridgeError] = useState<string | null>(null);
+  const [bridgeAmount, setBridgeAmount] = useState("");
+  const [selectedOriginChain, setSelectedOriginChain] = useState<number>(1); // Ethereum
+  const [selectedDestChain, setSelectedDestChain] = useState<number>(137); // Polygon
 
   // D.FAITH Preis von OpenOcean holen und in Euro umrechnen mit Fallback
   useEffect(() => {
@@ -621,6 +630,86 @@ export default function BuyTab() {
     }
   }, [showInvestModal]);
 
+  // Adresse kopieren mit Feedback
+  const copyAddressWithFeedback = async (address: string) => {
+    try {
+      await navigator.clipboard.writeText(address);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Fehler beim Kopieren der Adresse:', err);
+    }
+  };
+
+  // Bridge-Funktionen
+  const getBridgeQuote = async (fromChain: number, toChain: number, amount: string) => {
+    if (!amount || parseFloat(amount) <= 0) return;
+    
+    setBridgeLoading(true);
+    setBridgeError(null);
+    
+    try {
+      // Convert amount to wei (assuming ETH/MATIC)
+      const amountWei = toWei(amount);
+      
+      // Placeholder für Bridge API - kann später mit korrekten Parametern ersetzt werden
+      console.log("Bridge Quote Request:", {
+        fromChain,
+        toChain,
+        amount: amountWei.toString(),
+        receiver: account?.address
+      });
+      
+      // Simuliertes Quote für UI-Tests
+      const simulatedQuote = {
+        transactionRequest: null, // Wird später von der echten API gefüllt
+        estimatedOutput: amountWei * BigInt(95) / BigInt(100), // 5% Gebühren simuliert
+        fees: amountWei * BigInt(5) / BigInt(100),
+        estimatedTime: "2-5 Minuten"
+      };
+      
+      setBridgeQuote(simulatedQuote);
+    } catch (error) {
+      console.error("Bridge quote error:", error);
+      setBridgeError(error instanceof Error ? error.message : "Fehler beim Laden des Bridge-Angebots");
+    } finally {
+      setBridgeLoading(false);
+    }
+  };
+
+  const executeBridgeBuy = async () => {
+    if (!bridgeQuote || !account) return;
+    
+    setBridgeLoading(true);
+    try {
+      // Hier würde später die echte Bridge-Transaktion ausgeführt
+      console.log("Executing bridge transaction...");
+      
+      // Für jetzt nur ein Alert für UI-Tests
+      alert("Bridge-Feature ist in Entwicklung. Die UI ist bereit für die Integration!");
+      
+      setShowBridgeBuyModal(false);
+      setBridgeQuote(null);
+      setBridgeAmount("");
+      
+      // Refresh balances
+      setTimeout(async () => {
+        // Price refresh passiert automatisch über useEffect
+        // Balance refresh
+        if (account?.address) {
+          const newBalance = await fetchTokenBalanceViaInsightApi("0x168c5967a57C2dC5ad6dF9c39Af1cb28C4b37169", account.address);
+          setDfaithBalance(newBalance);
+        }
+      }, 2000);
+      
+    } catch (error) {
+      console.error("Bridge execution error:", error);
+      setBridgeError(error instanceof Error ? error.message : "Fehler beim Ausführen der Bridge-Transaktion");
+    } finally {
+      setBridgeLoading(false);
+    }
+  };
+
   return (
     <div className="flex flex-col gap-6 p-6">
       <div className="text-center mb-6">
@@ -1014,6 +1103,37 @@ export default function BuyTab() {
             POL kaufen
           </Button>
         </div>
+
+        {/* Bridge Cross-Chain Kauf */}
+        <div className="bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl p-6 border border-zinc-700">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-gradient-to-r from-cyan-400 to-blue-600 rounded-full">
+                <FaLink className="text-white text-lg" />
+              </div>
+              <div>
+                <h3 className="font-bold text-cyan-400">Cross-Chain Bridge</h3>
+                <p className="text-xs text-zinc-500">D.FAITH von anderen Chains kaufen</p>
+              </div>
+            </div>
+            <span className="text-xs text-zinc-400 bg-zinc-700/50 px-2 py-1 rounded">ETH/MATIC → D.FAITH</span>
+          </div>
+          
+          <div className="space-y-4">
+            <div className="text-sm text-zinc-400">
+              Tausche ETH oder MATIC von anderen Chains direkt gegen D.FAITH auf Polygon.
+            </div>
+          </div>
+          
+          <Button
+            className="w-full mt-4 bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold py-3 rounded-xl hover:opacity-90 transition-opacity"
+            onClick={() => setShowBridgeBuyModal(true)}
+            disabled={!account?.address}
+          >
+            <FaLink className="inline mr-2" />
+            Bridge kaufen
+          </Button>
+        </div>
       </div>
 
       <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4 mt-6">
@@ -1148,6 +1268,158 @@ export default function BuyTab() {
               className="w-full mt-2 text-zinc-400 text-xs underline"
               onClick={() => setShowInvestModal(false)}
             >Abbrechen</button>
+          </div>
+        </div>
+      )}
+
+      {/* Bridge Buy Modal */}
+      {showBridgeBuyModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center min-h-screen bg-black/60 overflow-y-auto">
+          <div className="bg-zinc-900 rounded-xl p-6 w-full max-w-md mx-4 border border-cyan-500 my-4">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-bold text-cyan-400">Cross-Chain Bridge Kauf</h3>
+              <button
+                onClick={() => {
+                  setShowBridgeBuyModal(false);
+                  setBridgeAmount("");
+                  setBridgeQuote(null);
+                  setBridgeError(null);
+                }}
+                className="text-zinc-400 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Chain Auswahl */}
+              <div>
+                <label className="block text-sm font-medium text-zinc-300 mb-2">
+                  Von Chain:
+                </label>
+                <select
+                  value={selectedOriginChain}
+                  onChange={(e) => setSelectedOriginChain(Number(e.target.value))}
+                  className="w-full bg-zinc-800 border border-zinc-600 rounded-lg px-3 py-2 text-white"
+                >
+                  <option value={1}>Ethereum Mainnet</option>
+                  <option value={10}>Optimism</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-zinc-300 mb-2">
+                  Zu Chain:
+                </label>
+                <select
+                  value={selectedDestChain}
+                  onChange={(e) => setSelectedDestChain(Number(e.target.value))}
+                  className="w-full bg-zinc-800 border border-zinc-600 rounded-lg px-3 py-2 text-white"
+                >
+                  <option value={137}>Polygon (D.FAITH)</option>
+                  <option value={1}>Ethereum Mainnet</option>
+                </select>
+              </div>
+
+              {/* Amount Input */}
+              <div>
+                <label className="block text-sm font-medium text-zinc-300 mb-2">
+                  Betrag ({selectedOriginChain === 1 ? 'ETH' : 'MATIC'}):
+                </label>
+                <input
+                  type="number"
+                  step="0.001"
+                  placeholder="0.1"
+                  value={bridgeAmount}
+                  onChange={(e) => setBridgeAmount(e.target.value)}
+                  className="w-full bg-zinc-800 border border-zinc-600 rounded-lg px-3 py-2 text-white"
+                />
+              </div>
+
+              {/* Quote Button */}
+              <Button
+                onClick={() => getBridgeQuote(selectedOriginChain, selectedDestChain, bridgeAmount)}
+                disabled={!bridgeAmount || parseFloat(bridgeAmount) <= 0 || bridgeLoading}
+                className="w-full bg-cyan-600 hover:bg-cyan-700 text-white"
+              >
+                {bridgeLoading ? (
+                  <div className="flex items-center justify-center gap-2">
+                    <FaSync className="animate-spin" />
+                    Lade Quote...
+                  </div>
+                ) : (
+                  'Quote holen'
+                )}
+              </Button>
+
+              {/* Quote Display */}
+              {bridgeQuote && (
+                <div className="bg-zinc-800/50 rounded-lg p-4 space-y-2">
+                  <div className="font-medium text-cyan-400">Bridge Quote:</div>
+                  <div className="text-sm space-y-1">
+                    <div className="flex justify-between">
+                      <span className="text-zinc-400">Eingabe:</span>
+                      <span>{bridgeAmount} {selectedOriginChain === 1 ? 'ETH' : 'MATIC'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-zinc-400">Ausgabe (geschätzt):</span>
+                      <span className="text-green-400">
+                        {(Number(bridgeQuote.estimatedOutput) / Math.pow(10, 18)).toFixed(6)} D.FAITH
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-zinc-400">Gebühren:</span>
+                      <span className="text-yellow-400">
+                        {(Number(bridgeQuote.fees) / Math.pow(10, 18)).toFixed(6)} {selectedOriginChain === 1 ? 'ETH' : 'MATIC'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-zinc-400">Geschätzte Zeit:</span>
+                      <span className="text-blue-400">{bridgeQuote.estimatedTime}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Execute Button */}
+              {bridgeQuote && (
+                <Button
+                  onClick={executeBridgeBuy}
+                  disabled={bridgeLoading}
+                  className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white"
+                >
+                  {bridgeLoading ? (
+                    <div className="flex items-center justify-center gap-2">
+                      <FaSync className="animate-spin" />
+                      Verarbeite...
+                    </div>
+                  ) : (
+                    <>
+                      <FaLink className="inline mr-2" />
+                      Bridge ausführen
+                    </>
+                  )}
+                </Button>
+              )}
+
+              {/* Error Display */}
+              {bridgeError && (
+                <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 text-red-400 text-sm">
+                  {bridgeError}
+                </div>
+              )}
+
+              {/* Info */}
+              <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 text-xs">
+                <div className="flex items-start gap-2">
+                  <span className="text-blue-400">ℹ️</span>
+                  <div className="text-zinc-400">
+                    <div className="font-medium text-blue-400 mb-1">Hinweis:</div>
+                    Bridge-Transaktionen können 2-10 Minuten dauern. Stelle sicher, dass du genügend Gas-Token hast.
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
