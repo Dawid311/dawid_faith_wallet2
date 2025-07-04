@@ -373,12 +373,16 @@ export default function BuyTab() {
         receiver: account.address, // Empfänger-Adresse
         amount: toWei(polPurchaseAmount), // Gewünschte POL-Menge
         currency: "EUR", // Euro als Fiat-Währung
+        // Explizit POL als Ziel-Token angeben
+        onrampTokenAddress: NATIVE_TOKEN_ADDRESS, // Stelle sicher, dass POL gekauft wird
+        onrampChainId: polygon.id, // Direkt auf Polygon kaufen
         // Optional: country code hinzufügen wenn verfügbar
         // country: "DE"
       });
 
       console.log("Onramp prepared:", onrampPrepare);
       console.log(`Kosten: ${onrampPrepare.currencyAmount} ${onrampPrepare.currency}`);
+      console.log(`Ziel-Token: POL auf Chain ${polygon.id}`);
       
       setOnrampSession(onrampPrepare);
       setPolOnrampStatus("ready");
@@ -1163,11 +1167,26 @@ export default function BuyTab() {
                     </div>
                     {/* Provider Info */}
                     <div className="mt-2 p-2 bg-zinc-800/50 rounded text-xs text-zinc-400">
-                      {selectedProvider === "stripe" && "Kreditkarte, Debitkarte, Banking"}
-                      {selectedProvider === "coinbase" && "Coinbase Konto, Banking, Karte"}
-                      {selectedProvider === "transak" && "Global verfügbar, Banking, Karte"}
+                      {selectedProvider === "stripe" && "Kreditkarte, Debitkarte, Banking → Direkt POL"}
+                      {selectedProvider === "coinbase" && "Coinbase Konto, Banking, Karte → Eventuell über USDC"}
+                      {selectedProvider === "transak" && "Global verfügbar, Banking, Karte → Direkt POL"}
                     </div>
                   </div>
+
+                  {/* Coinbase Warnung */}
+                  {selectedProvider === "coinbase" && (
+                    <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded text-xs">
+                      <div className="flex items-start gap-2">
+                        <span className="text-yellow-400 mt-0.5">⚠️</span>
+                        <div>
+                          <div className="font-medium text-yellow-400 mb-1">Coinbase Hinweis</div>
+                          <div className="text-zinc-400">
+                            Coinbase kauft möglicherweise USDC statt POL. Falls das passiert, können Sie USDC später gegen POL tauschen.
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {/* POL Amount Input */}
                   <div className="mb-4">
