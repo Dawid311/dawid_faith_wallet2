@@ -73,8 +73,8 @@ export default function WalletTab() {
   const [stakedBalance, setStakedBalance] = useState<string>("0");
 
   const [dfaithEurValue, setDfaithEurValue] = useState<string>("0.00");
-  const [dfaithPriceEur, setDfaithPriceEur] = useState<number>(0.001);
-  const [polPriceEur, setPolPriceEur] = useState<number>(0.50);
+  const [dfaithPriceEur, setDfaithPriceEur] = useState<number>(0);
+  const [polPriceEur, setPolPriceEur] = useState<number>(0);
   const [lastKnownPrices, setLastKnownPrices] = useState<{
     dfaith?: number;
     dfaithEur?: number;
@@ -82,6 +82,7 @@ export default function WalletTab() {
     timestamp?: number;
   }>({});
   const [priceError, setPriceError] = useState<string | null>(null);
+  const [pricesLoaded, setPricesLoaded] = useState<boolean>(false);
   // State für Loading und Refresh
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLoadingBalances, setIsLoadingBalances] = useState(false);
@@ -178,29 +179,7 @@ export default function WalletTab() {
     const currentRequestId = ++requestIdRef.current;
     
     try {
-      // Lade gespeicherte Preise falls noch nicht geladen
-      if (dfaithPriceEur <= 0 || !lastKnownPrices.dfaithEur) {
-        try {
-          const stored = localStorage.getItem('dawid_faith_prices');
-          if (stored) {
-            const parsed = JSON.parse(stored);
-            const now = Date.now();
-            // Verwende gespeicherte Preise wenn sie weniger als 6 Stunden alt sind
-            if (parsed.timestamp && (now - parsed.timestamp) < 6 * 60 * 60 * 1000) {
-              setLastKnownPrices(parsed);
-              if (parsed.dfaithEur && dfaithPriceEur <= 0) {
-                setDfaithPriceEur(parsed.dfaithEur);
-                console.log('Gespeicherten D.FAITH Preis bei Balance-Update geladen:', parsed.dfaithEur);
-              }
-              if (parsed.polEur && polPriceEur <= 0) {
-                setPolPriceEur(parsed.polEur);
-              }
-            }
-          }
-        } catch (e) {
-          console.log('Fehler beim Laden gespeicherter Preise in fetchTokenBalances:', e);
-        }
-      }
+      // Keine lokale Preis-Lade-Logik hier mehr - wird zentral beim Start gemacht
 
       // Alle Token-Balances via Insight API laden
       const [dfaithValue, dinvestValue, polValue] = await Promise.all([
@@ -223,50 +202,9 @@ export default function WalletTab() {
       // Gestakte Balance aus Staking Contract abrufen
       await fetchStakedBalance();
       
-      // EUR-Wert sofort berechnen mit aktuellen oder gespeicherten Preisen
-      const balanceFloat = parseFloat(dfaithDisplay);
-      if (balanceFloat > 0) {
-        let priceToUse = dfaithPriceEur;
-        
-        // Falls kein aktueller Preis verfügbar, versuche gespeicherte Preise
-        if (priceToUse <= 0) {
-          // Verwende lastKnownPrices wenn verfügbar
-          if (lastKnownPrices.dfaithEur && lastKnownPrices.dfaithEur > 0) {
-            priceToUse = lastKnownPrices.dfaithEur;
-            console.log('Verwende lastKnownPrices für EUR-Berechnung:', priceToUse);
-          } else {
-            // Fallback: direkt aus localStorage lesen
-            try {
-              const stored = localStorage.getItem('dawid_faith_prices');
-              if (stored) {
-                const parsed = JSON.parse(stored);
-                if (parsed.dfaithEur && parsed.dfaithEur > 0) {
-                  priceToUse = parsed.dfaithEur;
-                  console.log('Verwende localStorage Preis für EUR-Berechnung:', priceToUse);
-                }
-              }
-            } catch (e) {
-              console.log('Fehler beim Lesen des localStorage Preises:', e);
-            }
-          }
-        }
-        
-        if (priceToUse > 0) {
-          const eurValue = balanceFloat * priceToUse;
-          setDfaithEurValue(eurValue.toFixed(2));
-          console.log('EUR-Wert nach Balance-Update berechnet:', { 
-            balance: dfaithDisplay, 
-            priceUsed: priceToUse,
-            source: dfaithPriceEur > 0 ? 'current' : 'stored',
-            eurValue: eurValue 
-          });
-        } else {
-          setDfaithEurValue("0.00");
-          console.log('Kein Preis verfügbar für EUR-Berechnung');
-        }
-      } else {
-        setDfaithEurValue("0.00");
-      }
+      // EUR-Wert berechnen (verwende zentrale Funktion)
+      const newEurValue = calculateEurValue(dfaithDisplay);
+      setDfaithEurValue(newEurValue);
 
       // Debug-Ausgabe für D.INVEST API-Antwort
       console.debug("DINVEST Insight API Wert (raw):", dinvestValue);
@@ -569,11 +507,8 @@ export default function WalletTab() {
         setDfaithPriceEur(dfaithPriceEur);
         // EUR-Wert sofort nach Preis-Update neu berechnen
         if (dfaithBalance?.displayValue) {
-          const balanceFloat = parseFloat(dfaithBalance.displayValue);
-          if (balanceFloat > 0) {
-            const eurValue = balanceFloat * dfaithPriceEur;
-            setDfaithEurValue(eurValue.toFixed(2));
-          }
+          const newEurValue = calculateEurValue(dfaithBalance.displayValue);
+          setDfaithEurValue(newEurValue);
         }
       }
 
@@ -601,13 +536,14 @@ export default function WalletTab() {
       // Verwende letzte bekannte Preise als Fallback
       if (lastKnownPrices.dfaithEur) {
         setDfaithPriceEur(lastKnownPrices.dfaithEur);
-      } else {
-        setDfaithPriceEur(0.001);
       }
       if (lastKnownPrices.polEur) {
         setPolPriceEur(lastKnownPrices.polEur);
-      } else {
-        setPolPriceEur(0.50);
+      }
+      // EUR-Wert neu berechnen mit Fallback-Preisen
+      if (dfaithBalance?.displayValue) {
+        const newEurValue = calculateEurValue(dfaithBalance.displayValue);
+        setDfaithEurValue(newEurValue);
       }
     }
   };
@@ -638,58 +574,94 @@ export default function WalletTab() {
 
   const formatAddress = (address: string) => `${address.slice(0, 6)}...${address.slice(-4)}`;
 
-  // EUR-Wert neu berechnen wenn sich Preis oder Balance ändert
-  useEffect(() => {
-    if (dfaithBalance?.displayValue) {
-      const balanceFloat = parseFloat(dfaithBalance.displayValue);
-      
-      if (balanceFloat > 0) {
-        // Verwende aktuellen Preis oder gespeicherten Preis als Fallback
-        let priceToUse = dfaithPriceEur;
-        
-        // Falls kein aktueller Preis verfügbar, versuche alle verfügbaren Quellen
-        if (priceToUse <= 0) {
-          // 1. Versuche lastKnownPrices
-          if (lastKnownPrices.dfaithEur && lastKnownPrices.dfaithEur > 0) {
-            priceToUse = lastKnownPrices.dfaithEur;
-            console.log('useEffect: Verwende lastKnownPrices für EUR-Berechnung:', priceToUse);
-          } else {
-            // 2. Fallback: direkt aus localStorage lesen
-            try {
-              const stored = localStorage.getItem('dawid_faith_prices');
-              if (stored) {
-                const parsed = JSON.parse(stored);
-                if (parsed.dfaithEur && parsed.dfaithEur > 0) {
-                  priceToUse = parsed.dfaithEur;
-                  console.log('useEffect: Verwende localStorage Preis für EUR-Berechnung:', priceToUse);
-                }
-              }
-            } catch (e) {
-              console.log('useEffect: Fehler beim Lesen des localStorage Preises:', e);
-            }
+  // Zentrale Funktion zur EUR-Wert-Berechnung
+  const calculateEurValue = (balance: string): string => {
+    const balanceFloat = parseFloat(balance);
+    if (balanceFloat <= 0) return "0.00";
+
+    // Verwende alle verfügbaren Preisquellen
+    let priceToUse = 0;
+    
+    // 1. Aktueller Preis im State
+    if (dfaithPriceEur > 0) {
+      priceToUse = dfaithPriceEur;
+    }
+    // 2. Preis aus lastKnownPrices
+    else if (lastKnownPrices.dfaithEur && lastKnownPrices.dfaithEur > 0) {
+      priceToUse = lastKnownPrices.dfaithEur;
+    }
+    // 3. Fallback: direkt aus localStorage
+    else {
+      try {
+        const stored = localStorage.getItem('dawid_faith_prices');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          const now = Date.now();
+          // Verwende Preis wenn er weniger als 24 Stunden alt ist
+          if (parsed.dfaithEur && parsed.dfaithEur > 0 && 
+              parsed.timestamp && (now - parsed.timestamp) < 24 * 60 * 60 * 1000) {
+            priceToUse = parsed.dfaithEur;
           }
         }
-        
-        if (priceToUse > 0) {
-          const eurValue = balanceFloat * priceToUse;
-          setDfaithEurValue(eurValue.toFixed(2));
-          console.log('useEffect: EUR-Wert neu gesetzt:', { 
-            balance: dfaithBalance.displayValue, 
-            priceUsed: priceToUse,
-            source: dfaithPriceEur > 0 ? 'current' : 'stored',
-            eurValue: eurValue.toFixed(2)
-          });
-        } else {
-          setDfaithEurValue("0.00");
-          console.log('useEffect: Kein Preis verfügbar für EUR-Berechnung');
-        }
-      } else {
-        setDfaithEurValue("0.00");
+      } catch (e) {
+        console.log('Fehler beim Lesen des localStorage in calculateEurValue:', e);
       }
-    } else {
-      console.log('useEffect: EUR-Wert Update übersprungen - keine Balance verfügbar');
     }
-  }, [dfaithPriceEur, dfaithBalance?.displayValue, lastKnownPrices.dfaithEur]);
+
+    if (priceToUse > 0) {
+      const eurValue = balanceFloat * priceToUse;
+      console.log('EUR-Wert berechnet:', { 
+        balance, 
+        priceUsed: priceToUse, 
+        eurValue: eurValue.toFixed(2),
+        source: dfaithPriceEur > 0 ? 'current' : 'stored'
+      });
+      return eurValue.toFixed(2);
+    }
+
+    return "0.00";
+  };
+
+  // Lade gespeicherte Preise beim Start
+  useEffect(() => {
+    const loadStoredPrices = () => {
+      try {
+        const stored = localStorage.getItem('dawid_faith_prices');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          const now = Date.now();
+          // Verwende gespeicherte Preise wenn sie weniger als 6 Stunden alt sind
+          if (parsed.timestamp && (now - parsed.timestamp) < 6 * 60 * 60 * 1000) {
+            console.log('Lade gespeicherte Preise beim Start:', parsed);
+            setLastKnownPrices(parsed);
+            if (parsed.dfaithEur && parsed.dfaithEur > 0) {
+              setDfaithPriceEur(parsed.dfaithEur);
+            }
+            if (parsed.polEur && parsed.polEur > 0) {
+              setPolPriceEur(parsed.polEur);
+            }
+            setPricesLoaded(true);
+          }
+        }
+      } catch (e) {
+        console.log('Fehler beim Laden gespeicherter Preise beim Start:', e);
+      } finally {
+        setPricesLoaded(true);
+      }
+    };
+
+    loadStoredPrices();
+  }, []);
+
+  // EUR-Wert neu berechnen wenn sich Balance, Preise oder lastKnownPrices ändern
+  useEffect(() => {
+    if (dfaithBalance?.displayValue && pricesLoaded) {
+      const newEurValue = calculateEurValue(dfaithBalance.displayValue);
+      setDfaithEurValue(newEurValue);
+    } else if (!dfaithBalance?.displayValue) {
+      setDfaithEurValue("0.00");
+    }
+  }, [dfaithPriceEur, dfaithBalance?.displayValue, lastKnownPrices.dfaithEur, pricesLoaded]);
 
   // Entferne fetchTokenBalanceViaContract komplett (nicht mehr benötigt)
 
