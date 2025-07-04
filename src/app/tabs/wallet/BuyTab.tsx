@@ -307,7 +307,7 @@ export default function BuyTab() {
         amount: amountToSend,
         slippage: slippage,
         gasPrice: "50",
-        account: account.address,
+        account: account?.address ?? "",
       });
       
       const quoteUrl = `https://open-api.openocean.finance/v3/polygon/swap_quote?${quoteParams}`;
@@ -463,6 +463,239 @@ export default function BuyTab() {
     }
   }, [showInvestModal]);
 
+  // Neue States für den verbesserten Kaufprozess
+  const [buyStep, setBuyStep] = useState<'initial' | 'quoteFetched' | 'completed'>('initial');
+  const [quoteTxData, setQuoteTxData] = useState<any>(null);
+  const [quoteError, setQuoteError] = useState<string | null>(null);
+
+  // Funktion um Quote zu holen
+  const handleGetQuote = async () => {
+    if (!swapAmountPol || parseFloat(swapAmountPol) <= 0 || !account?.address) return;
+    
+    setSwapTxStatus("pending");
+    setQuoteError(null);
+    setQuoteTxData(null);
+    setBuyStep('initial');
+    
+    try {
+      console.log("1. Quote anfordern für", swapAmountPol, "POL → D.FAITH");
+      
+      // Betrag in Wei umrechnen für POL (18 Dezimalstellen)
+      const amountInWei = (parseFloat(swapAmountPol) * Math.pow(10, POL_DECIMALS)).toString();
+      console.log("Betrag für OpenOcean:", amountInWei);
+      
+      const params = new URLSearchParams({
+        chain: "polygon",
+        inTokenAddress: "0x0000000000000000000000000000000000001010", // Native POL
+        outTokenAddress: DFAITH_TOKEN,
+        amount: amountInWei,
+        slippage: slippage,
+        gasPrice: "50",
+        account: account?.address,
+      });
+      
+      const response = await fetch(`https://open-api.openocean.finance/v3/polygon/swap_quote?${params}`);
+      
+      if (!response.ok) {
+        throw new Error(`OpenOcean Quote Fehler: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log("Quote Response:", data);
+      
+      if (!data || data.code !== 200 || !data.data) {
+        throw new Error('OpenOcean: Keine gültige Quote erhalten');
+      }
+      
+      const txData = data.data;
+      
+      if (!txData.to || !txData.data) {
+        throw new Error('OpenOcean: Unvollständige Transaktionsdaten');
+      }
+      
+      console.log("✅ Quote erfolgreich erhalten");
+      setQuoteTxData(txData);
+      setBuyStep('quoteFetched');
+      setSwapTxStatus(null);
+      
+    } catch (e: any) {
+      console.error("Quote Fehler:", e);
+      setQuoteError(e.message || "Fehler beim Holen der Quote");
+      setSwapTxStatus("error");
+      setTimeout(() => setSwapTxStatus(null), 4000);
+    }
+  };
+
+  // Funktion für den Swap (ohne Approve da native POL)
+  const handleBuySwap = async () => {
+    if (!quoteTxData || !account?.address) return;
+    
+    setIsSwapping(true);
+    setSwapTxStatus("swapping");
+    
+    // Aktuelle Balance vor dem Swap speichern
+    const initialBalance = parseFloat(dfaithBalance);
+    
+    try {
+      console.log("2. Swap Transaktion starten");
+      console.log("Verwende Quote-Daten:", quoteTxData);
+      
+      const { prepareTransaction } = await import("thirdweb");
+      
+      // Vereinfachte Transaktionsvorbereitung ohne explizite Nonce
+      const tx = prepareTransaction({
+        to: quoteTxData.to,
+        data: quoteTxData.data,
+        value: BigInt(quoteTxData.value || "0"),
+        chain: polygon,
+        client,
+        gas: BigInt(quoteTxData.gasLimit || "300000"),
+        gasPrice: BigInt(quoteTxData.gasPrice || "50000000000")
+      });
+      
+      console.log("Sending swap transaction");
+      
+      // Verwende sendAndConfirmTransaction anstatt sendTransaction + waitForReceipt
+      const { sendAndConfirmTransaction } = await import("thirdweb");
+      const receipt = await sendAndConfirmTransaction({
+        transaction: tx,
+        account: account,
+      });
+      
+      console.log("Transaktion bestätigt:", receipt);
+      
+      // Prüfe ob Transaktion erfolgreich war
+      if (receipt.status !== "success") {
+        console.error("Transaktion Details:", {
+          status: receipt.status,
+          gasUsed: receipt.gasUsed?.toString(),
+          logs: receipt.logs,
+          transactionHash: receipt.transactionHash
+        });
+        throw new Error(`Transaktion fehlgeschlagen - Status: ${receipt.status}. Hash: ${receipt.transactionHash}`);
+      }
+      
+      setSwapTxStatus("verifying");
+      console.log("3. Verifiziere Balance-Änderung...");
+      
+      // Unendliche Balance-Verifizierung bis Erfolg bestätigt
+      let balanceVerified = false;
+      let attempts = 0;
+      
+      // Erste längere Wartezeit nach Transaktionsbestätigung
+      console.log("Warte 5 Sekunden vor erster Balance-Prüfung...");
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      
+      // Läuft so lange bis Balance-Änderung verifiziert ist
+      while (!balanceVerified) {
+        attempts++;
+        console.log(`Balance-Verifizierung Versuch ${attempts}`);
+        
+        try {
+          // Stufenweise längere Wartezeiten, aber maximal 15 Sekunden
+          if (attempts > 1) {
+            const waitTime = Math.min(attempts * 2000, 15000);
+            console.log(`Warte ${waitTime/1000} Sekunden vor nächstem Versuch...`);
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+          }
+          
+          // Neue Balance abrufen
+          const response = await fetch(`https://insight.thirdweb.com/v1/tokens?chain_id=137&token_address=${DFAITH_TOKEN}&owner_address=${account.address}&include_native=true`);
+          const data = await response.json();
+          const balance = data?.data?.[0]?.balance ?? "0";
+          const currentBalance = Number(balance) / Math.pow(10, DFAITH_DECIMALS);
+          
+          console.log(`Initiale Balance: ${initialBalance}, Aktuelle Balance: ${currentBalance}`);
+          
+          // Prüfe ob sich die Balance um mindestens den erwarteten Betrag erhöht hat
+          const expectedIncrease = dfaithPrice !== null
+            ? parseFloat(swapAmountPol) * dfaithPrice * (1 - parseFloat(slippage) / 100)
+            : 0;
+          const actualIncrease = currentBalance - initialBalance;
+          
+          console.log(`Erwartete Erhöhung: ${expectedIncrease}, Tatsächliche Erhöhung: ${actualIncrease}`);
+          
+          // Großzügige Toleranz für Rundungsfehler
+          if (actualIncrease >= (expectedIncrease * 0.9)) { // 10% Toleranz
+            console.log("✅ Balance-Änderung verifiziert - Kauf erfolgreich!");
+            setDfaithBalance(currentBalance.toFixed(DFAITH_DECIMALS));
+            balanceVerified = true;
+            setBuyStep('completed');
+            setSwapTxStatus("success");
+            setSwapAmountPol("");
+            setQuoteTxData(null);
+            setTimeout(() => setSwapTxStatus(null), 5000);
+          } else {
+            console.log(`Versuch ${attempts}: Balance noch nicht ausreichend geändert, weiter warten...`);
+          }
+        } catch (balanceError) {
+          console.error(`Balance-Verifizierung Versuch ${attempts} fehlgeschlagen:`, balanceError);
+          console.log("Balance-Abfrage fehlgeschlagen, versuche es weiter...");
+        }
+        
+        // Sicherheitsventil: Nach 50 Versuchen Fehler werfen
+        if (attempts >= 50) {
+          throw new Error("Balance-Verifizierung nach 50 Versuchen noch nicht erfolgreich - manuell prüfen");
+        }
+      }
+      
+    } catch (error) {
+      console.error("Kauf Fehler:", error);
+      setSwapTxStatus("error");
+      
+      // Versuche trotzdem die Balance zu aktualisieren
+      try {
+        const response = await fetch(`https://insight.thirdweb.com/v1/tokens?chain_id=137&token_address=${DFAITH_TOKEN}&owner_address=${account.address}&include_native=true`);
+        const data = await response.json();
+        const balance = data?.data?.[0]?.balance ?? "0";
+        const currentBalance = (Number(balance) / Math.pow(10, DFAITH_DECIMALS)).toFixed(DFAITH_DECIMALS);
+        setDfaithBalance(currentBalance);
+      } catch (balanceError) {
+        console.error("Fehler beim Aktualisieren der Balance nach Kauf-Fehler:", balanceError);
+      }
+      
+      setTimeout(() => setSwapTxStatus(null), 5000);
+    } finally {
+      setIsSwapping(false);
+    }
+  };
+  
+  // All-in-One Funktion für den kompletten Kaufprozess
+  const handleBuyAllInOne = async () => {
+    try {
+      if (buyStep === 'initial') {
+        setIsSwapping(true);
+        await handleGetQuote();
+      }
+      
+      // Swap ausführen wenn Quote vorhanden
+      if (buyStep === 'quoteFetched') {
+        await handleBuySwap();
+      }
+      
+    } catch (e: any) {
+      console.error("Kaufprozess Fehler:", e);
+      setQuoteError(e.message || "Fehler beim Kauf");
+      setSwapTxStatus("error");
+      setTimeout(() => setSwapTxStatus(null), 4000);
+    } finally {
+      if (buyStep === 'initial') {
+        setIsSwapping(false);
+      }
+    }
+  };
+
+  // Reset Funktion
+  const resetBuyProcess = () => {
+    setBuyStep('initial');
+    setSwapAmountPol("");
+    setSlippage("1");
+    setSwapTxStatus(null);
+    setQuoteError(null);
+    setQuoteTxData(null);
+    setIsSwapping(false);
+  };
+
   return (
     <div className="flex flex-col gap-6 p-6">
       <div className="text-center mb-6">
@@ -535,15 +768,52 @@ export default function BuyTab() {
                   <button
                     onClick={() => {
                       setShowDfaithBuyModal(false);
-                      setSwapAmountPol("");
-                      setSlippage("1");
-                      setSwapTxStatus(null);
+                      resetBuyProcess();
                     }}
                     className="p-2 text-amber-400 hover:text-yellow-300 hover:bg-zinc-800 rounded-lg transition-all flex-shrink-0"
                     disabled={isSwapping}
                   >
                     <span className="text-lg">✕</span>
                   </button>
+                </div>
+                
+                {/* Prozessschritte-Anzeige */}
+                <div className="mb-6 p-4 bg-zinc-800/50 rounded-lg">
+                  <div className="flex items-center justify-center gap-4">
+                    {/* Quote Schritt */}
+                    <div className="flex items-center gap-2">
+                      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold
+                        ${buyStep === 'initial' ? 'bg-amber-500 text-black' : 
+                          buyStep === 'quoteFetched' || buyStep === 'completed' ? 'bg-green-500 text-white' : 'bg-zinc-600 text-zinc-400'}
+                      `}>
+                        {buyStep === 'quoteFetched' || buyStep === 'completed' ? '✓' : '1'}
+                      </div>
+                      <span className={`text-sm font-medium
+                        ${buyStep === 'initial' ? 'text-amber-400' : 
+                          buyStep === 'quoteFetched' || buyStep === 'completed' ? 'text-green-400' : 'text-zinc-400'}
+                      `}>
+                        Quote
+                      </span>
+                    </div>
+                    
+                    <div className="w-6 h-0.5 bg-zinc-600"></div>
+                    
+                    {/* Swap Schritt */}
+                    <div className="flex items-center gap-2">
+                      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold
+                        ${buyStep === 'quoteFetched' ? 'bg-amber-500 text-black' : 
+                          buyStep === 'completed' ? 'bg-green-500 text-white' : 'bg-zinc-600 text-zinc-400'}
+                      `}>
+                        {buyStep === 'completed' ? '✓' : '2'}
+                      </div>
+                      <span className={`text-sm font-medium
+                        ${buyStep === 'quoteFetched' ? 'text-amber-400' : 
+                          buyStep === 'completed' ? 'text-green-400' : 'text-zinc-400'}
+                      `}>
+                        Swap
+                      </span>
+                    </div>
+                  </div>
                 </div>
                 
                 {/* POL Balance */}
@@ -567,18 +837,15 @@ export default function BuyTab() {
                       className="w-full bg-zinc-800 border border-zinc-600 rounded-xl py-3 px-4 pr-16 text-lg font-bold text-purple-400 focus:border-amber-500 focus:outline-none"
                       value={swapAmountPol}
                       onChange={(e) => setSwapAmountPol(e.target.value)}
-                      disabled={isSwapping}
+                      disabled={isSwapping || buyStep !== 'initial'}
                     />
                     <button
                       className="absolute right-3 top-1/2 transform -translate-y-1/2 text-xs px-2 py-1 bg-purple-500/20 text-purple-400 rounded hover:bg-purple-500/30 transition"
                       onClick={() => setSwapAmountPol((parseFloat(polBalance) * 0.95).toFixed(3))}
-                      disabled={isSwapping || parseFloat(polBalance) <= 0}
+                      disabled={isSwapping || parseFloat(polBalance) <= 0 || buyStep !== 'initial'}
                     >
                       MAX
                     </button>
-                  </div>
-                  <div className="text-xs text-zinc-500 mt-1">
-                    Native POL wird direkt für den Swap verwendet
                   </div>
                 </div>
                 
@@ -595,34 +862,31 @@ export default function BuyTab() {
                       className="flex-1 bg-zinc-800 border border-zinc-600 rounded-xl py-2 px-3 text-sm text-zinc-300 focus:border-amber-500 focus:outline-none"
                       value={slippage}
                       onChange={(e) => setSlippage(e.target.value)}
-                      disabled={isSwapping}
+                      disabled={isSwapping || buyStep !== 'initial'}
                     />
                     <div className="flex gap-1">
                       <button
                         className="text-xs px-2 py-1 bg-zinc-700/50 text-zinc-400 rounded hover:bg-zinc-600/50 transition"
                         onClick={() => setSlippage("0.5")}
-                        disabled={isSwapping}
+                        disabled={isSwapping || buyStep !== 'initial'}
                       >
                         0.5%
                       </button>
                       <button
                         className="text-xs px-2 py-1 bg-zinc-700/50 text-zinc-400 rounded hover:bg-zinc-600/50 transition"
                         onClick={() => setSlippage("1")}
-                        disabled={isSwapping}
+                        disabled={isSwapping || buyStep !== 'initial'}
                       >
                         1%
                       </button>
                       <button
                         className="text-xs px-2 py-1 bg-zinc-700/50 text-zinc-400 rounded hover:bg-zinc-600/50 transition"
                         onClick={() => setSlippage("3")}
-                        disabled={isSwapping}
+                        disabled={isSwapping || buyStep !== 'initial'}
                       >
                         3%
                       </button>
                     </div>
-                  </div>
-                  <div className="text-xs text-zinc-500 mt-1">
-                    Höhere Slippage = höhere Erfolgswahrscheinlichkeit, aber weniger Token
                   </div>
                 </div>
                 
@@ -647,6 +911,53 @@ export default function BuyTab() {
                   </div>
                 )}
                 
+                {/* Transaction Status */}
+                {(swapTxStatus || quoteError) && (
+                  <div className="mb-4 p-3 rounded-lg border">
+                    {swapTxStatus === "pending" && (
+                      <div className="flex items-center gap-2 text-blue-400 border-blue-400/30 bg-blue-400/10">
+                        <div className="animate-spin w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full"></div>
+                        <span className="text-sm">Quote wird geholt...</span>
+                      </div>
+                    )}
+                    
+                    {swapTxStatus === "swapping" && (
+                      <div className="flex items-center gap-2 text-purple-400 border-purple-400/30 bg-purple-400/10">
+                        <div className="animate-spin w-4 h-4 border-2 border-purple-400 border-t-transparent rounded-full"></div>
+                        <span className="text-sm">Swap wird durchgeführt...</span>
+                      </div>
+                    )}
+                    
+                    {swapTxStatus === "confirming" && (
+                      <div className="flex items-center gap-2 text-amber-400 border-amber-400/30 bg-amber-400/10">
+                        <div className="animate-spin w-4 h-4 border-2 border-amber-400 border-t-transparent rounded-full"></div>
+                        <span className="text-sm">Warte auf Bestätigung...</span>
+                      </div>
+                    )}
+                    
+                    {swapTxStatus === "verifying" && (
+                      <div className="flex items-center gap-2 text-yellow-400 border-yellow-400/30 bg-yellow-400/10">
+                        <div className="animate-spin w-4 h-4 border-2 border-yellow-400 border-t-transparent rounded-full"></div>
+                        <span className="text-sm">Verifiziere Kauf...</span>
+                      </div>
+                    )}
+                    
+                    {swapTxStatus === "success" && (
+                      <div className="flex items-center gap-2 text-green-400 border-green-400/30 bg-green-400/10">
+                        <span className="text-green-400">✓</span>
+                        <span className="text-sm">Kauf erfolgreich!</span>
+                      </div>
+                    )}
+                    
+                    {(swapTxStatus === "error" || quoteError) && (
+                      <div className="flex items-center gap-2 text-red-400 border-red-400/30 bg-red-400/10">
+                        <span className="text-red-400">✕</span>
+                        <span className="text-sm">{quoteError || "Kauf fehlgeschlagen"}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
                 {/* Info wenn keine POL verfügbar */}
                 {parseFloat(polBalance) <= 0 && (
                   <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
@@ -662,279 +973,259 @@ export default function BuyTab() {
                   </div>
                 )}
                 
-                {/* Transaction Status */}
-                {swapTxStatus && (
-                  <div className={`mb-4 p-3 rounded-lg text-center ${
-                    swapTxStatus === "success" ? "bg-green-500/20 text-green-400" :
-                    swapTxStatus === "error" ? "bg-red-500/20 text-red-400" :
-                    swapTxStatus === "confirming" ? "bg-blue-500/20 text-blue-400" :
-                    "bg-yellow-500/20 text-yellow-400"
-                  }`}>
-                    {swapTxStatus === "success" && (
-                      <div>
-                        <div className="font-bold">🎉 Swap erfolgreich!</div>
-                        <div className="text-xs mt-1">Token wurden erfolgreich getauscht</div>
-                      </div>
-                    )}
-                    {swapTxStatus === "error" && (
-                      <div>
-                        <div className="font-bold">❌ Swap fehlgeschlagen!</div>
-                        <div className="text-xs mt-1">Bitte versuchen Sie es erneut</div>
-                      </div>
-                    )}
-                    {swapTxStatus === "confirming" && (
-                      <div>
-                        <div className="font-bold">⏳ Bestätigung läuft...</div>
-                        <div className="text-xs mt-1">Warte auf Blockchain-Bestätigung</div>
-                      </div>
-                    )}
-                    {swapTxStatus === "pending" && (
-                      <div>
-                        <div className="font-bold">📝 Transaktion wird vorbereitet...</div>
-                        <div className="text-xs mt-1">Bitte bestätigen Sie in Ihrem Wallet</div>
-                      </div>
-                    )}
-                  </div>
-                )}
-                
-                {/* Swap Button */}
+                {/* Action Buttons */}
                 <div className="space-y-3">
-                  <Button
-                    className="w-full bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-3 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50"
-                    onClick={handleDfaithSwap}
-                    disabled={
-                      !swapAmountPol || 
-                      parseFloat(swapAmountPol) <= 0 || 
-                      isSwapping || 
-                      !account?.address || 
-                      parseFloat(polBalance) <= 0 ||
-                      parseFloat(swapAmountPol) > parseFloat(polBalance)
-                    }
-                  >
-                    <FaExchangeAlt className="inline mr-2" />
-                    {isSwapping ? (
-                      swapTxStatus === "pending" ? "Bereite Swap vor..." :
-                      swapTxStatus === "confirming" ? "Bestätige Transaktion..." :
-                      "Swapping..."
-                    ) : parseFloat(polBalance) <= 0 ? 
-                      "Keine POL verfügbar" :
-                    parseFloat(swapAmountPol) > parseFloat(polBalance) ?
-                      "Nicht genügend POL" :
-                    swapAmountPol ? 
-                      `${swapAmountPol} POL → D.FAITH` : 
-                      "Betrag eingeben"
-                    }
-                  </Button>
+                  {/* Haupt-Action Button */}
+                  {buyStep === 'initial' && (
+                    <button
+                      onClick={handleBuyAllInOne}
+                      disabled={!swapAmountPol || parseFloat(swapAmountPol) <= 0 || parseFloat(polBalance) <= 0 || isSwapping}
+                      className="w-full py-3 px-4 bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-600 hover:to-yellow-700 disabled:from-zinc-600 disabled:to-zinc-700 disabled:cursor-not-allowed text-black font-bold rounded-xl transition-all duration-200 transform hover:scale-[1.02] disabled:scale-100"
+                    >
+                      {isSwapping ? "Wird verarbeitet..." : "Quote holen"}
+                    </button>
+                  )}
                   
-                  <Button
-                    className="w-full bg-zinc-600 hover:bg-zinc-700 text-white font-bold py-2 rounded-xl transition-colors"
-                    onClick={() => {
-                      setShowDfaithBuyModal(false);
-                      setSwapAmountPol("");
-                      setSlippage("1");
-                      setSwapTxStatus(null);
-                    }}
-                    disabled={isSwapping}
-                  >
-                    Schließen
-                  </Button>
+                  {buyStep === 'quoteFetched' && (
+                    <button
+                      onClick={handleBuyAllInOne}
+                      disabled={isSwapping}
+                      className="w-full py-3 px-4 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 disabled:from-zinc-600 disabled:to-zinc-700 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-all duration-200 transform hover:scale-[1.02] disabled:scale-100"
+                    >
+                      {isSwapping ? "Swap läuft..." : "Swap durchführen"}
+                    </button>
+                  )}
+                  
+                  {buyStep === 'completed' && (
+                    <button
+                      onClick={resetBuyProcess}
+                      className="w-full py-3 px-4 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-bold rounded-xl transition-all duration-200 transform hover:scale-[1.02]"
+                    >
+                      Neuer Kauf
+                    </button>
+                  )}
+                  
+                  {/* Cancel Button nur im Quote-Schritt */}
+                  {buyStep === 'quoteFetched' && (
+                    <button
+                      onClick={resetBuyProcess}
+                      disabled={isSwapping}
+                      className="w-full py-2 px-4 bg-zinc-700 hover:bg-zinc-600 disabled:bg-zinc-800 disabled:cursor-not-allowed text-zinc-300 rounded-xl transition-all duration-200"
+                    >
+                      Abbrechen
+                    </button>
+                  )}
                 </div>
+              </div>
+            </div>
+          ) : null}
 
-                {/* Validation und Error Messages */}
-                {parseFloat(swapAmountPol) > parseFloat(polBalance) && (
-                  <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
-                    <div className="flex items-center gap-2">
-                      <span className="text-red-400 text-xs">❌</span>
-                      <div className="text-sm text-red-400">
-                        Nicht genügend POL verfügbar
-                      </div>
-                    </div>
-                    <div className="text-xs text-red-300/70 mt-1">
-                      Verfügbar: {polBalance} POL | Benötigt: {swapAmountPol} POL
-                    </div>
-                  </div>
-                )}
-
-                {parseFloat(swapAmountPol) > 0 && parseFloat(swapAmountPol) < 0.001 && (
-                  <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
-                    <div className="flex items-center gap-2">
-                      <span className="text-yellow-400 text-xs">⚠️</span>
-                      <div className="text-sm text-yellow-400">
-                        Minimum: 0.001 POL
-                      </div>
-                    </div>
-                  </div>
-                )}
+          {/* POL kaufen */}
+          <div className="bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl p-6 border border-zinc-700">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-gradient-to-r from-blue-400 to-sky-600 rounded-full">
+                  <FaLock className="text-black text-lg" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sky-400">POL Token</h3>
+                  <p className="text-xs text-zinc-500">Polygon Native Token</p>
+                </div>
               </div>
+              <span className="text-xs text-zinc-400 bg-zinc-700/50 px-2 py-1 rounded">für D.FAITH Swap</span>
             </div>
-          ) : (
-            <Button
-              className="w-full mt-4 bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-3 rounded-xl hover:opacity-90 transition-opacity"
-              onClick={() => {
-                if (account?.address) {
-                  setShowDfaithBuyModal(true);
-                } else {
-                  alert('Bitte Wallet verbinden!');
-                }
-              }}
-              disabled={!account?.address}
-            >
-              D.FAITH kaufen
-            </Button>
-          )}
-        </div>
-
-        {/* D.INVEST kaufen */}
-        <div className="bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl p-6 border border-zinc-700">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-gradient-to-r from-yellow-400 to-amber-600 rounded-full">
-                <FaLock className="text-black text-lg" />
-              </div>
-              <div>
-                <h3 className="font-bold text-amber-400">D.INVEST Token</h3>
-                <p className="text-xs text-zinc-500">Investment & Staking Token</p>
-              </div>
-            </div>
-            <span className="text-xs text-zinc-400 bg-zinc-700/50 px-2 py-1 rounded">mit EUR kaufen</span>
-          </div>
-          
-          <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
-              <span className="text-sm text-zinc-400">Aktueller Preis:</span>
-              <span className="text-sm text-amber-400 font-medium">5€ pro D.INVEST</span>
-            </div>
-            <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
-              <span className="text-sm text-zinc-400">Minimum:</span>
-              <span className="text-sm text-zinc-300 font-medium">5 EUR</span>
-            </div>
-          </div>
-          
-          <Button
-            className="w-full mt-4 bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-3 rounded-xl hover:opacity-90 transition-opacity"
-            onClick={handleInvestBuy}
-          >
-            D.INVEST kaufen
-          </Button>
-        </div>
-
-        {/* POL kaufen */}
-        <div className="bg-gradient-to-br from-blue-800/30 to-blue-900/30 rounded-xl p-6 border border-blue-700/50">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-gradient-to-r from-purple-500 to-purple-700 rounded-full">
-                <span className="text-white text-lg font-bold">🔷</span>
-              </div>
-              <div>
-                <h3 className="font-bold text-purple-400">POL Token</h3>
-                <p className="text-xs text-zinc-500">Polygon Native Token</p>
-              </div>
-            </div>
-            <span className="text-xs text-zinc-400 bg-zinc-700/50 px-2 py-1 rounded">mit EUR kaufen</span>
-          </div>
-          
-          <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
-              <span className="text-sm text-zinc-400">Aktueller Preis:</span>
-              <span className="text-sm text-purple-400 font-bold">
-                {polPriceEur ? (
-                  <span>
-                    {polPriceEur.toFixed(2)}€ pro POL
-                    {priceError && (
-                      <span className="text-xs text-yellow-400 ml-1">(cached)</span>
-                    )}
-                  </span>
-                ) : (
-                  "~0.50€ pro POL"
-                )}
-              </span>
-            </div>
-          </div>
-          
-          <div className="w-full mt-4">
+            
+            {/* POL kaufen Modal */}
             {showPolBuyModal ? (
-              <div
-                className="fixed inset-0 z-50 flex items-center justify-center min-h-screen bg-black/60 overflow-y-auto"
-              >
+              <div className="fixed inset-0 z-50 flex items-center justify-center min-h-screen bg-black/60 overflow-y-auto">
                 <div
                   ref={polBuyModalRef}
-                  className="bg-zinc-900 rounded-xl p-4 max-w-full w-full sm:max-w-xs border border-purple-500 text-center flex flex-col items-center justify-center my-4"
+                  className="bg-zinc-900 rounded-xl p-4 sm:p-6 max-w-md w-full mx-4 border border-amber-400 my-8"
                 >
-                  <div className="mb-4 text-purple-400 text-2xl font-bold">POL kaufen</div>
-                  <div className="w-full flex-1 flex items-center justify-center">
-                    <BuyWidget
-                      client={client}
-                      tokenAddress={NATIVE_TOKEN_ADDRESS}
-                      chain={polygon}
-                      amount="1"
-                      theme="dark"
-                      className="w-full"
-                    />
+                  {/* Header mit Close Button */}
+                  <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-xl sm:text-2xl font-bold text-amber-400">POL kaufen</h3>
+                    <button
+                      onClick={() => {
+                        setShowPolBuyModal(false);
+                        setSwapAmount("");
+                        setSlippage("1");
+                        setSwapStatus(null);
+                      }}
+                      className="p-2 text-amber-400 hover:text-yellow-300 hover:bg-zinc-800 rounded-lg transition-all flex-shrink-0"
+                      disabled={isSwapPending}
+                    >
+                      <span className="text-lg">✕</span>
+                    </button>
                   </div>
-                  <Button
-                    className="w-full bg-zinc-600 hover:bg-zinc-700 text-white font-bold py-2 rounded-xl mt-4"
-                    onClick={() => setShowPolBuyModal(false)}
-                  >
-                    Schließen
-                  </Button>
+                  
+                  {/* Preis und Slippage Info */}
+                  <div className="mb-4 p-3 bg-zinc-800/50 rounded-lg">
+                    <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
+                      <span className="text-sm text-zinc-400">Aktueller Preis:</span>
+                      <span className="text-sm text-amber-400 font-medium">
+                        {isLoadingPrice && !polPriceEur ? (
+                          <span className="animate-pulse">Laden...</span>
+                        ) : polPriceEur ? (
+                          <span>
+                            {polPriceEur.toFixed(3)}€ pro POL
+                            {priceError && (
+                              <span className="text-xs text-yellow-400 ml-1">(cached)</span>
+                            )}
+                          </span>
+                        ) : (
+                          <span className="text-red-400 text-xs">{priceError || "Preis nicht verfügbar"}</span>
+                        )}
+                      </span>
+                    </div>
+                    
+                    <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0 mt-2">
+                      <span className="text-sm text-zinc-400">Slippage Toleranz:</span>
+                      <span className="text-sm text-zinc-300 font-medium">
+                        {slippage}%
+                      </span>
+                    </div>
+                  </div>
+                  
+                  {/* Swap Input */}
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-zinc-300 mb-2">Betrag in EUR</label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        placeholder="0.0"
+                        className="w-full bg-zinc-800 border border-zinc-600 rounded-xl py-3 px-4 pr-16 text-lg font-bold text-purple-400 focus:border-amber-500 focus:outline-none"
+                        value={swapAmount}
+                        onChange={(e) => setSwapAmount(e.target.value)}
+                        disabled={isSwapPending}
+                      />
+                      <button
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-xs px-2 py-1 bg-purple-500/20 text-purple-400 rounded hover:bg-purple-500/30 transition"
+                        onClick={() => setSwapAmount((parseFloat(polPriceEur?.toString() || "0") * 0.95).toFixed(3))}
+                        disabled={isSwapPending || !polPriceEur}
+                      >
+                        MAX
+                      </button>
+                    </div>
+                    <div className="text-xs text-zinc-500 mt-1">
+                      Kaufen Sie POL mit Euro für D.FAITH Swap
+                    </div>
+                  </div>
+                  
+                  {/* Transaction Status */}
+                  {swapStatus && (
+                    <div className="mt-4 p-3 bg-zinc-800 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-zinc-400">Transaktionsstatus:</span>
+                        <span className="text-sm font-bold text-amber-400">
+                          {swapStatus === "pending" && "Wird bearbeitet..."}
+                          {swapStatus === "confirming" && "Bestätigen..."}
+                          {swapStatus === "success" && "Erfolgreich!"}
+                          {swapStatus === "error" && "Fehler"}
+                        </span>
+                      </div>
+                      {swapStatus === "error" && (
+                        <div className="mt-2 text-xs text-red-400">
+                          {swapError}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
+                  {/* Buttons */}
+                  <div className="mt-4">
+                    <Button
+                      onClick={async () => {
+                        setIsSwapping(true);
+                        setSwapStatus("pending");
+                        
+                        try {
+                          // Schritt 1: Hole Quote von OpenOcean
+                          const params = new URLSearchParams({
+                            chain: "polygon",
+                            inTokenAddress: "0x0000000000000000000000000000000000001010", // Native POL
+                            outTokenAddress: "0xF051E3B0335eB332a7ef0dc308BB4F0c10301060", // D.FAITH
+                            amount: (parseFloat(swapAmount) / dfaithPriceEur!).toFixed(DFAITH_DECIMALS),
+                            slippage: slippage,
+                            gasPrice: "50",
+                            account: account?.address ?? "",
+                          });
+                          
+                          const response = await fetch(`https://open-api.openocean.finance/v3/polygon/swap_quote?${params}`);
+                          
+                          if (!response.ok) {
+                            throw new Error(`OpenOcean Quote Fehler: ${response.status}`);
+                          }
+                          
+                          const data = await response.json();
+                          console.log("Quote Response:", data);
+                          
+                          if (!data || data.code !== 200 || !data.data) {
+                            throw new Error('OpenOcean: Keine gültige Quote erhalten');
+                          }
+                          
+                          const txData = data.data;
+                          
+                          if (!txData.to || !txData.data) {
+                            throw new Error('OpenOcean: Unvollständige Transaktionsdaten');
+                          }
+                          
+                          // Schritt 2: Bereite Transaktion vor
+                          const { prepareTransaction } = await import("thirdweb");
+                          const transaction = await prepareTransaction({
+                            to: txData.to,
+                            data: txData.data,
+                            value: BigInt(txData.value || "0"),
+                            chain: polygon,
+                            client
+                          });
+                          
+                          console.log("Prepared Transaction:", transaction);
+                          setSwapStatus("confirming");
+                          
+                          // Schritt 3: Sende Transaktion
+                          await sendTransaction(transaction);
+                          console.log("Transaction sent successfully");
+                          
+                          // Bei erfolgreichem Senden
+                          setSwapStatus("success");
+                          
+                          // Balance sofort aktualisieren
+                          setTimeout(() => updatePolBalance(true), 1000);
+                          setTimeout(() => updatePolBalance(true), 3000);
+                          
+                          // Input zurücksetzen
+                          setSwapAmount("");
+                          
+                          // Success-Status nach 5 Sekunden ausblenden
+                          setTimeout(() => {
+                            setSwapStatus(null);
+                          }, 5000);
+                          
+                        } catch (error) {
+                          console.error("Swap Error:", error);
+                          setSwapStatus("error");
+                          
+                          // Error-Status nach 5 Sekunden ausblenden
+                          setTimeout(() => {
+                            setSwapStatus(null);
+                          }, 5000);
+                        } finally {
+                          setIsSwapping(false);
+                        }
+                      }}
+                      className="w-full"
+                      disabled={isSwapping || !swapAmount || parseFloat(swapAmount) <= 0}
+                    >
+                      {isSwapping ? "Wird verarbeitet..." : "Jetzt kaufen"}
+                    </Button>
+                  </div>
                 </div>
               </div>
-            ) : (
-              <Button
-                className="w-full bg-gradient-to-r from-purple-500 to-purple-700 text-white font-bold py-3 rounded-xl hover:opacity-90 transition-opacity"
-                onClick={() => {
-                  setShowPolBuyModal(true);
-                  // Das Scrollen übernimmt jetzt der useEffect
-                }}
-              >
-                POL kaufen
-              </Button>
-            )}
+            ) : null}
           </div>
         </div>
       </div>
-
-      <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4 mt-6">
-        <div className="flex items-start gap-3">
-          <div className="w-5 h-5 rounded-full bg-blue-500/20 flex items-center justify-center mt-0.5">
-            <span className="text-blue-400 text-xs">ℹ</span>
-          </div>
-          <div>
-            <div className="font-medium text-blue-400 mb-1">Hinweis</div>
-            <div className="text-sm text-zinc-400">
-              Stellen Sie sicher, dass Sie genügend POL für Transaktionsgebühren in Ihrem Wallet haben.
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Info Modal für D.INVEST */}
-      {showInvestModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center min-h-screen bg-black/60 overflow-y-auto">
-          <div
-            ref={investBuyModalRef}
-            className="bg-zinc-900 rounded-xl p-8 w-full max-w-xs border border-amber-400 text-center flex flex-col items-center justify-center my-8"
-          >
-            <div className="mb-4 text-amber-400 text-2xl font-bold">Wichtiger Hinweis</div>
-            <div className="mb-4 text-zinc-300 text-sm">
-              {copied
-                ? "Deine Wallet-Adresse wurde kopiert. Bitte füge sie beim Stripe-Kauf als Verwendungszweck ein, damit wir dir die Token zuweisen können."
-                : "Bitte stelle sicher, dass du eine Wallet verbunden hast."}
-            </div>
-            <Button
-              className="w-full bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-2 rounded-xl mt-2"
-              onClick={handleInvestContinue}
-              autoFocus
-            >
-              Weiter zu Stripe
-            </Button>
-            <button
-              className="w-full mt-2 text-zinc-400 text-xs underline"
-              onClick={() => setShowInvestModal(false)}
-            >Abbrechen</button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
