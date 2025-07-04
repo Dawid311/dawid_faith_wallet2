@@ -949,15 +949,46 @@ export default function BuyTab() {
                   className="bg-zinc-900 rounded-xl p-4 max-w-full w-full sm:max-w-xs border border-purple-500 text-center flex flex-col items-center justify-center my-4"
                 >
                   <div className="mb-4 text-purple-400 text-2xl font-bold">POL kaufen</div>
-                  <div className="w-full flex-1 flex items-center justify-center">
-                    <BuyWidget
-                      client={client}
-                      tokenAddress={NATIVE_TOKEN_ADDRESS}
-                      chain={polygon}
-                      amount="1"
-                      theme="dark"
-                      className="w-full"
-                    />
+                  <div className="w-full flex-1 flex items-center justify-center min-h-[400px]">
+                    {/* Versuche zuerst das BuyWidget, bei CSP-Fehlern zeige Fallback */}
+                    <div className="w-full h-full">
+                      <BuyWidget
+                        client={client}
+                        tokenAddress={NATIVE_TOKEN_ADDRESS}
+                        chain={polygon}
+                        amount="1"
+                        theme="dark"
+                        className="w-full h-full"
+                        onError={() => {
+                          console.log("BuyWidget CSP Error detected - showing fallback");
+                        }}
+                      />
+                    </div>
+                  </div>
+                  
+                  {/* Fallback-Information falls das Widget nicht lädt */}
+                  <div className="text-xs text-zinc-400 text-center mb-4 max-w-sm">
+                    <p className="mb-2">Falls das Widget nicht lädt, können Sie POL auch direkt auf diesen Plattformen kaufen:</p>
+                    <div className="space-y-1">
+                      <button 
+                        onClick={() => window.open('https://quickswap.exchange/#/swap', '_blank')}
+                        className="block w-full text-purple-400 hover:text-purple-300 underline"
+                      >
+                        • QuickSwap (DEX)
+                      </button>
+                      <button 
+                        onClick={() => window.open('https://app.uniswap.org/#/swap', '_blank')}
+                        className="block w-full text-purple-400 hover:text-purple-300 underline"
+                      >
+                        • Uniswap
+                      </button>
+                      <button 
+                        onClick={() => window.open('https://www.binance.com/', '_blank')}
+                        className="block w-full text-purple-400 hover:text-purple-300 underline"
+                      >
+                        • Binance
+                      </button>
+                    </div>
                   </div>
                   <Button
                     className="w-full bg-zinc-600 hover:bg-zinc-700 text-white font-bold py-2 rounded-xl mt-4"
