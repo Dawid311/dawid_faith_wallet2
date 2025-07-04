@@ -23,6 +23,7 @@ import { CONTRACTS, BASE_CHAIN_ID } from '../onchainConfig';
 import { Card, CardContent } from "../../../components/ui/card";
 import { Button } from "../../../components/ui/button";
 import { FaRegCopy, FaCoins, FaArrowDown, FaArrowUp, FaPaperPlane, FaLock, FaHistory, FaTimes, FaSync } from "react-icons/fa";
+import ClientOnlyWrapper from '../components/ClientOnlyWrapper';
 
 // Import Subtabs
 import BuyTab from "./wallet/BuyTab";
