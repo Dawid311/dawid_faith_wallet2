@@ -662,11 +662,12 @@ export default function BuyTab() {
             <div className="fixed inset-0 z-50 flex items-center justify-center min-h-screen bg-black/60 overflow-y-auto">
               <div
                 ref={dfaithBuyModalRef}
-                className="bg-zinc-900 rounded-xl p-4 sm:p-6 max-w-md w-full mx-4 border border-amber-400 my-8"
+                className="bg-zinc-900 rounded-xl p-3 sm:p-6 max-w-md w-full mx-2 sm:mx-4 border border-amber-400 my-4 max-h-[90vh] overflow-y-auto flex flex-col"
+                style={{ boxSizing: 'border-box' }}
               >
                 {/* Header mit Close Button */}
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-xl sm:text-2xl font-bold text-amber-400">D.FAITH kaufen</h3>
+                <div className="flex items-center justify-between mb-4 sm:mb-6">
+                  <h3 className="text-lg sm:text-2xl font-bold text-amber-400">D.FAITH kaufen</h3>
                   <button
                     onClick={() => {
                       setShowDfaithBuyModal(false);
