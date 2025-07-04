@@ -950,46 +950,76 @@ export default function BuyTab() {
                 >
                   <div className="mb-4 text-purple-400 text-2xl font-bold">POL kaufen</div>
                   <div className="w-full flex-1 flex items-center justify-center min-h-[400px]">
-                    {/* Versuche zuerst das BuyWidget, bei CSP-Fehlern zeige Fallback */}
-                    <div className="w-full h-full">
-                      <BuyWidget
-                        client={client}
-                        tokenAddress={NATIVE_TOKEN_ADDRESS}
-                        chain={polygon}
-                        amount="1"
-                        theme="dark"
-                        className="w-full h-full"
-                        onError={() => {
-                          console.log("BuyWidget CSP Error detected - showing fallback");
+                    {/* Ersetze BuyWidget durch direkten Transak-Link (wie von Thirdweb empfohlen) */}
+                    <div className="w-full max-w-sm space-y-4">
+                      <div className="text-center mb-6">
+                        <h4 className="text-lg font-bold text-purple-400 mb-2">POL kaufen</h4>
+                        <p className="text-sm text-zinc-400">Wähle deine bevorzugte Plattform:</p>
+                      </div>
+                      
+                      {/* Direkter Transak-Link (wie von Thirdweb empfohlen) */}
+                      <button 
+                        onClick={() => {
+                          if (!account?.address) {
+                            alert('Bitte Wallet verbinden!');
+                            return;
+                          }
+                          const transakUrl = `https://global.transak.com?walletAddress=${account.address}&cryptoCurrency=POL&networks=polygon&defaultCryptoCurrency=POL&defaultPaymentMethod=credit_debit_card&themeColor=8b5cf6`;
+                          window.open(transakUrl, '_blank');
                         }}
-                      />
+                        disabled={!account?.address}
+                        className="w-full bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white px-4 py-4 rounded-lg border border-purple-400 transition-all group disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="text-left">
+                            <div className="font-bold">Transak (Empfohlen)</div>
+                            <div className="text-xs opacity-80">Fiat zu POL • Kreditkarte/Bank</div>
+                          </div>
+                          <div className="text-2xl group-hover:scale-110 transition-transform">💳</div>
+                        </div>
+                      </button>
+                      
+                      {/* QuickSwap Option */}
+                      <button 
+                        onClick={() => {
+                          const quickswapUrl = 'https://quickswap.exchange/#/swap?outputCurrency=0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270';
+                          window.open(quickswapUrl, '_blank');
+                        }}
+                        className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white px-4 py-4 rounded-lg border border-blue-400 transition-all group"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="text-left">
+                            <div className="font-bold">QuickSwap</div>
+                            <div className="text-xs opacity-80">DEX • Niedrige Gebühren</div>
+                          </div>
+                          <div className="text-2xl group-hover:scale-110 transition-transform">🚀</div>
+                        </div>
+                      </button>
+                      
+                      {/* Uniswap Option */}
+                      <button 
+                        onClick={() => {
+                          const uniswapUrl = 'https://app.uniswap.org/#/swap?outputCurrency=0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270&chain=polygon';
+                          window.open(uniswapUrl, '_blank');
+                        }}
+                        className="w-full bg-gradient-to-r from-pink-500 to-pink-600 hover:from-pink-600 hover:to-pink-700 text-white px-4 py-4 rounded-lg border border-pink-400 transition-all group"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="text-left">
+                            <div className="font-bold">Uniswap</div>
+                            <div className="text-xs opacity-80">Beliebteste DEX • Hohe Liquidität</div>
+                          </div>
+                          <div className="text-2xl group-hover:scale-110 transition-transform">🦄</div>
+                        </div>
+                      </button>
+                      
+                      <div className="text-xs text-zinc-500 text-center mt-4">
+                        💡 Tipp: Transak für EUR → POL, QuickSwap für Crypto → POL
+                      </div>
                     </div>
                   </div>
                   
-                  {/* Fallback-Information falls das Widget nicht lädt */}
-                  <div className="text-xs text-zinc-400 text-center mb-4 max-w-sm">
-                    <p className="mb-2">Falls das Widget nicht lädt, können Sie POL auch direkt auf diesen Plattformen kaufen:</p>
-                    <div className="space-y-1">
-                      <button 
-                        onClick={() => window.open('https://quickswap.exchange/#/swap', '_blank')}
-                        className="block w-full text-purple-400 hover:text-purple-300 underline"
-                      >
-                        • QuickSwap (DEX)
-                      </button>
-                      <button 
-                        onClick={() => window.open('https://app.uniswap.org/#/swap', '_blank')}
-                        className="block w-full text-purple-400 hover:text-purple-300 underline"
-                      >
-                        • Uniswap
-                      </button>
-                      <button 
-                        onClick={() => window.open('https://www.binance.com/', '_blank')}
-                        className="block w-full text-purple-400 hover:text-purple-300 underline"
-                      >
-                        • Binance
-                      </button>
-                    </div>
-                  </div>
+                  {/* Entferne die alten DEX-Links da sie jetzt oben integriert sind */}
                   <Button
                     className="w-full bg-zinc-600 hover:bg-zinc-700 text-white font-bold py-2 rounded-xl mt-4"
                     onClick={() => setShowPolBuyModal(false)}
