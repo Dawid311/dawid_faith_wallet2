@@ -213,30 +213,37 @@ export default function StakeTab() {
       console.log("Ungültige Eingabe oder keine Wallet verbunden");
       return;
     }
-    
+
+    // Wenn der Contract einen Stake erwartet, aber keiner vorhanden ist, verhindere den Aufruf
+    if (staked === "0" && parseInt(stakeAmount) <= 0) {
+      setTxStatus("error");
+      console.log("Du hast keinen Stake. Bitte gib einen gültigen Betrag ein.");
+      return;
+    }
+
     const amountToStakeNum = parseInt(stakeAmount);
     const availableNum = parseInt(available);
-    
+
     if (amountToStakeNum > availableNum) {
       setTxStatus("error");
       console.log("Nicht genügend Token verfügbar");
       return;
     }
-    
+
     // Minimum Staking Check (mindestens 1 Token)
     if (amountToStakeNum < 1) {
       setTxStatus("error");
       console.log("Mindestens 1 D.INVEST Token erforderlich");
       return;
     }
-    
+
     setTxStatus("pending");
-    
+
     try {
       const staking = getContract({ client, chain: polygon, address: STAKING_CONTRACT });
       const dinvest = getContract({ client, chain: polygon, address: DINVEST_TOKEN });
       const amountToStake = BigInt(amountToStakeNum);
-      
+
       console.log("Staking Betrag:", amountToStakeNum);
       console.log("Aktuell gestaked:", staked);
       
@@ -306,9 +313,15 @@ export default function StakeTab() {
             resolve();
           },
           onError: (error) => {
-            console.error("Staking fehlgeschlagen:", error);
-            setTxStatus("error");
+            // Fehlerausgabe für den Nutzer
+            if (error && error.message && error.message.includes("No stake")) {
+              setTxStatus("error");
+              alert("Fehler: Du hast keinen Stake. Bitte stake zuerst einen Betrag.");
+            } else {
+              setTxStatus("error");
+            }
             setTimeout(() => setTxStatus(null), 5000);
+            console.error("Staking fehlgeschlagen:", error);
             reject(error);
           }
         });
