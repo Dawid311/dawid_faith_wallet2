@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { Button } from "../../../../components/ui/button";
+import { CoinImage } from "../../../../components/ui/CoinImage";
 import { FaCoins, FaLock, FaExchangeAlt, FaSync, FaRegCopy } from "react-icons/fa";
 import { useActiveAccount, useSendTransaction, BuyWidget } from "thirdweb/react";
 import { polygon } from "thirdweb/chains";
@@ -552,9 +553,12 @@ export default function BuyTab() {
         <div className="bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl p-6 border border-zinc-700">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-gradient-to-r from-yellow-400 to-amber-600 rounded-full">
-                <FaCoins className="text-black text-lg" />
-              </div>
+              <CoinImage 
+                tokenAddress={DFAITH_TOKEN}
+                symbol="DFAITH"
+                size="lg"
+                className="shadow-lg ring-2 ring-amber-400/20"
+              />
               <div>
                 <h3 className="font-bold text-amber-400">D.FAITH Token</h3>
                 <p className="text-xs text-zinc-500">Dawid Faith Utility Token</p>
@@ -607,7 +611,15 @@ export default function BuyTab() {
               >
                 {/* Header mit Close Button */}
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-lg sm:text-2xl font-bold text-amber-400">D.FAITH kaufen</h3>
+                  <div className="flex items-center gap-2">
+                    <CoinImage 
+                      tokenAddress={DFAITH_TOKEN}
+                      symbol="DFAITH"
+                      size="md"
+                      className="shadow"
+                    />
+                    <h3 className="text-lg sm:text-2xl font-bold text-amber-400">D.FAITH kaufen</h3>
+                  </div>
                   <button
                     onClick={() => {
                       setShowDfaithBuyModal(false);
@@ -638,7 +650,12 @@ export default function BuyTab() {
                 <div className="flex gap-2 items-center mb-3 w-full">
                   {/* POL-Balance Badge */}
                   <div className="flex items-center gap-1 bg-purple-900/60 border border-purple-500 rounded-lg px-3 py-2 text-purple-300 font-bold text-sm whitespace-nowrap">
-                    <span className="text-purple-400 text-base">🔷</span>
+                    <CoinImage 
+                      tokenAddress="0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270"
+                      symbol="POL"
+                      size="sm"
+                      className="shadow"
+                    />
                     <span>{polBalance}</span>
                     <span className="text-xs font-normal ml-1">POL</span>
                   </div>
@@ -833,9 +850,12 @@ export default function BuyTab() {
         <div className="bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl p-6 border border-zinc-700">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-gradient-to-r from-yellow-400 to-amber-600 rounded-full">
-                <FaLock className="text-black text-lg" />
-              </div>
+              <CoinImage 
+                tokenAddress={DINVEST_TOKEN}
+                symbol="DINVEST"
+                size="lg"
+                className="shadow-lg ring-2 ring-amber-400/20"
+              />
               <div>
                 <h3 className="font-bold text-amber-400">D.INVEST Token</h3>
                 <p className="text-xs text-zinc-500">Investment & Staking Token</p>
@@ -867,9 +887,12 @@ export default function BuyTab() {
         <div className="bg-gradient-to-br from-blue-800/30 to-blue-900/30 rounded-xl p-6 border border-blue-700/50">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-gradient-to-r from-purple-500 to-purple-700 rounded-full">
-                <span className="text-white text-lg font-bold">🔷</span>
-              </div>
+              <CoinImage 
+                tokenAddress="0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270"
+                symbol="POL"
+                size="lg"
+                className="shadow-lg ring-2 ring-purple-400/20"
+              />
               <div>
                 <h3 className="font-bold text-purple-400">POL Token</h3>
                 <p className="text-xs text-zinc-500">Polygon Native Token</p>
