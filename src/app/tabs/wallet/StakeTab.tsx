@@ -8,7 +8,7 @@ import { useSendTransaction } from "thirdweb/react";
 import { balanceOf, approve } from "thirdweb/extensions/erc20";
 
 const STAKING_CONTRACT = "0x89E0ED96e21E73e1F47260cdF72e7E7cb878A2B2"; // Aktualisierte Staking Contract-Adresse
-const DFAITH_TOKEN = "0xF051E3B0335eB332a7ef0dc308BB4F0c10301060";
+const DFAITH_TOKEN = "0xD05903dF2E1465e2bDEbB8979104204D1c48698d";
 const DFAITH_DECIMALS = 2;
 const DINVEST_TOKEN = "0x90aCC32F7b0B1CACc3958a260c096c10CCfa0383";
 const DINVEST_DECIMALS = 0;

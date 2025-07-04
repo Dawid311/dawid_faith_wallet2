@@ -96,7 +96,7 @@ export default function WalletTab() {
   
   // Konstanten für Token mit echten Contract-Adressen
   const DFAITH_TOKEN = {
-    address: "0xF051E3B0335eB332a7ef0dc308BB4F0c10301060", // D.FAITH Token-Contract-Adresse
+    address: "0xD05903dF2E1465e2bDEbB8979104204D1c48698d", // D.FAITH Token-Contract-Adresse
     decimals: 2, 
     symbol: "D.FAITH"
   };

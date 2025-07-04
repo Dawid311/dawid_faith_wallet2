@@ -7,7 +7,7 @@ import { NATIVE_TOKEN_ADDRESS, getContract, prepareContractCall, sendAndConfirmT
 import { client } from "../../client";
 import { balanceOf, approve } from "thirdweb/extensions/erc20";
 
-const DFAITH_TOKEN = "0xF051E3B0335eB332a7ef0dc308BB4F0c10301060"; // Neue D.FAITH Token-Adresse
+const DFAITH_TOKEN = "0xD05903dF2E1465e2bDEbB8979104204D1c48698d"; // Neue D.FAITH Token-Adresse
 const DFAITH_DECIMALS = 2; // Neue Dezimalstellen
 const DINVEST_TOKEN = "0x90aCC32F7b0B1CACc3958a260c096c10CCfa0383"; // D.INVEST Token Adresse
 const DINVEST_DECIMALS = 0; // D.INVEST hat keine Dezimalstellen

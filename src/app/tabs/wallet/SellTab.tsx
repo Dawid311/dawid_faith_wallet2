@@ -7,7 +7,7 @@ import { getContract, prepareContractCall } from "thirdweb";
 import { client } from "../../client";
 import { balanceOf } from "thirdweb/extensions/erc20";
 
-const DFAITH_TOKEN = "0xF051E3B0335eB332a7ef0dc308BB4F0c10301060";
+const DFAITH_TOKEN = "0xD05903dF2E1465e2bDEbB8979104204D1c48698d";
 const DFAITH_DECIMALS = 2;
 const DINVEST_TOKEN = "0x90aCC32F7b0B1CACc3958a260c096c10CCfa0383";
 const DINVEST_DECIMALS = 0;
