@@ -200,6 +200,13 @@ export default function StakeTab() {
       return;
     }
     
+    // Minimum Staking Check (mindestens 1 Token)
+    if (amountToStakeNum < 1) {
+      setTxStatus("error");
+      console.log("Mindestens 1 D.INVEST Token erforderlich");
+      return;
+    }
+    
     setTxStatus("pending");
     
     try {
@@ -208,6 +215,10 @@ export default function StakeTab() {
       const amountToStake = BigInt(amountToStakeNum);
       
       console.log("Staking Betrag:", amountToStakeNum);
+      console.log("Aktuell gestaked:", staked);
+      
+      // Der Contract hat nur stake() - diese Funktion addiert automatisch zum bestehenden Stake
+      // und claimed automatisch Rewards vor dem neuen Staking
       
       // 1. Aktuelle Allowance prüfen
       let allowance = BigInt(0);
@@ -251,7 +262,7 @@ export default function StakeTab() {
         await new Promise(resolve => setTimeout(resolve, 2000));
       }
       
-      // 3. Stake die Token
+      // 3. Stake die Token (Contract addiert automatisch zum bestehenden Stake)
       console.log("Staking wird durchgeführt...");
       setTxStatus("staking");
       
@@ -466,6 +477,23 @@ export default function StakeTab() {
       {/* Stake Interface */}
       {activeTab === "stake" && (
         <div className="bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl p-6 border border-zinc-700 space-y-6">
+          {/* Wichtiger Hinweis über Auto-Claim */}
+          {parseInt(staked) > 0 && parseFloat(claimableRewards) > 0 && (
+            <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4 mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-5 h-5 rounded-full bg-blue-500/20 flex items-center justify-center">
+                  <span className="text-blue-400 text-xs">ℹ</span>
+                </div>
+                <div className="text-sm text-zinc-300">
+                  <div className="font-medium">Auto-Claim Feature</div>
+                  <div className="text-xs text-zinc-500 mt-1">
+                    Beim Hinzufügen von Token werden verfügbare Rewards ({claimableRewards} D.FAITH) automatisch ausgezahlt.
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Eingabe und verfügbare Balance in einer Zeile */}
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between mb-1">
@@ -489,12 +517,12 @@ export default function StakeTab() {
               value={stakeAmount}
               onChange={(e) => {
                 const value = e.target.value;
-                // Nur positive ganze Zahlen erlauben
+                // Nur positive ganze Zahlen erlauben, mindestens 1
                 if (value === "" || (Number(value) >= 0 && Number.isInteger(Number(value)))) {
                   setStakeAmount(value);
                 }
               }}
-              min="0"
+              min="1"
               step="1"
             />
           </div>
@@ -514,11 +542,15 @@ export default function StakeTab() {
           >
             <FaLock className="inline mr-2" />
             {txStatus === "approving" && "Approval läuft..."}
-            {txStatus === "staking" && "Staking läuft..."}
+            {txStatus === "staking" && (parseInt(staked) > 0 ? "Token hinzufügen..." : "Staking läuft...")}
             {txStatus === "pending" && "Wird verarbeitet..."}
-            {!txStatus && (!stakeAmount || parseInt(stakeAmount) <= 0) && "Betrag eingeben"}
+            {!txStatus && (!stakeAmount || parseInt(stakeAmount) <= 0) && "Betrag eingeben (min. 1)"}
             {!txStatus && stakeAmount && parseInt(stakeAmount) > parseInt(available) && "Nicht genügend Token"}
-            {!txStatus && stakeAmount && parseInt(stakeAmount) > 0 && parseInt(stakeAmount) <= parseInt(available) && `${stakeAmount} D.INVEST staken`}
+            {!txStatus && stakeAmount && parseInt(stakeAmount) > 0 && parseInt(stakeAmount) <= parseInt(available) && (
+              parseInt(staked) > 0 
+                ? `${stakeAmount} D.INVEST hinzufügen` 
+                : `${stakeAmount} D.INVEST staken`
+            )}
           </Button>
 
         {/* Status kompakt als Info-Box */}
