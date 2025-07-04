@@ -113,7 +113,7 @@ export default function SendTab() {
           >
             {tokenOptions.map((t) => (
               <option key={t.key} value={t.key} className="bg-zinc-900 text-zinc-200">
-                {t.label} - {isLoadingBalances ? "Laden..." : t.balance} verfügbar
+                {t.label} - {t.balance} verfügbar
               </option>
             ))}
           </select>
@@ -134,16 +134,12 @@ export default function SendTab() {
           </div>
           <div className="text-right">
             <div className="text-sm font-bold text-amber-400">
-              {isLoadingBalances ? (
-                <span className="inline-flex items-center gap-1">
-                  <span className="opacity-75">
-                    {tokenOptions.find(t => t.key === selectedToken)?.balance}
-                  </span>
-                  <span className="animate-spin text-xs">↻</span>
-                </span>
-              ) : (
-                tokenOptions.find(t => t.key === selectedToken)?.balance
-              )}
+              <span className="inline-flex items-center gap-1">
+                {tokenOptions.find(t => t.key === selectedToken)?.balance}
+                {isLoadingBalances && (
+                  <span className="animate-spin text-xs opacity-60">↻</span>
+                )}
+              </span>
             </div>
             <div className="text-xs text-zinc-500">Verfügbar</div>
           </div>
@@ -155,20 +151,13 @@ export default function SendTab() {
         <div className="flex justify-between items-center">
           <label className="text-sm font-medium text-zinc-300">Betrag:</label>
           <div className="text-xs text-zinc-500">
-            Verfügbar: <span className="text-amber-400 font-semibold">
-              {isLoadingBalances ? (
-                <span className="inline-flex items-center gap-1">
-                  <span className="opacity-75">
-                    {selectedToken === "DFAITH" ? dfaithBalance : 
-                     selectedToken === "DINVEST" ? dinvestBalance : polBalance}
-                  </span>
-                  <span className="animate-spin text-xs">↻</span>
-                </span>
-              ) : (
-                <>
-                  {selectedToken === "DFAITH" ? dfaithBalance : 
-                   selectedToken === "DINVEST" ? dinvestBalance : polBalance} {selectedToken}
-                </>
+            Verfügbar: <span className="text-amber-400 font-semibold inline-flex items-center gap-1">
+              <span>
+                {selectedToken === "DFAITH" ? dfaithBalance : 
+                 selectedToken === "DINVEST" ? dinvestBalance : polBalance} {selectedToken}
+              </span>
+              {isLoadingBalances && (
+                <span className="animate-spin text-xs opacity-60">↻</span>
               )}
             </span>
           </div>
