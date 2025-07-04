@@ -178,6 +178,30 @@ export default function WalletTab() {
     const currentRequestId = ++requestIdRef.current;
     
     try {
+      // Lade gespeicherte Preise falls noch nicht geladen
+      if (dfaithPriceEur <= 0 || !lastKnownPrices.dfaithEur) {
+        try {
+          const stored = localStorage.getItem('dawid_faith_prices');
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            const now = Date.now();
+            // Verwende gespeicherte Preise wenn sie weniger als 6 Stunden alt sind
+            if (parsed.timestamp && (now - parsed.timestamp) < 6 * 60 * 60 * 1000) {
+              setLastKnownPrices(parsed);
+              if (parsed.dfaithEur && dfaithPriceEur <= 0) {
+                setDfaithPriceEur(parsed.dfaithEur);
+                console.log('Gespeicherten D.FAITH Preis bei Balance-Update geladen:', parsed.dfaithEur);
+              }
+              if (parsed.polEur && polPriceEur <= 0) {
+                setPolPriceEur(parsed.polEur);
+              }
+            }
+          }
+        } catch (e) {
+          console.log('Fehler beim Laden gespeicherter Preise in fetchTokenBalances:', e);
+        }
+      }
+
       // Alle Token-Balances via Insight API laden
       const [dfaithValue, dinvestValue, polValue] = await Promise.all([
         fetchTokenBalanceViaInsightApi(DFAITH_TOKEN.address, account.address),
@@ -201,14 +225,33 @@ export default function WalletTab() {
       
       // EUR-Wert sofort berechnen mit aktuellen Preisen
       if (dfaithPriceEur > 0) {
-        fetchDfaithEurValue(dfaithDisplay);
-        console.log('EUR-Wert nach Balance-Update berechnet:', { 
-          balance: dfaithDisplay, 
-          price: dfaithPriceEur,
-          eurValue: parseFloat(dfaithDisplay) * dfaithPriceEur 
-        });
+        const balanceFloat = parseFloat(dfaithDisplay);
+        if (balanceFloat > 0) {
+          const eurValue = balanceFloat * dfaithPriceEur;
+          setDfaithEurValue(eurValue.toFixed(2));
+          console.log('EUR-Wert nach Balance-Update berechnet:', { 
+            balance: dfaithDisplay, 
+            price: dfaithPriceEur,
+            eurValue: eurValue 
+          });
+        } else {
+          setDfaithEurValue("0.00");
+        }
       } else {
         console.log('Kein D.FAITH Preis verfügbar für EUR-Berechnung:', dfaithPriceEur);
+        // Versuche gespeicherte Preise zu verwenden
+        if (lastKnownPrices.dfaithEur && lastKnownPrices.dfaithEur > 0) {
+          const balanceFloat = parseFloat(dfaithDisplay);
+          if (balanceFloat > 0) {
+            const eurValue = balanceFloat * lastKnownPrices.dfaithEur;
+            setDfaithEurValue(eurValue.toFixed(2));
+            console.log('EUR-Wert mit gespeichertem Preis berechnet:', { 
+              balance: dfaithDisplay, 
+              storedPrice: lastKnownPrices.dfaithEur,
+              eurValue: eurValue 
+            });
+          }
+        }
       }
 
       // Debug-Ausgabe für D.INVEST API-Antwort
@@ -581,46 +624,39 @@ export default function WalletTab() {
 
   const formatAddress = (address: string) => `${address.slice(0, 6)}...${address.slice(-4)}`;
 
-  // D.FAITH Wert in EUR berechnen basierend auf aktuellen Preisen
-  const fetchDfaithEurValue = (balance: string) => {
-    try {
-      const balanceFloat = parseFloat(balance);
-      if (balanceFloat <= 0 || dfaithPriceEur <= 0) {
-        setDfaithEurValue("0.00");
-        return;
-      }
-
-      // Verwende den aktuellen D.FAITH EUR Preis nur wenn vorhanden
-      const eurValue = balanceFloat * dfaithPriceEur;
-      setDfaithEurValue(eurValue.toFixed(2));
-      
-    } catch (error) {
-      console.error("Fehler beim Berechnen des D.FAITH EUR-Wertes:", error);
-      setDfaithEurValue("0.00");
-    }
-  };
-
   // EUR-Wert neu berechnen wenn sich Preis oder Balance ändert
   useEffect(() => {
-    if (dfaithBalance?.displayValue && dfaithPriceEur > 0) {
-      console.log('EUR-Wert Update triggered:', { 
-        balance: dfaithBalance.displayValue, 
-        priceEur: dfaithPriceEur,
-        currentEurValue: dfaithEurValue 
-      });
+    if (dfaithBalance?.displayValue) {
       const balanceFloat = parseFloat(dfaithBalance.displayValue);
+      
       if (balanceFloat > 0) {
-        const eurValue = balanceFloat * dfaithPriceEur;
-        setDfaithEurValue(eurValue.toFixed(2));
-        console.log('EUR-Wert neu gesetzt:', eurValue.toFixed(2));
+        // Verwende aktuellen Preis oder gespeicherten Preis als Fallback
+        let priceToUse = dfaithPriceEur;
+        
+        if (priceToUse <= 0 && lastKnownPrices.dfaithEur && lastKnownPrices.dfaithEur > 0) {
+          priceToUse = lastKnownPrices.dfaithEur;
+          console.log('Verwende gespeicherten Preis für EUR-Berechnung:', priceToUse);
+        }
+        
+        if (priceToUse > 0) {
+          const eurValue = balanceFloat * priceToUse;
+          setDfaithEurValue(eurValue.toFixed(2));
+          console.log('EUR-Wert neu gesetzt:', { 
+            balance: dfaithBalance.displayValue, 
+            priceUsed: priceToUse,
+            eurValue: eurValue.toFixed(2)
+          });
+        } else {
+          setDfaithEurValue("0.00");
+          console.log('Kein Preis verfügbar für EUR-Berechnung');
+        }
+      } else {
+        setDfaithEurValue("0.00");
       }
     } else {
-      console.log('EUR-Wert Update übersprungen:', {
-        hasBalance: !!dfaithBalance?.displayValue,
-        priceEur: dfaithPriceEur
-      });
+      console.log('EUR-Wert Update übersprungen - keine Balance verfügbar');
     }
-  }, [dfaithPriceEur, dfaithBalance?.displayValue]);
+  }, [dfaithPriceEur, dfaithBalance?.displayValue, lastKnownPrices.dfaithEur]);
 
   // Entferne fetchTokenBalanceViaContract komplett (nicht mehr benötigt)
 
