@@ -471,7 +471,17 @@ export default function WalletTab() {
 
       // Setze Preise (entweder neue oder Fallback)
       if (polEur) setPolPriceEur(polEur);
-      if (dfaithPriceEur) setDfaithPriceEur(dfaithPriceEur);
+      if (dfaithPriceEur) {
+        setDfaithPriceEur(dfaithPriceEur);
+        // EUR-Wert sofort nach Preis-Update neu berechnen
+        if (dfaithBalance?.displayValue) {
+          const balanceFloat = parseFloat(dfaithBalance.displayValue);
+          if (balanceFloat > 0) {
+            const eurValue = balanceFloat * dfaithPriceEur;
+            setDfaithEurValue(eurValue.toFixed(2));
+          }
+        }
+      }
 
       // Speichere erfolgreiche Preise
       if (dfaithPriceEur && polEur) {
@@ -483,7 +493,7 @@ export default function WalletTab() {
         setLastKnownPrices(prev => ({ ...prev, ...newPrices }));
         try {
           localStorage.setItem('dawid_faith_prices', JSON.stringify(newPrices));
-          console.log('Preise erfolgreich gespeichert');
+          console.log('Preise erfolgreich gespeichert:', newPrices);
         } catch (e) {
           console.log('Fehler beim Speichern der Preise:', e);
         }
@@ -535,7 +545,7 @@ export default function WalletTab() {
   const formatAddress = (address: string) => `${address.slice(0, 6)}...${address.slice(-4)}`;
 
   // D.FAITH Wert in EUR berechnen basierend auf aktuellen Preisen
-  const fetchDfaithEurValue = async (balance: string) => {
+  const fetchDfaithEurValue = (balance: string) => {
     try {
       const balanceFloat = parseFloat(balance);
       if (balanceFloat <= 0 || dfaithPriceEur <= 0) {
@@ -555,7 +565,12 @@ export default function WalletTab() {
 
   // EUR-Wert neu berechnen wenn sich Preis oder Balance ändert
   useEffect(() => {
-    if (dfaithBalance?.displayValue) {
+    if (dfaithBalance?.displayValue && dfaithPriceEur > 0) {
+      console.log('EUR-Wert Update:', { 
+        balance: dfaithBalance.displayValue, 
+        priceEur: dfaithPriceEur,
+        currentEurValue: dfaithEurValue 
+      });
       fetchDfaithEurValue(dfaithBalance.displayValue);
     }
   }, [dfaithPriceEur, dfaithBalance?.displayValue]);
@@ -713,8 +728,8 @@ export default function WalletTab() {
                   <span className="ml-2 text-xs text-amber-500/60 animate-pulse">↻</span>
                 )}
               </div>
-              {/* Nur EUR-Wert anzeigen, wenn Preisquote vorhanden ist */}
-              {dfaithPriceEur > 0 && (
+              {/* EUR-Wert anzeigen, wenn Preisquote vorhanden ist und EUR-Wert > 0 */}
+              {dfaithPriceEur > 0 && parseFloat(dfaithEurValue) > 0 && (
                 <div className="text-xs text-zinc-500 mt-2">
                   ≈ {dfaithEurValue} EUR
                 </div>
