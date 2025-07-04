@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Button } from "../../../../components/ui/button";
 import { FaLock, FaUnlock, FaCoins, FaClock } from "react-icons/fa";
 import { useActiveAccount } from "thirdweb/react";
@@ -31,6 +31,8 @@ export default function StakeTab() {
   const [userCount, setUserCount] = useState(0);
   const [dfaithBalance, setDfaithBalance] = useState("0.00");
   const [dinvestBalance, setDinvestBalance] = useState("0");
+  const [lastClaimed, setLastClaimed] = useState<number>(0);
+  const [blockTimestamp, setBlockTimestamp] = useState<number>(0);
 
   // Korrekte API-Funktion für Balance-Abfrage  
   const fetchTokenBalanceViaInsightApi = async (
@@ -91,11 +93,12 @@ export default function StakeTab() {
             method: "function stakers(address) view returns (uint256, uint256)",
             params: [account.address]
           });
-          // stakeInfo[0] ist amount, stakeInfo[1] ist lastClaimed
           setStaked(stakeInfo[0].toString());
+          setLastClaimed(Number(stakeInfo[1]));
         } catch (e) {
           console.error("Fehler beim Abrufen der Stake Info:", e);
           setStaked("0");
+          setLastClaimed(0);
         }
         
         // Claimable Rewards abrufen
@@ -146,11 +149,31 @@ export default function StakeTab() {
           console.error("Fehler beim Abrufen der Contract Stats:", e);
         }
         
+        // Hole aktuellen Blocktimestamp (für Zeitberechnung)
+        try {
+          const res = await fetch("https://polygon-rpc.com", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              jsonrpc: "2.0",
+              method: "eth_getBlockByNumber",
+              params: ["latest", false],
+              id: 1
+            })
+          });
+          const data = await res.json();
+          setBlockTimestamp(parseInt(data.result.timestamp, 16));
+        } catch (e) {
+          setBlockTimestamp(Math.floor(Date.now() / 1000));
+        }
+        
       } catch (e) {
         console.error("Fehler beim Abrufen der Daten:", e);
         setAvailable("0"); 
         setStaked("0"); 
         setClaimableRewards("0.00");
+        setLastClaimed(0);
+        setBlockTimestamp(Math.floor(Date.now() / 1000));
       } finally {
         setLoading(false);
       }
@@ -300,8 +323,8 @@ export default function StakeTab() {
 
   // Unstake Function (unstakes all)
   const handleUnstake = async () => {
-    if (!account?.address || staked === "0") {
-      console.log("Keine Token zum Unstaken verfügbar");
+    if (!account?.address || staked === "0" || !weekPassed) {
+      console.log("Keine Token zum Unstaken verfügbar oder Mindestzeit nicht erreicht");
       return;
     }
     
@@ -344,8 +367,8 @@ export default function StakeTab() {
 
   // Claim Rewards Function
   const handleClaim = async () => {
-    if (!account?.address || parseFloat(claimableRewards) <= 0) {
-      console.log("Keine Rewards zum Einfordern verfügbar");
+    if (!account?.address || parseFloat(claimableRewards) <= 0 || !weekPassed) {
+      console.log("Keine Rewards zum Einfordern verfügbar oder Mindestzeit nicht erreicht");
       return;
     }
     
@@ -397,6 +420,12 @@ export default function StakeTab() {
     const stakedNum = parseInt(staked) || 0;
     return ((stakedNum * currentRewardRate) / 100).toFixed(2);
   };
+
+  // Hilfsfunktion: Ist eine Woche vorbei?
+  const weekPassed = useMemo(() => {
+    if (!lastClaimed) return false;
+    return blockTimestamp >= lastClaimed + 7 * 24 * 60 * 60;
+  }, [blockTimestamp, lastClaimed]);
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -613,13 +642,14 @@ export default function StakeTab() {
 
           <Button 
             className="w-full bg-zinc-700/50 hover:bg-zinc-600/50 text-zinc-300 font-bold py-3 rounded-xl border border-zinc-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={staked === "0" || loading || txStatus === "pending"}
+            disabled={staked === "0" || loading || txStatus === "pending" || !weekPassed}
             onClick={handleUnstake}
           >
             <FaUnlock className="inline mr-2" />
             {txStatus === "pending" && "Wird verarbeitet..."}
             {!txStatus && staked === "0" && "Keine Token gestaked"}
-            {!txStatus && staked !== "0" && `Alle ${staked} D.INVEST unstaken`}
+            {!txStatus && staked !== "0" && !weekPassed && "Mindestens 1 Woche Staking-Zeit erforderlich"}
+            {!txStatus && staked !== "0" && weekPassed && `Alle ${staked} D.INVEST unstaken`}
           </Button>
         </div>
       )}
@@ -644,11 +674,11 @@ export default function StakeTab() {
         
         <Button 
           className="w-full bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-3 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
-          disabled={parseFloat(claimableRewards) <= 0 || loading || txStatus === "pending"}
+          disabled={parseFloat(claimableRewards) <= 0 || loading || txStatus === "pending" || !weekPassed}
           onClick={handleClaim}
         >
           <FaCoins className="inline mr-2" />
-          {txStatus === "pending" ? "Wird verarbeitet..." : "Belohnungen einfordern"}
+          {txStatus === "pending" ? "Wird verarbeitet..." : !weekPassed ? "Mindestens 1 Woche Staking-Zeit erforderlich" : "Belohnungen einfordern"}
         </Button>
         {/* Erfolgsmeldung hier ENTFERNT */}
         {(txStatus === "success" || txStatus === "error" || txStatus === "pending") && (
