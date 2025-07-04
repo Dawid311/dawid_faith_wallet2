@@ -199,7 +199,17 @@ export default function WalletTab() {
       // Gestakte Balance aus Staking Contract abrufen
       await fetchStakedBalance();
       
-      fetchDfaithEurValue(dfaithDisplay);
+      // EUR-Wert sofort berechnen mit aktuellen Preisen
+      if (dfaithPriceEur > 0) {
+        fetchDfaithEurValue(dfaithDisplay);
+        console.log('EUR-Wert nach Balance-Update berechnet:', { 
+          balance: dfaithDisplay, 
+          price: dfaithPriceEur,
+          eurValue: parseFloat(dfaithDisplay) * dfaithPriceEur 
+        });
+      } else {
+        console.log('Kein D.FAITH Preis verfügbar für EUR-Berechnung:', dfaithPriceEur);
+      }
 
       // Debug-Ausgabe für D.INVEST API-Antwort
       console.debug("DINVEST Insight API Wert (raw):", dinvestValue);
@@ -258,32 +268,59 @@ export default function WalletTab() {
   // UseEffect für initiales Laden und periodische Aktualisierung (alle 30 Sekunden)
   useEffect(() => {
     let isMounted = true;
-    let intervalId: NodeJS.Timeout | null = null;
+    let balanceIntervalId: NodeJS.Timeout | null = null;
+    let priceIntervalId: NodeJS.Timeout | null = null;
     
-    const loadData = async () => {
+    const loadBalances = async () => {
       if (!account?.address || !isMounted) return;
       
       console.log("🔄 Starte automatische Balance-Aktualisierung...");
       await fetchTokenBalances();
+    };
+    
+    const loadPrices = async () => {
+      if (!account?.address || !isMounted) return;
+      
+      console.log("💰 Starte Preis-Aktualisierung...");
       await fetchDfaithPrice();
     };
     
-    // Initiales Laden
-    loadData();
+    const loadDataWithPrices = async () => {
+      if (!account?.address || !isMounted) return;
+      
+      console.log("🔄 Starte vollständige Aktualisierung (mit Preisen)...");
+      await fetchTokenBalances();
+      await fetchDfaithPrice();
+    };
     
-    // Regelmäßige Aktualisierung alle 30 Sekunden
-    intervalId = setInterval(() => {
+    // Initiales Laden mit Preisen
+    loadDataWithPrices();
+    
+    // Regelmäßige Balance-Aktualisierung alle 30 Sekunden
+    balanceIntervalId = setInterval(() => {
       if (isMounted && account?.address) {
         console.log("⏰ 30-Sekunden-Intervall: Lade Balances neu...");
-        loadData();
+        loadBalances();
       }
     }, 30000); // 30 Sekunden
     
+    // Separate Preis-Aktualisierung alle 5 Minuten
+    priceIntervalId = setInterval(() => {
+      if (isMounted && account?.address) {
+        console.log("💰 5-Minuten-Intervall: Lade Preise neu...");
+        loadPrices();
+      }
+    }, 5 * 60 * 1000); // 5 Minuten
+    
     return () => {
       isMounted = false;
-      if (intervalId) {
-        clearInterval(intervalId);
+      if (balanceIntervalId) {
+        clearInterval(balanceIntervalId);
         console.log("🛑 Balance-Aktualisierung gestoppt");
+      }
+      if (priceIntervalId) {
+        clearInterval(priceIntervalId);
+        console.log("🛑 Preis-Aktualisierung gestoppt");
       }
     };
   }, [account?.address]);
@@ -566,12 +603,22 @@ export default function WalletTab() {
   // EUR-Wert neu berechnen wenn sich Preis oder Balance ändert
   useEffect(() => {
     if (dfaithBalance?.displayValue && dfaithPriceEur > 0) {
-      console.log('EUR-Wert Update:', { 
+      console.log('EUR-Wert Update triggered:', { 
         balance: dfaithBalance.displayValue, 
         priceEur: dfaithPriceEur,
         currentEurValue: dfaithEurValue 
       });
-      fetchDfaithEurValue(dfaithBalance.displayValue);
+      const balanceFloat = parseFloat(dfaithBalance.displayValue);
+      if (balanceFloat > 0) {
+        const eurValue = balanceFloat * dfaithPriceEur;
+        setDfaithEurValue(eurValue.toFixed(2));
+        console.log('EUR-Wert neu gesetzt:', eurValue.toFixed(2));
+      }
+    } else {
+      console.log('EUR-Wert Update übersprungen:', {
+        hasBalance: !!dfaithBalance?.displayValue,
+        priceEur: dfaithPriceEur
+      });
     }
   }, [dfaithPriceEur, dfaithBalance?.displayValue]);
 
@@ -728,8 +775,11 @@ export default function WalletTab() {
                   <span className="ml-2 text-xs text-amber-500/60 animate-pulse">↻</span>
                 )}
               </div>
-              {/* EUR-Wert anzeigen, wenn Preisquote vorhanden ist und EUR-Wert > 0 */}
-              {dfaithPriceEur > 0 && parseFloat(dfaithEurValue) > 0 && (
+              {/* EUR-Wert anzeigen, wenn sowohl Balance als auch Preis vorhanden sind */}
+              {dfaithBalance?.displayValue && 
+               parseFloat(dfaithBalance.displayValue) > 0 && 
+               dfaithPriceEur > 0 && 
+               parseFloat(dfaithEurValue) > 0 && (
                 <div className="text-xs text-zinc-500 mt-2">
                   ≈ {dfaithEurValue} EUR
                 </div>
