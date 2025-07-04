@@ -634,7 +634,12 @@ export default function StakeTab() {
                 <div className="font-medium">Vollständiges Unstaking</div>
                 <div className="text-xs text-zinc-500 mt-1">
                   Alle gestakten Token ({staked} D.INVEST) werden unstaked.
-                  Rewards werden automatisch ausgezahlt.
+                  Unstaking ist nur nach mindestens 1 Woche möglich.
+                  {!weekPassed && lastClaimed > 0 && (
+                    <span className="block text-orange-400 mt-1">
+                      Unstaking möglich in: {getTimeUntilNextClaim()}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -655,13 +660,14 @@ export default function StakeTab() {
 
           <Button 
             className="w-full bg-zinc-700/50 hover:bg-zinc-600/50 text-zinc-300 font-bold py-3 rounded-xl border border-zinc-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={staked === "0" || loading || txStatus === "pending"}
+            disabled={staked === "0" || loading || txStatus === "pending" || !weekPassed}
             onClick={handleUnstake}
           >
             <FaUnlock className="inline mr-2" />
             {txStatus === "pending" && "Wird verarbeitet..."}
             {!txStatus && staked === "0" && "Keine Token gestaked"}
-            {!txStatus && staked !== "0" && `Alle ${staked} D.INVEST unstaken`}
+            {!txStatus && staked !== "0" && !weekPassed && `Warten: ${getTimeUntilNextClaim()}`}
+            {!txStatus && staked !== "0" && weekPassed && `Alle ${staked} D.INVEST unstaken`}
           </Button>
         </div>
       )}

@@ -213,19 +213,7 @@ export default function HistoryTab() {
         <h2 className="text-2xl font-bold bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 bg-clip-text text-transparent mb-2">
           Transaktionshistorie
         </h2>
-        <p className="text-zinc-400 mb-3">Polygonscan API Integration - Live Daten</p>
-        <div className="bg-gradient-to-r from-zinc-800/50 to-zinc-900/50 rounded-lg p-3 border border-zinc-700">
-          <p className="text-xs text-zinc-500 mb-1">Überwachte Wallet-Adresse:</p>
-          <p className="text-amber-400 font-mono text-sm break-all">
-            {userAddress}
-          </p>
-          {account?.address && userAddress !== targetAddress && (
-            <p className="text-xs text-green-400 mt-2">✓ Verbundene Wallet wird verwendet</p>
-          )}
-          {!account?.address && (
-            <p className="text-xs text-blue-400 mt-2">📍 Feste Demo-Adresse wird angezeigt</p>
-          )}
-        </div>
+        <p className="text-zinc-400">Polygonscan API Integration - Live Daten</p>
       </div>
 
       {/* Loading State */}

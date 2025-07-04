@@ -642,17 +642,17 @@ export default function BuyTab() {
                     <span>{polBalance}</span>
                     <span className="text-xs font-normal ml-1">POL</span>
                   </div>
-                  {/* POL Input */}
+                  {/* POL Input - jetzt mit mehr Platz */}
                   <input
                     type="number"
                     min="0"
                     step="0.001"
                     placeholder="Betrag"
-                    className="flex-1 bg-zinc-800 border border-zinc-600 rounded-lg py-3 px-3 text-base font-bold text-purple-400 focus:border-amber-500 focus:outline-none"
+                    className="flex-grow bg-zinc-800 border border-zinc-600 rounded-lg py-3 px-3 text-base font-bold text-purple-400 focus:border-amber-500 focus:outline-none"
                     value={swapAmountPol}
                     onChange={e => setSwapAmountPol(e.target.value)}
                     disabled={isSwapping || buyStep !== 'initial'}
-                    style={{ minWidth: 0 }}
+                    style={{ minWidth: '120px' }}
                   />
                   <button
                     className="text-xs px-2 py-2 bg-purple-500/20 text-purple-400 rounded hover:bg-purple-500/30 transition font-bold"
@@ -660,14 +660,14 @@ export default function BuyTab() {
                     disabled={isSwapping || parseFloat(polBalance) <= 0 || buyStep !== 'initial'}
                     style={{ minWidth: 'unset' }}
                   >MAX</button>
-                  {/* Slippage Input */}
+                  {/* Slippage Input - jetzt kleiner */}
                   <input
                     type="number"
                     min="0.1"
                     max="50"
                     step="0.1"
-                    placeholder="Slippage %"
-                    className="w-20 bg-zinc-800 border border-zinc-600 rounded-lg py-3 px-2 text-sm text-zinc-300 focus:border-amber-500 focus:outline-none"
+                    placeholder="%"
+                    className="w-14 bg-zinc-800 border border-zinc-600 rounded-lg py-3 px-1 text-sm text-zinc-300 focus:border-amber-500 focus:outline-none text-center"
                     value={slippage}
                     onChange={e => setSlippage(e.target.value)}
                     disabled={isSwapping || buyStep !== 'initial'}
