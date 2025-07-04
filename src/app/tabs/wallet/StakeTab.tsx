@@ -184,33 +184,43 @@ export default function StakeTab() {
     })();
   }, [account?.address]);
 
-  // Stake Function
+  // Stake Function (echtes Staking mit Approval-Check)
   const handleStake = async () => {
-    if (!stakeAmount || parseInt(stakeAmount) <= 0) return;
+    if (!stakeAmount || parseInt(stakeAmount) <= 0 || !account?.address) return;
     setTxStatus("pending");
     try {
       const staking = getContract({ client, chain: polygon, address: STAKING_CONTRACT });
       const dinvest = getContract({ client, chain: polygon, address: DINVEST_TOKEN });
-      
-      // D.INVEST hat 0 decimals
       const amountToStake = BigInt(parseInt(stakeAmount));
-      
-      // 1. Approve den Staking Contract
-      const approveTx = prepareContractCall({
-        contract: dinvest,
-        method: "function approve(address,uint256) returns (bool)",
-        params: [STAKING_CONTRACT, amountToStake]
-      });
-      await sendTransaction(approveTx);
-      
-      // 2. Stake die Token
+      // 1. Allowance prüfen
+      let allowance = BigInt(0);
+      try {
+        allowance = await readContract({
+          contract: dinvest,
+          method: "function allowance(address,address) view returns (uint256)",
+          params: [account.address, STAKING_CONTRACT]
+        });
+      } catch (e) {
+        allowance = BigInt(0);
+      }
+      // 2. Approve, falls nötig
+      if (allowance < amountToStake) {
+        setTxStatus("approving");
+        const approveTx = prepareContractCall({
+          contract: dinvest,
+          method: "function approve(address,uint256) returns (bool)",
+          params: [STAKING_CONTRACT, amountToStake]
+        });
+        await sendTransaction(approveTx);
+      }
+      // 3. Stake die Token
+      setTxStatus("staking");
       const stakeTx = prepareContractCall({
         contract: staking,
         method: "function stake(uint256)",
         params: [amountToStake]
       });
       await sendTransaction(stakeTx);
-      
       setTxStatus("success");
       setStakeAmount("");
     } catch (e) {
@@ -280,12 +290,6 @@ export default function StakeTab() {
         <p className="text-zinc-400">Verdienen Sie wöchentlich D.FAITH Token durch Staking</p>
       </div>
 
-      {/* Balance Anzeige */}
-      <div className="mb-4">
-        <div className="text-sm text-zinc-400">D.FAITH Balance: <span className="text-amber-400 font-bold">{dfaithBalance}</span></div>
-        <div className="text-sm text-zinc-400">D.INVEST Balance: <span className="text-amber-400 font-bold">{dinvestBalance}</span></div>
-      </div>
-
       {/* Staking Overview: Verfügbar, Gestaked, Reward */}
       <div className="grid grid-cols-3 gap-4 mb-6">
         <div className="bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl p-4 border border-zinc-700 text-center">
@@ -302,9 +306,9 @@ export default function StakeTab() {
           </div>
           <div className="text-xs text-zinc-500">D.INVEST</div>
         </div>
-        <div className="bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl p-4 border border-zinc-700 text-center">
-          <div className="text-sm text-zinc-500 mb-1">Reward/Woche</div>
-          <div className="text-xl font-bold text-green-400">
+        <div className="bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl p-4 border border-zinc-700 text-center flex flex-col items-center justify-center">
+          <div className="text-sm text-zinc-500 mb-1 whitespace-nowrap">Reward/Woche</div>
+          <div className="text-xl font-bold text-green-400 break-words max-w-full" style={{wordBreak:'break-word'}}>
             {getUserWeeklyReward()}
           </div>
           <div className="text-xs text-zinc-500">D.FAITH</div>
@@ -408,6 +412,12 @@ export default function StakeTab() {
           )}
           {txStatus === "pending" && (
             <div className="mt-2 text-yellow-400 text-sm text-center">Transaktion läuft...</div>
+          )}
+          {txStatus === "approving" && (
+            <div className="mt-2 text-orange-400 text-sm text-center">Approval wird durchgeführt...</div>
+          )}
+          {txStatus === "staking" && (
+            <div className="mt-2 text-purple-400 text-sm text-center">Staking wird durchgeführt...</div>
           )}
         </div>
       )}
