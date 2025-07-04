@@ -602,12 +602,12 @@ export default function BuyTab() {
             <div className="fixed inset-0 z-50 flex items-center justify-center min-h-screen bg-black/60 overflow-y-auto">
               <div
                 ref={dfaithBuyModalRef}
-                className="bg-zinc-900 rounded-xl p-3 sm:p-6 max-w-md w-full mx-2 sm:mx-4 border border-amber-400 my-4 max-h-[90vh] overflow-y-auto flex flex-col"
+                className="bg-zinc-900 rounded-xl p-2 sm:p-4 max-w-xs w-full mx-2 border border-amber-400 my-2 max-h-[85vh] overflow-y-auto flex flex-col"
                 style={{ boxSizing: 'border-box' }}
               >
                 {/* Header mit Close Button */}
-                <div className="flex items-center justify-between mb-4 sm:mb-6">
-                  <h3 className="text-lg sm:text-2xl font-bold text-amber-400">D.FAITH kaufen</h3>
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-base sm:text-lg font-bold text-amber-400">D.FAITH kaufen</h3>
                   <button
                     onClick={() => {
                       setShowDfaithBuyModal(false);
@@ -620,145 +620,73 @@ export default function BuyTab() {
                       setNeedsApproval(false);
                       setQuoteError(null);
                     }}
-                    className="p-2 text-amber-400 hover:text-yellow-300 hover:bg-zinc-800 rounded-lg transition-all flex-shrink-0"
+                    className="p-1 text-amber-400 hover:text-yellow-300 hover:bg-zinc-800 rounded-lg transition-all flex-shrink-0"
                     disabled={isSwapping}
                   >
-                    <span className="text-lg">✕</span>
+                    <span className="text-base">✕</span>
                   </button>
                 </div>
                 
                 {/* Prozessschritte anzeigen */}
-                <div className="mb-4 flex justify-between">
-                  <div className={`text-xs ${buyStep !== 'initial' ? 'text-green-400' : 'text-zinc-500'}`}>
-                    1. Quote {buyStep !== 'initial' ? '✓' : ''}
-                  </div>
-                  <div className={`text-xs ${buyStep === 'approved' || buyStep === 'completed' ? 'text-green-400' : 'text-zinc-500'}`}>
-                    2. Approve {buyStep === 'approved' || buyStep === 'completed' ? '✓' : needsApproval ? '' : '(nicht nötig)'}
-                  </div>
-                  <div className={`text-xs ${buyStep === 'completed' ? 'text-green-400' : 'text-zinc-500'}`}>
-                    3. Swap {buyStep === 'completed' ? '✓' : ''}
-                  </div>
+                <div className="mb-2 flex justify-between text-[11px]">
+                  <div className={` ${buyStep !== 'initial' ? 'text-green-400' : 'text-zinc-500'}`}>1. Quote {buyStep !== 'initial' ? '✓' : ''}</div>
+                  <div className={` ${buyStep === 'approved' || buyStep === 'completed' ? 'text-green-400' : 'text-zinc-500'}`}>2. Approve {buyStep === 'approved' || buyStep === 'completed' ? '✓' : needsApproval ? '' : '(nötig)'}</div>
+                  <div className={` ${buyStep === 'completed' ? 'text-green-400' : 'text-zinc-500'}`}>3. Swap {buyStep === 'completed' ? '✓' : ''}</div>
                 </div>
-                
-                {/* POL Balance */}
-                <div className="mb-4 p-3 bg-zinc-800/50 rounded-lg">
-                  <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
-                    <span className="text-sm text-zinc-400">Verfügbare POL:</span>
-                    <span className="text-sm text-purple-400 font-bold">{polBalance}</span>
-                  </div>
-                  <div className="text-xs text-zinc-500 mt-1">
-                    Native POL Token für Swaps
-                  </div>
+
+                {/* Kompakte Inputzeile: POL-Balance, Input, Slippage */}
+                <div className="flex gap-1 items-center mb-2 w-full">
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.001"
+                    placeholder={`POL: ${polBalance}`}
+                    className="flex-1 bg-zinc-800 border border-zinc-600 rounded-lg py-2 px-2 text-sm font-bold text-purple-400 focus:border-amber-500 focus:outline-none"
+                    value={swapAmountPol}
+                    onChange={e => setSwapAmountPol(e.target.value)}
+                    disabled={isSwapping || buyStep !== 'initial'}
+                    style={{ minWidth: 0 }}
+                  />
+                  <button
+                    className="text-xs px-2 py-1 bg-purple-500/20 text-purple-400 rounded hover:bg-purple-500/30 transition"
+                    onClick={() => setSwapAmountPol((parseFloat(polBalance) * 0.95).toFixed(3))}
+                    disabled={isSwapping || parseFloat(polBalance) <= 0 || buyStep !== 'initial'}
+                    style={{ minWidth: 'unset' }}
+                  >MAX</button>
+                  <input
+                    type="number"
+                    min="0.1"
+                    max="50"
+                    step="0.1"
+                    placeholder="Slippage %"
+                    className="w-16 bg-zinc-800 border border-zinc-600 rounded-lg py-2 px-2 text-xs text-zinc-300 focus:border-amber-500 focus:outline-none"
+                    value={slippage}
+                    onChange={e => setSlippage(e.target.value)}
+                    disabled={isSwapping || buyStep !== 'initial'}
+                  />
                 </div>
-                
-                {/* Swap Input */}
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-zinc-300 mb-2">POL Betrag</label>
-                  <div className="relative">
-                    <input
-                      type="number"
-                      placeholder="0.0"
-                      className="w-full bg-zinc-800 border border-zinc-600 rounded-xl py-3 px-4 pr-16 text-lg font-bold text-purple-400 focus:border-amber-500 focus:outline-none"
-                      value={swapAmountPol}
-                      onChange={(e) => setSwapAmountPol(e.target.value)}
-                      disabled={isSwapping || buyStep !== 'initial'}
-                    />
-                    <button
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-xs px-2 py-1 bg-purple-500/20 text-purple-400 rounded hover:bg-purple-500/30 transition"
-                      onClick={() => setSwapAmountPol((parseFloat(polBalance) * 0.95).toFixed(3))}
-                      disabled={isSwapping || parseFloat(polBalance) <= 0 || buyStep !== 'initial'}
-                    >
-                      MAX
-                    </button>
-                  </div>
-                  <div className="text-xs text-zinc-500 mt-1">
-                    Native POL wird direkt für den Swap verwendet
-                  </div>
+                <div className="flex justify-between text-[10px] text-zinc-500 mb-2">
+                  <span>Verfügbar: {polBalance} POL</span>
+                  <span>Slippage: {slippage}%</span>
                 </div>
-                
-                {/* Slippage Input */}
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-zinc-300 mb-2">Slippage Toleranz (%)</label>
-                  <div className="flex flex-col sm:flex-row gap-2">
-                    <input
-                      type="number"
-                      placeholder="1"
-                      min="0.1"
-                      max="50"
-                      step="0.1"
-                      className="flex-1 bg-zinc-800 border border-zinc-600 rounded-xl py-2 px-3 text-sm text-zinc-300 focus:border-amber-500 focus:outline-none"
-                      value={slippage}
-                      onChange={(e) => setSlippage(e.target.value)}
-                      disabled={isSwapping || buyStep !== 'initial'}
-                    />
-                    <div className="flex gap-1">
-                      <button
-                        className="text-xs px-2 py-1 bg-zinc-700/50 text-zinc-400 rounded hover:bg-zinc-600/50 transition"
-                        onClick={() => setSlippage("0.5")}
-                        disabled={isSwapping}
-                      >
-                        0.5%
-                      </button>
-                      <button
-                        className="text-xs px-2 py-1 bg-zinc-700/50 text-zinc-400 rounded hover:bg-zinc-600/50 transition"
-                        onClick={() => setSlippage("1")}
-                        disabled={isSwapping}
-                      >
-                        1%
-                      </button>
-                      <button
-                        className="text-xs px-2 py-1 bg-zinc-700/50 text-zinc-400 rounded hover:bg-zinc-600/50 transition"
-                        onClick={() => setSlippage("3")}
-                        disabled={isSwapping}
-                      >
-                        3%
-                      </button>
-                    </div>
-                  </div>
-                  <div className="text-xs text-zinc-500 mt-1">
-                    Höhere Slippage = höhere Erfolgswahrscheinlichkeit, aber weniger Token
-                  </div>
-                </div>
-                
+
                 {/* Estimated Output */}
                 {swapAmountPol && parseFloat(swapAmountPol) > 0 && dfaithPrice && dfaithPriceEur && (
-                  <div className="mb-4 p-3 bg-zinc-800/50 rounded-lg">
-                    <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0 mb-2">
-                      <span className="text-sm text-zinc-400">Geschätzte D.FAITH:</span>
-                      <span className="text-sm text-amber-400 font-bold">
-                        ~{(parseFloat(swapAmountPol) * dfaithPrice).toFixed(2)}
-                      </span>
+                  <div className="mb-2 p-2 bg-zinc-800/50 rounded text-xs">
+                    <div className="flex justify-between mb-1">
+                      <span className="text-zinc-400">~D.FAITH:</span>
+                      <span className="text-amber-400 font-bold">{(parseFloat(swapAmountPol) * dfaithPrice).toFixed(2)}</span>
                     </div>
-                    <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0 mb-2">
-                      <span className="text-sm text-zinc-400">Geschätzter Wert:</span>
-                      <span className="text-sm text-green-400 font-bold">
-                        ~{(parseFloat(swapAmountPol) * dfaithPrice * dfaithPriceEur).toFixed(3)}€
-                      </span>
-                    </div>
-                    <div className="text-xs text-zinc-500 mt-2 pt-2 border-t border-zinc-700/50">
-                      Slippage: {slippage}% | Minimum: ~{(parseFloat(swapAmountPol) * dfaithPrice * (1 - parseFloat(slippage)/100)).toFixed(2)}
+                    <div className="flex justify-between mb-1">
+                      <span className="text-zinc-400">~Wert:</span>
+                      <span className="text-green-400 font-bold">{(parseFloat(swapAmountPol) * dfaithPrice * dfaithPriceEur).toFixed(3)}€</span>
                     </div>
                   </div>
                 )}
-                
-                {/* Info wenn keine POL verfügbar */}
-                {parseFloat(polBalance) <= 0 && (
-                  <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
-                    <div className="flex items-center gap-2">
-                      <span className="text-yellow-400 text-xs">⚠️</span>
-                      <div className="text-sm text-yellow-400">
-                        Sie benötigen POL Token für den Swap
-                      </div>
-                    </div>
-                    <div className="text-xs text-yellow-300/70 mt-1">
-                      Kaufen Sie zuerst POL Token unten über das BuyWidget
-                    </div>
-                  </div>
-                )}
-                
-                {/* Transaction Status */}
+
+                {/* Status/Fehler kompakt */}
                 {swapTxStatus && (
-                  <div className={`mb-4 p-3 rounded-lg text-center ${
+                  <div className={`mb-2 p-2 rounded text-center text-xs ${
                     swapTxStatus === "success" ? "bg-green-500/20 text-green-400" :
                     swapTxStatus === "error" ? "bg-red-500/20 text-red-400" :
                     swapTxStatus === "confirming" ? "bg-blue-500/20 text-blue-400" :
@@ -767,57 +695,21 @@ export default function BuyTab() {
                     swapTxStatus === "swapping" ? "bg-purple-500/20 text-purple-400" :
                     "bg-yellow-500/20 text-yellow-400"
                   }`}>
-                    {swapTxStatus === "success" && (
-                      <div>
-                        <div className="font-bold">🎉 Kauf erfolgreich!</div>
-                        <div className="text-xs mt-1">D.FAITH Token wurden erfolgreich gekauft und verifiziert</div>
-                      </div>
-                    )}
-                    {swapTxStatus === "error" && (
-                      <div>
-                        <div className="font-bold">❌ Kauf fehlgeschlagen!</div>
-                        <div className="text-xs mt-1">{quoteError || "Bitte versuchen Sie es erneut"}</div>
-                      </div>
-                    )}
-                    {swapTxStatus === "confirming" && (
-                      <div>
-                        <div className="font-bold">⏳ Bestätigung läuft...</div>
-                        <div className="text-xs mt-1">Warte auf Blockchain-Bestätigung</div>
-                      </div>
-                    )}
-                    {swapTxStatus === "verifying" && (
-                      <div>
-                        <div className="font-bold">� Verifiziere Kauf...</div>
-                        <div className="text-xs mt-1">Prüfe Balance-Änderung zur Bestätigung</div>
-                      </div>
-                    )}
-                    {swapTxStatus === "approving" && (
-                      <div>
-                        <div className="font-bold">🔐 Token-Berechtigung wird gesetzt...</div>
-                        <div className="text-xs mt-1">Bitte bestätigen Sie in Ihrem Wallet</div>
-                      </div>
-                    )}
-                    {swapTxStatus === "swapping" && (
-                      <div>
-                        <div className="font-bold">🔄 Kauf wird durchgeführt...</div>
-                        <div className="text-xs mt-1">Bitte bestätigen Sie in Ihrem Wallet</div>
-                      </div>
-                    )}
-                    {swapTxStatus === "pending" && (
-                      <div>
-                        <div className="font-bold">📝 Quote wird abgefragt...</div>
-                        <div className="text-xs mt-1">Bitte warten Sie einen Moment</div>
-                      </div>
-                    )}
+                    {swapTxStatus === "success" && <div><b>🎉 Kauf erfolgreich!</b><div className="mt-1">D.FAITH gekauft</div></div>}
+                    {swapTxStatus === "error" && <div><b>❌ Kauf fehlgeschlagen!</b><div className="mt-1">{quoteError || "Bitte erneut versuchen"}</div></div>}
+                    {swapTxStatus === "confirming" && <div><b>⏳ Bestätigung...</b></div>}
+                    {swapTxStatus === "verifying" && <div><b>🔎 Verifiziere...</b></div>}
+                    {swapTxStatus === "approving" && <div><b>🔐 Approval...</b></div>}
+                    {swapTxStatus === "swapping" && <div><b>🔄 Swap läuft...</b></div>}
+                    {swapTxStatus === "pending" && <div><b>📝 Quote wird geholt...</b></div>}
                   </div>
                 )}
-                
-                {/* Swap Buttons - verschiedene Schritte */}
-                <div className="space-y-3">
-                  {/* Schritt 1: Quote anfordern */}
+
+                {/* Swap Buttons */}
+                <div className="space-y-2">
                   {buyStep === 'initial' && (
                     <Button
-                      className="w-full bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-3 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50"
+                      className="w-full bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-2 rounded-lg text-sm"
                       onClick={handleGetQuote}
                       disabled={
                         !swapAmountPol || 
@@ -828,39 +720,33 @@ export default function BuyTab() {
                         parseFloat(swapAmountPol) > parseFloat(polBalance)
                       }
                     >
-                      <FaExchangeAlt className="inline mr-2" />
-                      {isSwapping ? "Lade Quote..." : `Quote für ${swapAmountPol || "0"} POL holen`}
+                      <FaExchangeAlt className="inline mr-1" />
+                      {isSwapping ? "Lade Quote..." : `Quote holen`}
                     </Button>
                   )}
-                  
-                  {/* Schritt 2: Approval (falls nötig) */}
                   {buyStep === 'quoteFetched' && needsApproval && (
                     <Button
-                      className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 rounded-xl mb-2"
+                      className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 rounded-lg text-sm"
                       onClick={handleApprove}
                       disabled={isSwapping}
                     >
-                      <FaExchangeAlt className="inline mr-2" />
-                      {isSwapping ? "Approval läuft..." : "POL für Kauf freigeben"}
+                      <FaExchangeAlt className="inline mr-1" />
+                      {isSwapping ? "Approval läuft..." : "POL freigeben"}
                     </Button>
                   )}
-                  
-                  {/* Schritt 3: Swap durchführen */}
                   {((buyStep === 'quoteFetched' && !needsApproval) || buyStep === 'approved') && (
                     <Button
-                      className="w-full bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-3 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50"
+                      className="w-full bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-2 rounded-lg text-sm"
                       onClick={handleBuySwap}
                       disabled={isSwapping}
                     >
-                      <FaExchangeAlt className="inline mr-2" />
-                      {isSwapping ? "Kaufe..." : `${swapAmountPol || "0"} POL → D.FAITH kaufen`}
+                      <FaExchangeAlt className="inline mr-1" />
+                      {isSwapping ? "Kaufe..." : `${swapAmountPol || "0"} POL → D.FAITH`}
                     </Button>
                   )}
-                  
-                  {/* "Neuer Kauf" Button wenn Kauf abgeschlossen ist */}
                   {buyStep === 'completed' && (
                     <Button
-                      className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold py-3 rounded-xl hover:opacity-90 transition-opacity"
+                      className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold py-2 rounded-lg text-sm"
                       onClick={() => {
                         setBuyStep('initial');
                         setQuoteTxData(null);
@@ -876,13 +762,11 @@ export default function BuyTab() {
                       Neuer Kauf
                     </Button>
                   )}
-                  
                   {quoteError && (
-                    <div className="text-red-400 text-sm text-center">{quoteError}</div>
+                    <div className="text-red-400 text-xs text-center">{quoteError}</div>
                   )}
-                  
                   <Button
-                    className="w-full bg-zinc-600 hover:bg-zinc-700 text-white font-bold py-2 rounded-xl transition-colors"
+                    className="w-full bg-zinc-600 hover:bg-zinc-700 text-white font-bold py-1 rounded-lg text-xs"
                     onClick={() => {
                       setShowDfaithBuyModal(false);
                       setSwapAmountPol("");
@@ -900,28 +784,21 @@ export default function BuyTab() {
                   </Button>
                 </div>
 
-                {/* Validation und Error Messages */}
+                {/* Validation kompakt */}
                 {parseFloat(swapAmountPol) > parseFloat(polBalance) && (
-                  <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
-                    <div className="flex items-center gap-2">
-                      <span className="text-red-400 text-xs">❌</span>
-                      <div className="text-sm text-red-400">
-                        Nicht genügend POL verfügbar
-                      </div>
+                  <div className="mb-2 p-2 bg-red-500/10 border border-red-500/30 rounded text-xs">
+                    <div className="flex items-center gap-1">
+                      <span className="text-red-400">❌</span>
+                      <span>Nicht genügend POL</span>
                     </div>
-                    <div className="text-xs text-red-300/70 mt-1">
-                      Verfügbar: {polBalance} POL | Benötigt: {swapAmountPol} POL
-                    </div>
+                    <div className="text-[10px] text-red-300/70 mt-1">Verfügbar: {polBalance} | Benötigt: {swapAmountPol}</div>
                   </div>
                 )}
-
                 {parseFloat(swapAmountPol) > 0 && parseFloat(swapAmountPol) < 0.001 && (
-                  <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
-                    <div className="flex items-center gap-2">
-                      <span className="text-yellow-400 text-xs">⚠️</span>
-                      <div className="text-sm text-yellow-400">
-                        Minimum: 0.001 POL
-                      </div>
+                  <div className="mb-2 p-2 bg-yellow-500/10 border border-yellow-500/30 rounded text-xs">
+                    <div className="flex items-center gap-1">
+                      <span className="text-yellow-400">⚠️</span>
+                      <span>Minimum: 0.001 POL</span>
                     </div>
                   </div>
                 )}
