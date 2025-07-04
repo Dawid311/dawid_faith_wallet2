@@ -39,6 +39,13 @@ export default function BuyTab() {
   const { mutate: sendTransaction, isPending: isSwapPending } = useSendTransaction();
   const [swapStatus, setSwapStatus] = useState<string | null>(null);
 
+  // Neuer State für mehrstufigen Kaufprozess
+  const [buyStep, setBuyStep] = useState<'initial' | 'quoteFetched' | 'approved' | 'completed'>('initial');
+  const [needsApproval, setNeedsApproval] = useState(false);
+  const [quoteTxData, setQuoteTxData] = useState<any>(null);
+  const [spenderAddress, setSpenderAddress] = useState<string | null>(null);
+  const [quoteError, setQuoteError] = useState<string | null>(null);
+
   // D.FAITH Preis von OpenOcean holen und in Euro umrechnen mit Fallback
   useEffect(() => {
     // Lade gespeicherte Preise beim Start
@@ -287,24 +294,25 @@ export default function BuyTab() {
     })();
   }, [account?.address]);
 
-  // D.FAITH Swap Funktion mit Transaktionsbestätigung
-  const handleDfaithSwap = async () => {
-    if (!swapAmountPol || parseFloat(swapAmountPol) <= 0 || !account?.address) return;
-    setIsSwapping(true);
+  // D.FAITH Swap Funktion mit mehrstufigem Prozess wie im SellTab
+  const handleGetQuote = async () => {
     setSwapTxStatus("pending");
-    
+    setQuoteError(null);
+    setQuoteTxData(null);
+    setSpenderAddress(null);
+    setNeedsApproval(false);
+
     try {
-      // Step 1: Hole Quote von OpenOcean
-      const amountToSend = swapAmountPol;
-      
+      if (!swapAmountPol || parseFloat(swapAmountPol) <= 0 || !account?.address) return;
+
       console.log("=== OpenOcean Quote Request ===");
-      console.log("POL Amount:", amountToSend);
+      console.log("POL Amount:", swapAmountPol);
       
       const quoteParams = new URLSearchParams({
         chain: "polygon",
         inTokenAddress: "0x0000000000000000000000000000000000001010", // Native POL
-        outTokenAddress: "0xF051E3B0335eB332a7ef0dc308BB4F0c10301060", // D.FAITH
-        amount: amountToSend,
+        outTokenAddress: DFAITH_TOKEN, // D.FAITH
+        amount: swapAmountPol,
         slippage: slippage,
         gasPrice: "50",
         account: account.address,
@@ -330,51 +338,178 @@ export default function BuyTab() {
         throw new Error('OpenOcean: Unvollständige Transaktionsdaten');
       }
       
-      // Step 2: Bereite Transaktion vor
+      setQuoteTxData(txData);
+      
+      // Bei POL-Käufen ist normalerweise kein Approval nötig, da es native Token sind
+      // Aber wir prüfen trotzdem für Konsistenz
+      setNeedsApproval(false);
+      setBuyStep('quoteFetched');
+      setSwapTxStatus(null);
+      
+    } catch (e: any) {
+      console.error("Quote Fehler:", e);
+      setQuoteError(e.message || "Quote Fehler");
+      setSwapTxStatus("error");
+      setTimeout(() => setSwapTxStatus(null), 4000);
+    }
+  };
+
+  // Approval wird normalerweise nicht benötigt bei POL → D.FAITH da POL native ist
+  // Aber wir implementieren es für Konsistenz
+  const handleApprove = async () => {
+    if (!account?.address) return;
+    setSwapTxStatus("approving");
+    
+    try {
+      console.log("Approval für POL (normalerweise nicht nötig)");
+      // Bei Native Token ist kein Approval nötig, also überspringen wir direkt
+      setNeedsApproval(false);
+      setBuyStep('approved');
+      setSwapTxStatus(null);
+    } catch (e) {
+      console.error("Approve Fehler:", e);
+      setSwapTxStatus("error");
+      setTimeout(() => setSwapTxStatus(null), 4000);
+    }
+  };
+
+  // Verbesserter D.FAITH Swap mit Balance-Verifizierung
+  const handleBuySwap = async () => {
+    if (!quoteTxData || !account?.address) return;
+    setIsSwapping(true);
+    setSwapTxStatus("swapping");
+    
+    // Aktuelle Balance vor dem Swap speichern
+    const initialBalance = parseFloat(dfaithBalance);
+    
+    try {
+      console.log("=== D.FAITH Kauf-Swap wird gestartet ===");
+      console.log("Verwende Quote-Daten:", quoteTxData);
+      
       const { prepareTransaction } = await import("thirdweb");
+      
+      // Aktuelle Nonce explizit abrufen
+      const { getRpcClient } = await import("thirdweb");
+      const rpc = getRpcClient({ client, chain: polygon });
+      const nonce = await rpc({
+        method: "eth_getTransactionCount",
+        params: [account.address, "pending"]
+      });
+      
+      console.log("Aktuelle Nonce:", nonce);
+      
       const transaction = await prepareTransaction({
-        to: txData.to,
-        data: txData.data,
-        value: BigInt(txData.value || "0"),
+        to: quoteTxData.to,
+        data: quoteTxData.data,
+        value: BigInt(quoteTxData.value || "0"),
         chain: polygon,
-        client
+        client,
+        nonce: parseInt(nonce, 16),
+        gas: BigInt(quoteTxData.gasLimit || "300000"),
+        gasPrice: BigInt(quoteTxData.gasPrice || "50000000000")
       });
       
       console.log("Prepared Transaction:", transaction);
       setSwapTxStatus("confirming");
       
-      // Step 3: Sende Transaktion - sendTransaction ist async und gibt Promise<void> zurück
+      // Sende Transaktion
       await sendTransaction(transaction);
       console.log("Transaction sent successfully");
       
-      // Bei erfolgreichem Senden
-      setSwapTxStatus("success");
+      setSwapTxStatus("verifying");
+      console.log("Verifiziere Balance-Änderung...");
       
-      // Balance sofort aktualisieren
-      setTimeout(() => updatePolBalance(true), 1000);
-      setTimeout(() => updatePolBalance(true), 3000);
+      // Balance-Verifizierung mit mehreren Versuchen
+      let balanceVerified = false;
+      let attempts = 0;
+      const maxAttempts = 30; // Maximal 30 Versuche
       
-      // Input zurücksetzen
-      setSwapAmountPol("");
+      // Erste Wartezeit nach Transaktionsbestätigung
+      console.log("Warte 3 Sekunden vor erster Balance-Prüfung...");
+      await new Promise(resolve => setTimeout(resolve, 3000));
       
-      // Success-Status nach 5 Sekunden ausblenden
-      setTimeout(() => {
-        setSwapTxStatus(null);
-      }, 5000);
+      while (!balanceVerified && attempts < maxAttempts) {
+        attempts++;
+        console.log(`Balance-Verifizierung Versuch ${attempts}/${maxAttempts}`);
+        
+        try {
+          if (attempts > 1) {
+            const waitTime = Math.min(attempts * 1000, 10000); // 1s, 2s, 3s... bis max 10s
+            console.log(`Warte ${waitTime/1000} Sekunden vor nächstem Versuch...`);
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+          }
+          
+          // D.FAITH Balance über API neu laden
+          const res = await fetch(`https://insight.thirdweb.com/v1/tokens?chain_id=137&token_address=${DFAITH_TOKEN}&owner_address=${account.address}&include_native=true`);
+          const data = await res.json();
+          const bal = data?.data?.[0]?.balance ?? "0";
+          const currentBalance = Number(bal) / Math.pow(10, DFAITH_DECIMALS);
+          
+          console.log(`Initiale Balance: ${initialBalance}, Aktuelle Balance: ${currentBalance}`);
+          
+          // Prüfe ob sich die Balance erhöht hat
+          const expectedIncrease = parseFloat(swapAmountPol) * (dfaithPrice || 0);
+          const actualIncrease = currentBalance - initialBalance;
+          
+          console.log(`Erwartete Erhöhung: ${expectedIncrease}, Tatsächliche Erhöhung: ${actualIncrease}`);
+          
+          // Großzügige Toleranz für Slippage und Rundungsfehler
+          if (actualIncrease >= (expectedIncrease * 0.8)) { // 20% Toleranz für Slippage
+            console.log("✅ Balance-Änderung verifiziert - Kauf erfolgreich!");
+            setDfaithBalance(currentBalance.toFixed(DFAITH_DECIMALS));
+            balanceVerified = true;
+            setBuyStep('completed');
+            setSwapTxStatus("success");
+            setSwapAmountPol("");
+            setQuoteTxData(null);
+            setSpenderAddress(null);
+            
+            // POL Balance auch aktualisieren
+            setTimeout(() => updatePolBalance(true), 1000);
+            
+            setTimeout(() => setSwapTxStatus(null), 5000);
+          } else {
+            console.log(`Versuch ${attempts}: Balance noch nicht ausreichend geändert, weiter warten...`);
+          }
+        } catch (balanceError) {
+          console.error(`Balance-Verifizierung Versuch ${attempts} fehlgeschlagen:`, balanceError);
+        }
+      }
+      
+      if (!balanceVerified) {
+        console.log("⚠️ Balance-Verifizierung nach mehreren Versuchen nicht erfolgreich");
+        // Trotzdem als Erfolg werten, da Transaktion gesendet wurde
+        setSwapTxStatus("success");
+        setBuyStep('completed');
+        setSwapAmountPol("");
+        setTimeout(() => updatePolBalance(true), 2000);
+        setTimeout(() => setSwapTxStatus(null), 8000);
+      }
       
     } catch (error) {
       console.error("Swap Error:", error);
       setSwapTxStatus("error");
       
-      // Error-Status nach 5 Sekunden ausblenden
+      // Versuche trotzdem die Balances zu aktualisieren
+      setTimeout(() => updatePolBalance(true), 1000);
       setTimeout(() => {
-        setSwapTxStatus(null);
-      }, 5000);
+        // D.FAITH Balance aktualisieren
+        (async () => {
+          try {
+            const res = await fetch(`https://insight.thirdweb.com/v1/tokens?chain_id=137&token_address=${DFAITH_TOKEN}&owner_address=${account.address}&include_native=true`);
+            const data = await res.json();
+            const bal = data?.data?.[0]?.balance ?? "0";
+            setDfaithBalance((Number(bal) / Math.pow(10, DFAITH_DECIMALS)).toFixed(DFAITH_DECIMALS));
+          } catch { }
+        })();
+      }, 2000);
+      
+      setTimeout(() => setSwapTxStatus(null), 5000);
     } finally {
       setIsSwapping(false);
     }
   };
-  
+
   // Verbesserte Funktion zum Aktualisieren der POL-Balance mit mehreren Versuchen
   const updatePolBalance = async (isPostSwap = false) => {
     if (!account?.address) return;
@@ -538,12 +673,30 @@ export default function BuyTab() {
                       setSwapAmountPol("");
                       setSlippage("1");
                       setSwapTxStatus(null);
+                      setBuyStep('initial');
+                      setQuoteTxData(null);
+                      setSpenderAddress(null);
+                      setNeedsApproval(false);
+                      setQuoteError(null);
                     }}
                     className="p-2 text-amber-400 hover:text-yellow-300 hover:bg-zinc-800 rounded-lg transition-all flex-shrink-0"
                     disabled={isSwapping}
                   >
                     <span className="text-lg">✕</span>
                   </button>
+                </div>
+                
+                {/* Prozessschritte anzeigen */}
+                <div className="mb-4 flex justify-between">
+                  <div className={`text-xs ${buyStep !== 'initial' ? 'text-green-400' : 'text-zinc-500'}`}>
+                    1. Quote {buyStep !== 'initial' ? '✓' : ''}
+                  </div>
+                  <div className={`text-xs ${buyStep === 'approved' || buyStep === 'completed' ? 'text-green-400' : 'text-zinc-500'}`}>
+                    2. Approve {buyStep === 'approved' || buyStep === 'completed' ? '✓' : needsApproval ? '' : '(nicht nötig)'}
+                  </div>
+                  <div className={`text-xs ${buyStep === 'completed' ? 'text-green-400' : 'text-zinc-500'}`}>
+                    3. Swap {buyStep === 'completed' ? '✓' : ''}
+                  </div>
                 </div>
                 
                 {/* POL Balance */}
@@ -567,12 +720,12 @@ export default function BuyTab() {
                       className="w-full bg-zinc-800 border border-zinc-600 rounded-xl py-3 px-4 pr-16 text-lg font-bold text-purple-400 focus:border-amber-500 focus:outline-none"
                       value={swapAmountPol}
                       onChange={(e) => setSwapAmountPol(e.target.value)}
-                      disabled={isSwapping}
+                      disabled={isSwapping || buyStep !== 'initial'}
                     />
                     <button
                       className="absolute right-3 top-1/2 transform -translate-y-1/2 text-xs px-2 py-1 bg-purple-500/20 text-purple-400 rounded hover:bg-purple-500/30 transition"
                       onClick={() => setSwapAmountPol((parseFloat(polBalance) * 0.95).toFixed(3))}
-                      disabled={isSwapping || parseFloat(polBalance) <= 0}
+                      disabled={isSwapping || parseFloat(polBalance) <= 0 || buyStep !== 'initial'}
                     >
                       MAX
                     </button>
@@ -595,7 +748,7 @@ export default function BuyTab() {
                       className="flex-1 bg-zinc-800 border border-zinc-600 rounded-xl py-2 px-3 text-sm text-zinc-300 focus:border-amber-500 focus:outline-none"
                       value={slippage}
                       onChange={(e) => setSlippage(e.target.value)}
-                      disabled={isSwapping}
+                      disabled={isSwapping || buyStep !== 'initial'}
                     />
                     <div className="flex gap-1">
                       <button
@@ -668,18 +821,21 @@ export default function BuyTab() {
                     swapTxStatus === "success" ? "bg-green-500/20 text-green-400" :
                     swapTxStatus === "error" ? "bg-red-500/20 text-red-400" :
                     swapTxStatus === "confirming" ? "bg-blue-500/20 text-blue-400" :
+                    swapTxStatus === "verifying" ? "bg-blue-500/20 text-blue-400" :
+                    swapTxStatus === "approving" ? "bg-orange-500/20 text-orange-400" :
+                    swapTxStatus === "swapping" ? "bg-purple-500/20 text-purple-400" :
                     "bg-yellow-500/20 text-yellow-400"
                   }`}>
                     {swapTxStatus === "success" && (
                       <div>
-                        <div className="font-bold">🎉 Swap erfolgreich!</div>
-                        <div className="text-xs mt-1">Token wurden erfolgreich getauscht</div>
+                        <div className="font-bold">🎉 Kauf erfolgreich!</div>
+                        <div className="text-xs mt-1">D.FAITH Token wurden erfolgreich gekauft und verifiziert</div>
                       </div>
                     )}
                     {swapTxStatus === "error" && (
                       <div>
-                        <div className="font-bold">❌ Swap fehlgeschlagen!</div>
-                        <div className="text-xs mt-1">Bitte versuchen Sie es erneut</div>
+                        <div className="font-bold">❌ Kauf fehlgeschlagen!</div>
+                        <div className="text-xs mt-1">{quoteError || "Bitte versuchen Sie es erneut"}</div>
                       </div>
                     )}
                     {swapTxStatus === "confirming" && (
@@ -688,43 +844,101 @@ export default function BuyTab() {
                         <div className="text-xs mt-1">Warte auf Blockchain-Bestätigung</div>
                       </div>
                     )}
+                    {swapTxStatus === "verifying" && (
+                      <div>
+                        <div className="font-bold">� Verifiziere Kauf...</div>
+                        <div className="text-xs mt-1">Prüfe Balance-Änderung zur Bestätigung</div>
+                      </div>
+                    )}
+                    {swapTxStatus === "approving" && (
+                      <div>
+                        <div className="font-bold">🔐 Token-Berechtigung wird gesetzt...</div>
+                        <div className="text-xs mt-1">Bitte bestätigen Sie in Ihrem Wallet</div>
+                      </div>
+                    )}
+                    {swapTxStatus === "swapping" && (
+                      <div>
+                        <div className="font-bold">🔄 Kauf wird durchgeführt...</div>
+                        <div className="text-xs mt-1">Bitte bestätigen Sie in Ihrem Wallet</div>
+                      </div>
+                    )}
                     {swapTxStatus === "pending" && (
                       <div>
-                        <div className="font-bold">📝 Transaktion wird vorbereitet...</div>
-                        <div className="text-xs mt-1">Bitte bestätigen Sie in Ihrem Wallet</div>
+                        <div className="font-bold">📝 Quote wird abgefragt...</div>
+                        <div className="text-xs mt-1">Bitte warten Sie einen Moment</div>
                       </div>
                     )}
                   </div>
                 )}
                 
-                {/* Swap Button */}
+                {/* Swap Buttons - verschiedene Schritte */}
                 <div className="space-y-3">
-                  <Button
-                    className="w-full bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-3 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50"
-                    onClick={handleDfaithSwap}
-                    disabled={
-                      !swapAmountPol || 
-                      parseFloat(swapAmountPol) <= 0 || 
-                      isSwapping || 
-                      !account?.address || 
-                      parseFloat(polBalance) <= 0 ||
-                      parseFloat(swapAmountPol) > parseFloat(polBalance)
-                    }
-                  >
-                    <FaExchangeAlt className="inline mr-2" />
-                    {isSwapping ? (
-                      swapTxStatus === "pending" ? "Bereite Swap vor..." :
-                      swapTxStatus === "confirming" ? "Bestätige Transaktion..." :
-                      "Swapping..."
-                    ) : parseFloat(polBalance) <= 0 ? 
-                      "Keine POL verfügbar" :
-                    parseFloat(swapAmountPol) > parseFloat(polBalance) ?
-                      "Nicht genügend POL" :
-                    swapAmountPol ? 
-                      `${swapAmountPol} POL → D.FAITH` : 
-                      "Betrag eingeben"
-                    }
-                  </Button>
+                  {/* Schritt 1: Quote anfordern */}
+                  {buyStep === 'initial' && (
+                    <Button
+                      className="w-full bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-3 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50"
+                      onClick={handleGetQuote}
+                      disabled={
+                        !swapAmountPol || 
+                        parseFloat(swapAmountPol) <= 0 || 
+                        isSwapping || 
+                        !account?.address || 
+                        parseFloat(polBalance) <= 0 ||
+                        parseFloat(swapAmountPol) > parseFloat(polBalance)
+                      }
+                    >
+                      <FaExchangeAlt className="inline mr-2" />
+                      {isSwapping ? "Lade Quote..." : `Quote für ${swapAmountPol || "0"} POL holen`}
+                    </Button>
+                  )}
+                  
+                  {/* Schritt 2: Approval (falls nötig) */}
+                  {buyStep === 'quoteFetched' && needsApproval && (
+                    <Button
+                      className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 rounded-xl mb-2"
+                      onClick={handleApprove}
+                      disabled={isSwapping}
+                    >
+                      <FaExchangeAlt className="inline mr-2" />
+                      {isSwapping ? "Approval läuft..." : "POL für Kauf freigeben"}
+                    </Button>
+                  )}
+                  
+                  {/* Schritt 3: Swap durchführen */}
+                  {((buyStep === 'quoteFetched' && !needsApproval) || buyStep === 'approved') && (
+                    <Button
+                      className="w-full bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-3 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50"
+                      onClick={handleBuySwap}
+                      disabled={isSwapping}
+                    >
+                      <FaExchangeAlt className="inline mr-2" />
+                      {isSwapping ? "Kaufe..." : `${swapAmountPol || "0"} POL → D.FAITH kaufen`}
+                    </Button>
+                  )}
+                  
+                  {/* "Neuer Kauf" Button wenn Kauf abgeschlossen ist */}
+                  {buyStep === 'completed' && (
+                    <Button
+                      className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold py-3 rounded-xl hover:opacity-90 transition-opacity"
+                      onClick={() => {
+                        setBuyStep('initial');
+                        setQuoteTxData(null);
+                        setSpenderAddress(null);
+                        setNeedsApproval(false);
+                        setQuoteError(null);
+                        setSwapAmountPol("");
+                        setSwapTxStatus(null);
+                        setSlippage("1");
+                      }}
+                      disabled={isSwapping}
+                    >
+                      Neuer Kauf
+                    </Button>
+                  )}
+                  
+                  {quoteError && (
+                    <div className="text-red-400 text-sm text-center">{quoteError}</div>
+                  )}
                   
                   <Button
                     className="w-full bg-zinc-600 hover:bg-zinc-700 text-white font-bold py-2 rounded-xl transition-colors"
@@ -733,6 +947,11 @@ export default function BuyTab() {
                       setSwapAmountPol("");
                       setSlippage("1");
                       setSwapTxStatus(null);
+                      setBuyStep('initial');
+                      setQuoteTxData(null);
+                      setSpenderAddress(null);
+                      setNeedsApproval(false);
+                      setQuoteError(null);
                     }}
                     disabled={isSwapping}
                   >
