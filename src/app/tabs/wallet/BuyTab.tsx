@@ -718,7 +718,47 @@ export default function BuyTab() {
                 </div>
                 <div className="flex justify-between text-xs text-zinc-500 mb-3">
                   <span>Verfügbar: <span className="text-purple-400 font-bold">{polBalance} POL</span></span>
-                  <span>Slippage: {slippage}%</span>
+                </div>
+
+                {/* Slippage */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-zinc-300 mb-2">Slippage Toleranz (%)</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      placeholder="1"
+                      min="0.1"
+                      max="50"
+                      step="0.1"
+                      className="flex-1 bg-zinc-800 border border-zinc-600 rounded-xl py-2 px-3 text-sm text-zinc-300 focus:border-amber-500 focus:outline-none"
+                      value={slippage}
+                      onChange={(e) => setSlippage(e.target.value)}
+                      disabled={isSwapping || buyStep !== 'initial'}
+                    />
+                    <div className="flex gap-1">
+                      <button
+                        className="text-xs px-2 py-1 bg-zinc-700/50 text-zinc-400 rounded hover:bg-zinc-600/50 transition"
+                        onClick={() => setSlippage("0.5")}
+                        disabled={isSwapping || buyStep !== 'initial'}
+                      >
+                        0.5%
+                      </button>
+                      <button
+                        className="text-xs px-2 py-1 bg-zinc-700/50 text-zinc-400 rounded hover:bg-zinc-600/50 transition"
+                        onClick={() => setSlippage("1")}
+                        disabled={isSwapping || buyStep !== 'initial'}
+                      >
+                        1%
+                      </button>
+                      <button
+                        className="text-xs px-2 py-1 bg-zinc-700/50 text-zinc-400 rounded hover:bg-zinc-600/50 transition"
+                        onClick={() => setSlippage("3")}
+                        disabled={isSwapping || buyStep !== 'initial'}
+                      >
+                        3%
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Estimated Output */}

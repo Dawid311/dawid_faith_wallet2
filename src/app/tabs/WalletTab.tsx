@@ -733,10 +733,21 @@ export default function WalletTab() {
           <FaLock size={14} />
           <span className="text-sm font-medium">Staken & Verdienen</span>
         </button>
-        {/* Gestaked Anzeige */}
-        <div className="text-xs text-zinc-500 mt-2">
-          Gestaked: <span className="text-amber-400/80">{stakedBalance}</span>
-        </div>
+        {/* Gestaked Anzeige - verbessert */}
+        {parseFloat(stakedBalance) > 0 ? (
+          <div className="mt-3 p-2 bg-green-500/10 border border-green-500/30 rounded-lg">
+            <div className="flex items-center justify-center gap-2">
+              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+              <span className="text-sm font-medium text-green-400">
+                {stakedBalance} D.INVEST gestaked
+              </span>
+            </div>
+          </div>
+        ) : (
+          <div className="text-xs text-zinc-500 mt-2">
+            Noch nichts gestaked
+          </div>
+        )}
       </div>
     );
   };
