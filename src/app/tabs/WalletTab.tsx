@@ -87,6 +87,10 @@ export default function WalletTab() {
   const [isLoadingBalances, setIsLoadingBalances] = useState(false);
   // Tracking-ID für die aktuelle Abfrage
   const requestIdRef = useRef(0);
+  
+  // State für Kopieren-Feedback
+  const [showCopyModal, setShowCopyModal] = useState(false);
+  const [copySuccess, setCopySuccess] = useState(false);
 
   // Modal States
   const [showBuyModal, setShowBuyModal] = useState(false);
@@ -412,9 +416,27 @@ export default function WalletTab() {
     }
   };
 
-  const copyWalletAddress = () => {
+  const copyWalletAddress = async () => {
     if (account?.address) {
-      navigator.clipboard.writeText(account.address);
+      try {
+        await navigator.clipboard.writeText(account.address);
+        setCopySuccess(true);
+        setShowCopyModal(true);
+        
+        // Modal nach 2 Sekunden automatisch schließen
+        setTimeout(() => {
+          setShowCopyModal(false);
+          setCopySuccess(false);
+        }, 2000);
+      } catch (error) {
+        console.error("Fehler beim Kopieren:", error);
+        setCopySuccess(false);
+        setShowCopyModal(true);
+        
+        setTimeout(() => {
+          setShowCopyModal(false);
+        }, 2000);
+      }
     }
   };
 
@@ -559,7 +581,14 @@ export default function WalletTab() {
             <div className="flex justify-between items-center bg-zinc-800/70 backdrop-blur-sm rounded-xl p-3 mb-6 border border-zinc-700/80">
               <div className="flex flex-col">
                 <span className="text-xs text-zinc-500 mb-0.5">Wallet Adresse</span>
-                <span className="font-mono text-zinc-300 text-sm">{formatAddress(account.address)}</span>
+                <button
+                  onClick={copyWalletAddress}
+                  className="font-mono text-amber-400 text-sm hover:text-amber-300 transition-colors text-left group flex items-center gap-2"
+                  title="Adresse kopieren"
+                >
+                  <span>{formatAddress(account.address)}</span>
+                  <FaRegCopy className="text-xs opacity-50 group-hover:opacity-100 transition-opacity" />
+                </button>
               </div>
               <div className="flex items-center gap-2">
                 <button
@@ -572,7 +601,7 @@ export default function WalletTab() {
                 </button>
                 <button
                   onClick={copyWalletAddress}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-700 hover:bg-zinc-600 text-zinc-200 text-sm font-medium transition-all duration-200"
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gradient-to-r from-amber-500/20 to-yellow-500/20 hover:from-amber-500/30 hover:to-yellow-500/30 text-amber-400 text-sm font-medium transition-all duration-200 border border-amber-500/30"
                   title="Adresse kopieren"
                 >
                   <FaRegCopy /> Kopieren
@@ -658,6 +687,42 @@ export default function WalletTab() {
             <Modal open={showStakeModal} onClose={() => setShowStakeModal(false)} title="Staking">
               <div className="min-h-[400px]">
                 <StakeTab />
+              </div>
+            </Modal>
+
+            {/* Copy Success Modal */}
+            <Modal open={showCopyModal} onClose={() => setShowCopyModal(false)} title={copySuccess ? "Erfolgreich kopiert!" : "Fehler beim Kopieren"}>
+              <div className="text-center py-8">
+                <div className={`w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center ${
+                  copySuccess 
+                    ? 'bg-green-500/20 text-green-400' 
+                    : 'bg-red-500/20 text-red-400'
+                }`}>
+                  {copySuccess ? (
+                    <span className="text-2xl">✓</span>
+                  ) : (
+                    <span className="text-2xl">✗</span>
+                  )}
+                </div>
+                <p className={`text-lg font-medium mb-2 ${
+                  copySuccess ? 'text-green-400' : 'text-red-400'
+                }`}>
+                  {copySuccess ? 'Wallet-Adresse kopiert!' : 'Kopieren fehlgeschlagen'}
+                </p>
+                <p className="text-zinc-400 text-sm mb-4">
+                  {copySuccess 
+                    ? 'Die Adresse befindet sich jetzt in deiner Zwischenablage.' 
+                    : 'Bitte versuche es erneut oder kopiere die Adresse manuell.'
+                  }
+                </p>
+                {copySuccess && (
+                  <div className="bg-zinc-800/50 rounded-lg p-3 border border-zinc-700">
+                    <p className="text-xs text-zinc-500 mb-1">Kopierte Adresse:</p>
+                    <p className="text-amber-400 font-mono text-sm break-all">
+                      {account?.address}
+                    </p>
+                  </div>
+                )}
               </div>
             </Modal>
           </CardContent>
