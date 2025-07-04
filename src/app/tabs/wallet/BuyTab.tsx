@@ -373,14 +373,15 @@ export default function BuyTab() {
     }
   };
 
-  // Verbesserter D.FAITH Swap mit Balance-Verifizierung
+  // Verbesserter D.FAITH Swap mit POL-Balance-Verifizierung
   const handleBuySwap = async () => {
     if (!quoteTxData || !account?.address) return;
     setIsSwapping(true);
     setSwapTxStatus("swapping");
     
-    // Aktuelle Balance vor dem Swap speichern
-    const initialBalance = parseFloat(dfaithBalance);
+    // Aktuelle POL-Balance vor dem Swap speichern
+    const initialPolBalance = parseFloat(polBalance);
+    const polAmount = parseFloat(swapAmountPol);
     
     try {
       console.log("=== D.FAITH Kauf-Swap wird gestartet ===");
@@ -417,9 +418,9 @@ export default function BuyTab() {
       console.log("Transaction sent successfully");
       
       setSwapTxStatus("verifying");
-      console.log("Verifiziere Balance-Änderung...");
+      console.log("Verifiziere POL-Balance-Änderung...");
       
-      // Balance-Verifizierung mit mehreren Versuchen
+      // POL-Balance-Verifizierung mit mehreren Versuchen
       let balanceVerified = false;
       let attempts = 0;
       const maxAttempts = 30; // Maximal 30 Versuche
@@ -430,7 +431,7 @@ export default function BuyTab() {
       
       while (!balanceVerified && attempts < maxAttempts) {
         attempts++;
-        console.log(`Balance-Verifizierung Versuch ${attempts}/${maxAttempts}`);
+        console.log(`POL-Balance-Verifizierung Versuch ${attempts}/${maxAttempts}`);
         
         try {
           if (attempts > 1) {
@@ -438,133 +439,72 @@ export default function BuyTab() {
             console.log(`Warte ${waitTime/1000} Sekunden vor nächstem Versuch...`);
             await new Promise(resolve => setTimeout(resolve, waitTime));
           }
+          // POL-Balance neu laden
+          const response = await fetch(polygon.rpc, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              jsonrpc: '2.0',
+              method: 'eth_getBalance',
+              params: [account.address, 'latest'],
+              id: 1
+            })
+          });
+          const data = await response.json();
+          const polRaw = data?.result ? BigInt(data.result) : BigInt(0);
+          const currentPolBalance = Number(polRaw) / Math.pow(10, 18);
           
-          // D.FAITH Balance über API neu laden
-          const res = await fetch(`https://insight.thirdweb.com/v1/tokens?chain_id=137&token_address=${DFAITH_TOKEN}&owner_address=${account.address}&include_native=true`);
-          const data = await res.json();
-          const bal = data?.data?.[0]?.balance ?? "0";
-          const currentBalance = Number(bal) / Math.pow(10, DFAITH_DECIMALS);
+          console.log(`Initiale POL-Balance: ${initialPolBalance}, Aktuelle POL-Balance: ${currentPolBalance}`);
           
-          console.log(`Initiale Balance: ${initialBalance}, Aktuelle Balance: ${currentBalance}`);
+          // Prüfe ob sich die POL-Balance um mindestens den Kaufbetrag verringert hat (mit 10% Toleranz für Fees)
+          const expectedDecrease = polAmount;
+          const actualDecrease = initialPolBalance - currentPolBalance;
           
-          // Prüfe ob sich die Balance erhöht hat
-          const expectedIncrease = parseFloat(swapAmountPol) * (dfaithPrice || 0);
-          const actualIncrease = currentBalance - initialBalance;
+          console.log(`Erwartete Verringerung: ${expectedDecrease}, Tatsächliche Verringerung: ${actualDecrease}`);
           
-          console.log(`Erwartete Erhöhung: ${expectedIncrease}, Tatsächliche Erhöhung: ${actualIncrease}`);
-          
-          // Großzügige Toleranz für Slippage und Rundungsfehler
-          if (actualIncrease >= (expectedIncrease * 0.8)) { // 20% Toleranz für Slippage
-            console.log("✅ Balance-Änderung verifiziert - Kauf erfolgreich!");
-            setDfaithBalance(currentBalance.toFixed(DFAITH_DECIMALS));
+          if (actualDecrease >= (expectedDecrease * 0.9)) { // 10% Toleranz
+            console.log("✅ POL-Balance-Änderung verifiziert - Kauf erfolgreich!");
+            setPolBalance(currentPolBalance.toFixed(3));
             balanceVerified = true;
             setBuyStep('completed');
             setSwapTxStatus("success");
             setSwapAmountPol("");
             setQuoteTxData(null);
             setSpenderAddress(null);
-            
-            // POL Balance auch aktualisieren
-            setTimeout(() => updatePolBalance(true), 1000);
-            
+            // D.FAITH Balance auch aktualisieren
+            setTimeout(() => {
+              (async () => {
+                try {
+                  const res = await fetch(`https://insight.thirdweb.com/v1/tokens?chain_id=137&token_address=${DFAITH_TOKEN}&owner_address=${account.address}&include_native=true`);
+                  const data = await res.json();
+                  const bal = data?.data?.[0]?.balance ?? "0";
+                  setDfaithBalance((Number(bal) / Math.pow(10, DFAITH_DECIMALS)).toFixed(DFAITH_DECIMALS));
+                } catch {}
+              })();
+            }, 1000);
             setTimeout(() => setSwapTxStatus(null), 5000);
           } else {
-            console.log(`Versuch ${attempts}: Balance noch nicht ausreichend geändert, weiter warten...`);
+            console.log(`Versuch ${attempts}: POL-Balance noch nicht ausreichend geändert, weiter warten...`);
           }
         } catch (balanceError) {
-          console.error(`Balance-Verifizierung Versuch ${attempts} fehlgeschlagen:`, balanceError);
+          console.error(`POL-Balance-Verifizierung Versuch ${attempts} fehlgeschlagen:`, balanceError);
         }
       }
       
       if (!balanceVerified) {
-        console.log("⚠️ Balance-Verifizierung nach mehreren Versuchen nicht erfolgreich");
-        // Trotzdem als Erfolg werten, da Transaktion gesendet wurde
+        console.log("⚠️ POL-Balance-Verifizierung nach mehreren Versuchen nicht erfolgreich");
         setSwapTxStatus("success");
         setBuyStep('completed');
         setSwapAmountPol("");
-        setTimeout(() => updatePolBalance(true), 2000);
         setTimeout(() => setSwapTxStatus(null), 8000);
       }
       
     } catch (error) {
       console.error("Swap Error:", error);
       setSwapTxStatus("error");
-      
-      // Versuche trotzdem die Balances zu aktualisieren
-      setTimeout(() => updatePolBalance(true), 1000);
-      setTimeout(() => {
-        // D.FAITH Balance aktualisieren
-        (async () => {
-          try {
-            const res = await fetch(`https://insight.thirdweb.com/v1/tokens?chain_id=137&token_address=${DFAITH_TOKEN}&owner_address=${account.address}&include_native=true`);
-            const data = await res.json();
-            const bal = data?.data?.[0]?.balance ?? "0";
-            setDfaithBalance((Number(bal) / Math.pow(10, DFAITH_DECIMALS)).toFixed(DFAITH_DECIMALS));
-          } catch { }
-        })();
-      }, 2000);
-      
       setTimeout(() => setSwapTxStatus(null), 5000);
     } finally {
       setIsSwapping(false);
-    }
-  };
-
-  // Verbesserte Funktion zum Aktualisieren der POL-Balance mit mehreren Versuchen
-  const updatePolBalance = async (isPostSwap = false) => {
-    if (!account?.address) return;
-    
-    // Bei Post-Swap-Updates mehrere Versuche durchführen
-    const maxAttempts = isPostSwap ? 3 : 1;
-    let attempts = 0;
-    let success = false;
-    
-    while (attempts < maxAttempts && !success) {
-      try {
-        console.log(`Balance-Update Versuch ${attempts + 1}/${maxAttempts}`);
-        
-        const response = await fetch(polygon.rpc, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            jsonrpc: '2.0',
-            method: 'eth_getBalance',
-            params: [account.address, 'latest'],
-            id: 1
-          })
-        });
-        
-        if (!response.ok) {
-          throw new Error(`RPC Fehler: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        if (!data || !data.result) {
-          throw new Error("Ungültige RPC-Antwort");
-        }
-        
-        const balance = BigInt(data.result);
-        const polFormatted = Number(balance) / Math.pow(10, 18);
-        
-        console.log("Neue POL Balance:", polFormatted.toFixed(3));
-        setPolBalance(polFormatted.toFixed(3));
-        
-        success = true;
-      } catch (error) {
-        console.error(`Balance-Update Fehler (Versuch ${attempts + 1}):`, error);
-        attempts++;
-        
-        // Kurze Verzögerung vor dem nächsten Versuch
-        if (attempts < maxAttempts) {
-          await new Promise(r => setTimeout(r, 1000));
-        }
-      }
-    }
-    
-    // Wenn alle Versuche fehlgeschlagen sind und es ein Post-Swap-Update ist,
-    // einen weiteren verzögerten Versuch planen
-    if (!success && isPostSwap) {
-      setTimeout(() => updatePolBalance(false), 2000);
     }
   };
 
