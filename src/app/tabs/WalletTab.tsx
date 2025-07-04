@@ -174,8 +174,7 @@ export default function WalletTab() {
     if (!account?.address) return;
 
     setIsLoadingBalances(true);
-    setDfaithBalance(null);
-    setDinvestBalance(null);
+    // Behalte die alten Werte während des Ladens bei, setze sie nicht auf null
     const currentRequestId = ++requestIdRef.current;
     
     try {
@@ -291,6 +290,14 @@ export default function WalletTab() {
 
   // D.FAITH EUR-Preis holen mit Fallback System (basierend auf OpenOcean API)
   const fetchDfaithPrice = async () => {
+    // Rate Limiting für CoinGecko (max. 1 Request alle 30 Sekunden)
+    const lastCoinGeckoRequest = localStorage.getItem('last_coingecko_request');
+    const now = Date.now();
+    const cooldownPeriod = 30 * 1000; // 30 Sekunden
+    
+    const shouldSkipCoinGecko = lastCoinGeckoRequest && 
+      (now - parseInt(lastCoinGeckoRequest)) < cooldownPeriod;
+
     try {
       // Lade gespeicherte Preise beim Start
       const loadStoredPrices = () => {
@@ -321,15 +328,27 @@ export default function WalletTab() {
       let errorMsg = "";
 
       try {
-        // 1. Hole POL/EUR Preis von CoinGecko
-        const polResponse = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=polygon-ecosystem-token&vs_currencies=eur');
-        if (polResponse.ok) {
-          const polData = await polResponse.json();
-          polEur = polData['polygon-ecosystem-token']?.eur;
-          if (polEur) {
-            // Auf 2 Dezimalstellen runden
-            polEur = Math.round(polEur * 100) / 100;
+        // 1. Hole POL/EUR Preis von CoinGecko (mit Rate Limiting)
+        if (!shouldSkipCoinGecko) {
+          localStorage.setItem('last_coingecko_request', now.toString());
+          
+          const polResponse = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=polygon-ecosystem-token&vs_currencies=eur');
+          if (polResponse.ok) {
+            const polData = await polResponse.json();
+            polEur = polData['polygon-ecosystem-token']?.eur;
+            if (polEur) {
+              // Auf 2 Dezimalstellen runden
+              polEur = Math.round(polEur * 100) / 100;
+            }
+          } else if (polResponse.status === 429) {
+            // 429 Rate Limit - verwende Fallback
+            console.log('CoinGecko Rate Limit erreicht (429), verwende Fallback-Preise');
+            errorMsg = "Rate Limit erreicht";
+          } else {
+            console.log('CoinGecko Fehler:', polResponse.status, polResponse.statusText);
           }
+        } else {
+          console.log('CoinGecko Request übersprungen (Rate Limiting), verwende gespeicherte Preise');
         }
       } catch (e) {
         console.log('POL Preis Fehler:', e);

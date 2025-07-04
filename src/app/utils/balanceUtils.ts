@@ -95,6 +95,84 @@ export const fetchNativePolBalance = async (accountAddress: string): Promise<str
   }
 };
 
+// Verbesserte Preise mit Fallback-System
+export const fetchPricesWithFallback = async () => {
+  // Lade gespeicherte Preise
+  const loadStoredPrices = () => {
+    try {
+      const stored = localStorage.getItem('dawid_faith_prices');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        const now = Date.now();
+        // Verwende gespeicherte Preise wenn sie weniger als 6 Stunden alt sind
+        if (parsed.timestamp && (now - parsed.timestamp) < 6 * 60 * 60 * 1000) {
+          return parsed;
+        }
+      }
+    } catch (e) {
+      console.log('Fehler beim Laden gespeicherter Preise:', e);
+    }
+    return null;
+  };
+
+  const storedPrices = loadStoredPrices();
+  let polEur = storedPrices?.polEur || 0.50; // Fallback-Werte
+  let dfaithEur = storedPrices?.dfaithEur || 0.001;
+
+  try {
+    // Versuche CoinGecko für POL Preis
+    const polResponse = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=polygon-ecosystem-token&vs_currencies=eur');
+    if (polResponse.ok) {
+      const polData = await polResponse.json();
+      const newPolEur = polData['polygon-ecosystem-token']?.eur;
+      if (newPolEur) {
+        polEur = Math.round(newPolEur * 100) / 100;
+      }
+    } else if (polResponse.status === 429) {
+      console.log('CoinGecko Rate Limit erreicht (429), verwende gespeicherte Preise');
+    }
+  } catch (e) {
+    console.log('CoinGecko Fehler, verwende Fallback:', e);
+  }
+
+  try {
+    // Versuche OpenOcean für D.FAITH Preis
+    const params = new URLSearchParams({
+      chain: "polygon",
+      inTokenAddress: TOKEN_ADDRESSES.NATIVE_POL,
+      outTokenAddress: TOKEN_ADDRESSES.DFAITH,
+      amount: "1",
+      gasPrice: "50",
+    });
+    
+    const response = await fetch(`https://open-api.openocean.finance/v3/polygon/quote?${params}`);
+    
+    if (response.ok) {
+      const data = await response.json();
+      if (data?.data?.outAmount && data.data.outAmount !== "0") {
+        const dfaithPerPol = Number(data.data.outAmount) / Math.pow(10, TOKEN_DECIMALS.DFAITH);
+        dfaithEur = polEur / dfaithPerPol;
+      }
+    }
+  } catch (e) {
+    console.log("OpenOcean Fehler, verwende Fallback:", e);
+  }
+
+  // Speichere neue Preise
+  try {
+    const newPrices = {
+      dfaithEur,
+      polEur,
+      timestamp: Date.now()
+    };
+    localStorage.setItem('dawid_faith_prices', JSON.stringify(newPrices));
+  } catch (e) {
+    console.log('Fehler beim Speichern der Preise:', e);
+  }
+
+  return { dfaithEur, polEur };
+};
+
 // Alle Balances auf einmal laden
 export const fetchAllBalances = async (accountAddress: string) => {
   if (!accountAddress) {
