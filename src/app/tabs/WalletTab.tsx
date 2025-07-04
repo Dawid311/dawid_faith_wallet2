@@ -288,15 +288,20 @@ export default function WalletTab() {
     };
   }, [account?.address]);
 
-  // D.FAITH EUR-Preis holen mit Fallback System (basierend auf OpenOcean API)
+  // D.FAITH EUR-Preis holen mit mehreren Anbietern und Fallback System
   const fetchDfaithPrice = async () => {
-    // Rate Limiting für CoinGecko (max. 1 Request alle 30 Sekunden)
-    const lastCoinGeckoRequest = localStorage.getItem('last_coingecko_request');
+    // Rate Limiting für alle APIs (max. 1 Request alle 30 Sekunden pro Anbieter)
     const now = Date.now();
     const cooldownPeriod = 30 * 1000; // 30 Sekunden
     
-    const shouldSkipCoinGecko = lastCoinGeckoRequest && 
-      (now - parseInt(lastCoinGeckoRequest)) < cooldownPeriod;
+    const getLastRequest = (provider: string) => {
+      const lastRequest = localStorage.getItem(`last_${provider}_request`);
+      return lastRequest ? parseInt(lastRequest) : 0;
+    };
+    
+    const shouldSkipProvider = (provider: string) => {
+      return (now - getLastRequest(provider)) < cooldownPeriod;
+    };
 
     try {
       // Lade gespeicherte Preise beim Start
@@ -327,38 +332,103 @@ export default function WalletTab() {
       let dfaithPriceEur: number | null = null;
       let errorMsg = "";
 
-      try {
-        // 1. Hole POL/EUR Preis von CoinGecko (mit Rate Limiting)
-        if (!shouldSkipCoinGecko) {
-          localStorage.setItem('last_coingecko_request', now.toString());
-          
-          const polResponse = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=polygon-ecosystem-token&vs_currencies=eur');
-          if (polResponse.ok) {
-            const polData = await polResponse.json();
-            polEur = polData['polygon-ecosystem-token']?.eur;
-            if (polEur) {
-              // Auf 2 Dezimalstellen runden
-              polEur = Math.round(polEur * 100) / 100;
+      // Mehrere Anbieter für POL/EUR Preis versuchen
+      const polProviders = [
+        {
+          name: 'coingecko',
+          fetch: async () => {
+            if (shouldSkipProvider('coingecko')) {
+              console.log('CoinGecko Request übersprungen (Rate Limiting)');
+              return null;
             }
-          } else if (polResponse.status === 429) {
-            // 429 Rate Limit - verwende Fallback
-            console.log('CoinGecko Rate Limit erreicht (429), verwende Fallback-Preise');
-            errorMsg = "Rate Limit erreicht";
-          } else {
-            console.log('CoinGecko Fehler:', polResponse.status, polResponse.statusText);
+            localStorage.setItem('last_coingecko_request', now.toString());
+            
+            const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=polygon-ecosystem-token&vs_currencies=eur');
+            if (!response.ok) {
+              if (response.status === 429) {
+                console.log('CoinGecko Rate Limit erreicht (429)');
+              }
+              throw new Error(`CoinGecko: ${response.status}`);
+            }
+            const data = await response.json();
+            return data['polygon-ecosystem-token']?.eur;
           }
-        } else {
-          console.log('CoinGecko Request übersprungen (Rate Limiting), verwende gespeicherte Preise');
+        },
+        {
+          name: 'cryptocompare',
+          fetch: async () => {
+            if (shouldSkipProvider('cryptocompare')) {
+              console.log('CryptoCompare Request übersprungen (Rate Limiting)');
+              return null;
+            }
+            localStorage.setItem('last_cryptocompare_request', now.toString());
+            
+            const response = await fetch('https://min-api.cryptocompare.com/data/price?fsym=POL&tsyms=EUR');
+            if (!response.ok) {
+              if (response.status === 429) {
+                console.log('CryptoCompare Rate Limit erreicht (429)');
+              }
+              throw new Error(`CryptoCompare: ${response.status}`);
+            }
+            const data = await response.json();
+            return data.EUR;
+          }
+        },
+        {
+          name: 'binance',
+          fetch: async () => {
+            if (shouldSkipProvider('binance')) {
+              console.log('Binance Request übersprungen (Rate Limiting)');
+              return null;
+            }
+            localStorage.setItem('last_binance_request', now.toString());
+            
+            // Binance API für POL/USDT Preis, dann USDT/EUR
+            const [polUsdtResponse, usdtEurResponse] = await Promise.all([
+              fetch('https://api.binance.com/api/v3/ticker/price?symbol=POLUSDT'),
+              fetch('https://api.binance.com/api/v3/ticker/price?symbol=EURUSDT')
+            ]);
+            
+            if (!polUsdtResponse.ok || !usdtEurResponse.ok) {
+              throw new Error('Binance API Fehler');
+            }
+            
+            const polUsdtData = await polUsdtResponse.json();
+            const usdtEurData = await usdtEurResponse.json();
+            
+            const polUsdt = parseFloat(polUsdtData.price);
+            const eurUsdt = parseFloat(usdtEurData.price);
+            
+            if (polUsdt && eurUsdt) {
+              return polUsdt / eurUsdt; // POL in EUR
+            }
+            return null;
+          }
         }
-      } catch (e) {
-        console.log('POL Preis Fehler:', e);
+      ];
+
+      // Versuche die Anbieter nacheinander bis einer funktioniert
+      for (const provider of polProviders) {
+        try {
+          const price = await provider.fetch();
+          if (price && price > 0) {
+            polEur = Math.round(price * 100) / 100;
+            console.log(`POL Preis erfolgreich von ${provider.name} geholt: €${polEur}`);
+            break;
+          }
+        } catch (e) {
+          console.log(`${provider.name} Fehler:`, e);
+          continue;
+        }
       }
 
       // Fallback auf letzten bekannten POL Preis
       if (!polEur && lastKnownPrices.polEur) {
         polEur = lastKnownPrices.polEur;
+        console.log('Verwende gespeicherten POL Preis:', polEur);
       } else if (!polEur) {
         polEur = 0.50; // Hard fallback
+        console.log('Verwende Hard-Fallback POL Preis:', polEur);
       }
 
       try {
@@ -380,6 +450,7 @@ export default function WalletTab() {
             const dfaithPerPol = Number(data.data.outAmount) / Math.pow(10, DFAITH_TOKEN.decimals);
             // Berechne EUR Preis: 1 D.FAITH = POL_EUR / DFAITH_PER_POL
             dfaithPriceEur = polEur / dfaithPerPol;
+            console.log('D.FAITH Preis erfolgreich von OpenOcean berechnet:', dfaithPriceEur);
           } else {
             errorMsg = "OpenOcean: Keine Liquidität verfügbar";
           }
@@ -395,6 +466,7 @@ export default function WalletTab() {
       if (!dfaithPriceEur && lastKnownPrices.dfaithEur) {
         dfaithPriceEur = lastKnownPrices.dfaithEur;
         errorMsg = "";
+        console.log('Verwende gespeicherten D.FAITH Preis:', dfaithPriceEur);
       }
 
       // Setze Preise (entweder neue oder Fallback)
@@ -411,6 +483,7 @@ export default function WalletTab() {
         setLastKnownPrices(prev => ({ ...prev, ...newPrices }));
         try {
           localStorage.setItem('dawid_faith_prices', JSON.stringify(newPrices));
+          console.log('Preise erfolgreich gespeichert');
         } catch (e) {
           console.log('Fehler beim Speichern der Preise:', e);
         }
