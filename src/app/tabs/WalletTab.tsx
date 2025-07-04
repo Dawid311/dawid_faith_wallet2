@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { createThirdwebClient, getContract } from "thirdweb";
+import { createThirdwebClient, getContract, readContract } from "thirdweb";
 import { useActiveAccount, useActiveWalletConnectionStatus, useSendTransaction } from "thirdweb/react";
 import { ConnectButton } from "thirdweb/react";
 import { inAppWallet, createWallet } from "thirdweb/wallets";
@@ -70,6 +70,7 @@ export default function WalletTab() {
   // Entferne useBalance und nutze wieder eigenen State:
   const [dfaithBalance, setDfaithBalance] = useState<{ displayValue: string } | null>(null);
   const [dinvestBalance, setDinvestBalance] = useState<{ displayValue: string } | null>(null);
+  const [stakedBalance, setStakedBalance] = useState<string>("0");
 
   const [dfaithEurValue, setDfaithEurValue] = useState<string>("0.00");
   const [dfaithPriceEur, setDfaithPriceEur] = useState<number>(0.001);
@@ -108,7 +109,7 @@ export default function WalletTab() {
   };
 
   const STAKING_CONTRACT = {
-    address: "0xe730555afA4DeA022976DdDc0cC7DBba1C98568A", // D.INVEST Staking Contract
+    address: "0x89E0ED96e21E73e1F47260cdF72e7E7cb878A2B2", // Aktualisierte D.INVEST Staking Contract-Adresse
     name: "D.INVEST Staking"
   };
 
@@ -191,19 +192,47 @@ export default function WalletTab() {
 
       // D.INVEST: Keine Dezimalstellen
       setDinvestBalance({ displayValue: Math.floor(Number(dinvestValue)).toString() });
-      // Optional: State für POL-Balance hinzufügen, falls du sie anzeigen möchtest
-      // setPolBalance({ displayValue: ... });
+      
+      // Gestakte Balance aus Staking Contract abrufen
+      await fetchStakedBalance();
+      
       fetchDfaithEurValue(dfaithDisplay);
 
       // Debug-Ausgabe für D.INVEST API-Antwort
       console.debug("DINVEST Insight API Wert (raw):", dinvestValue);
-      // Optional: Hier könntest du auch fetchDinvestEurValue(dinvestValue) aufrufen, wenn du einen EUR-Wert anzeigen willst.
     } catch (error) {
-      // Fehlerbehandlung
+      console.error("Fehler beim Laden der Balances:", error);
     } finally {
       if (currentRequestId === requestIdRef.current) {
         setIsLoadingBalances(false);
       }
+    }
+  };
+
+  // Funktion zum Abrufen der gestakten Balance
+  const fetchStakedBalance = async () => {
+    if (!account?.address) {
+      setStakedBalance("0");
+      return;
+    }
+
+    try {
+      const stakingContract = getContract({ 
+        client, 
+        chain: polygon, 
+        address: STAKING_CONTRACT.address 
+      });
+
+      const stakeInfo = await readContract({
+        contract: stakingContract,
+        method: "function stakers(address) view returns (uint256, uint256)",
+        params: [account.address]
+      });
+      // stakeInfo[0] ist die gestakte Menge
+      setStakedBalance(stakeInfo[0].toString());
+    } catch (error) {
+      console.error("Fehler beim Abrufen der gestakten Balance:", error);
+      setStakedBalance("0");
     }
   };
 
@@ -216,6 +245,7 @@ export default function WalletTab() {
     try {
       await fetchTokenBalances();
       await fetchDfaithPrice();
+      await fetchStakedBalance(); // Gestakte Balance auch beim manuellen Refresh aktualisieren
     } finally {
       // Nach einer kurzen Verzögerung den Refresh-Status zurücksetzen (Animation)
       setTimeout(() => setIsRefreshing(false), 800);
@@ -485,7 +515,7 @@ export default function WalletTab() {
         </button>
         {/* Gestaked Anzeige */}
         <div className="text-xs text-zinc-500 mt-2">
-          Gestaked: <span className="text-amber-400/80">0</span>
+          Gestaked: <span className="text-amber-400/80">{stakedBalance}</span>
         </div>
       </div>
     );

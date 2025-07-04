@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import { Button } from "../../../../components/ui/button";
+import { Card } from "../../../../components/ui/card";
 import { FaLock, FaUnlock, FaCoins, FaClock } from "react-icons/fa";
 import { useActiveAccount } from "thirdweb/react";
 import { createThirdwebClient, getContract, prepareContractCall, resolveMethod, readContract } from "thirdweb";
@@ -101,18 +102,18 @@ export default function StakeTab() {
           setLastClaimed(0);
         }
         
-        // Claimable Rewards abrufen (neue Funktion)
+        // Claimable Rewards abrufen (korrigierte Funktion)
         try {
           const claimable = await readContract({
             contract: staking,
-            method: "function getPendingReward(address) view returns (uint256)",
+            method: "function getClaimableReward(address) view returns (uint256)",
             params: [account.address]
           });
           // Rewards sind in D.FAITH mit 2 Decimals
           const rewardsFormatted = Number(claimable) / Math.pow(10, 2);
           setClaimableRewards(rewardsFormatted.toFixed(2));
         } catch (e) {
-          console.error("Fehler beim Abrufen der Pending Rewards:", e);
+          console.error("Fehler beim Abrufen der Claimable Rewards:", e);
           setClaimableRewards("0.00");
         }
         
