@@ -267,31 +267,86 @@ export default function BuyTab() {
   const [dfaithBalance, setDfaithBalance] = useState("0.00");
   const [dinvestBalance, setDinvestBalance] = useState("0");
 
+  // Neue Funktion für Balance via Thirdweb Insight API (wie im WalletTab)
+  const fetchTokenBalanceViaInsightApi = async (
+    tokenAddress: string,
+    accountAddress: string
+  ): Promise<string> => {
+    if (!accountAddress) return "0";
+    try {
+      const params = new URLSearchParams({
+        chain_id: "137",
+        token_address: tokenAddress,
+        owner_address: accountAddress,
+        include_native: "true",
+        resolve_metadata_links: "true",
+        include_spam: "false",
+        limit: "50",
+        metadata: "false",
+      });
+      
+      const url = `https://insight.thirdweb.com/v1/tokens?${params.toString()}`;
+      const res = await fetch(url, {
+        method: "GET",
+        headers: {
+          "x-client-id": process.env.NEXT_PUBLIC_TEMPLATE_CLIENT_ID || "",
+        },
+      });
+      
+      let data;
+      try {
+        data = await res.json();
+      } catch (jsonErr) {
+        console.error("BuyTab: Insight API konnte keine JSON-Antwort parsen:", jsonErr);
+        data = null;
+      }
+      
+      if (!res.ok) {
+        console.error("BuyTab: Insight API Fehlerstatus:", res.status, res.statusText);
+        console.error("BuyTab: Insight API Fehlerantwort:", JSON.stringify(data, null, 2));
+        throw new Error("API Error");
+      }
+      
+      const balance = data?.data?.[0]?.balance ?? "0";
+      return balance;
+    } catch (e) {
+      console.error("BuyTab: Insight API Fehler:", e);
+      return "0";
+    }
+  };
+
   // Balances laden
   useEffect(() => {
-    if (!account?.address) {
-      setDfaithBalance("0.00");
-      setDinvestBalance("0");
-      return;
-    }
-    // D.FAITH
-    (async () => {
+    const loadBalances = async () => {
+      if (!account?.address) {
+        setDfaithBalance("0.00");
+        setDinvestBalance("0");
+        return;
+      }
+      
       try {
-        const res = await fetch(`https://insight.thirdweb.com/v1/tokens?chain_id=137&token_address=${DFAITH_TOKEN}&owner_address=${account.address}&include_native=true`);
-        const data = await res.json();
-        const bal = data?.data?.[0]?.balance ?? "0";
-        setDfaithBalance((Number(bal) / Math.pow(10, DFAITH_DECIMALS)).toFixed(DFAITH_DECIMALS));
-      } catch { setDfaithBalance("0.00"); }
-    })();
-    // D.INVEST
-    (async () => {
-      try {
-        const res = await fetch(`https://insight.thirdweb.com/v1/tokens?chain_id=137&token_address=${DINVEST_TOKEN}&owner_address=${account.address}&include_native=true`);
-        const data = await res.json();
-        const bal = data?.data?.[0]?.balance ?? "0";
-        setDinvestBalance(Math.floor(Number(bal)).toString());
-      } catch { setDinvestBalance("0"); }
-    })();
+        // D.FAITH Balance laden
+        const dfaithValue = await fetchTokenBalanceViaInsightApi(DFAITH_TOKEN, account.address);
+        const dfaithRaw = Number(dfaithValue);
+        const dfaithDisplay = (dfaithRaw / Math.pow(10, DFAITH_DECIMALS)).toFixed(DFAITH_DECIMALS);
+        setDfaithBalance(dfaithDisplay);
+        
+        // D.INVEST Balance laden  
+        const dinvestValue = await fetchTokenBalanceViaInsightApi(DINVEST_TOKEN, account.address);
+        setDinvestBalance(Math.floor(Number(dinvestValue)).toString());
+        
+      } catch (error) {
+        console.error("BuyTab: Fehler beim Laden der Token-Balances:", error);
+        setDfaithBalance("0.00");
+        setDinvestBalance("0");
+      }
+    };
+    
+    loadBalances();
+    
+    // Balance alle 30 Sekunden aktualisieren
+    const interval = setInterval(loadBalances, 30000);
+    return () => clearInterval(interval);
   }, [account?.address]);
 
   // D.FAITH Swap Funktion mit mehrstufigem Prozess wie im SellTab
@@ -472,15 +527,15 @@ export default function BuyTab() {
             setQuoteTxData(null);
             setSpenderAddress(null);
             // D.FAITH Balance auch aktualisieren
-            setTimeout(() => {
-              (async () => {
-                try {
-                  const res = await fetch(`https://insight.thirdweb.com/v1/tokens?chain_id=137&token_address=${DFAITH_TOKEN}&owner_address=${account.address}&include_native=true`);
-                  const data = await res.json();
-                  const bal = data?.data?.[0]?.balance ?? "0";
-                  setDfaithBalance((Number(bal) / Math.pow(10, DFAITH_DECIMALS)).toFixed(DFAITH_DECIMALS));
-                } catch {}
-              })();
+            setTimeout(async () => {
+              try {
+                const dfaithValue = await fetchTokenBalanceViaInsightApi(DFAITH_TOKEN, account.address);
+                const dfaithRaw = Number(dfaithValue);
+                const dfaithDisplay = (dfaithRaw / Math.pow(10, DFAITH_DECIMALS)).toFixed(DFAITH_DECIMALS);
+                setDfaithBalance(dfaithDisplay);
+              } catch (error) {
+                console.error("Fehler beim Aktualisieren der D.FAITH Balance nach Swap:", error);
+              }
             }, 1000);
             setTimeout(() => setSwapTxStatus(null), 5000);
           } else {
