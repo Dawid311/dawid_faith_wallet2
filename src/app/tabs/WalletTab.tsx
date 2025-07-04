@@ -544,8 +544,11 @@ export default function WalletTab() {
     return (
       <div className="flex flex-col items-center p-4 bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl border border-zinc-700 w-full">
         <div className="uppercase text-xs tracking-widest text-amber-500/80 mb-2">D.INVEST</div>
-        <div className="text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 mb-2">
-          {dinvestBalance?.displayValue}
+        <div className="text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 mb-2 flex items-center">
+          {dinvestBalance?.displayValue || "0"}
+          {(isLoadingBalances || isRefreshing) && (
+            <span className="ml-2 text-xs text-amber-500/60 animate-pulse">↻</span>
+          )}
         </div>
         <button 
           onClick={() => setShowStakeModal(true)}
@@ -632,7 +635,10 @@ export default function WalletTab() {
             <div className="flex flex-col items-center p-4 bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl border border-zinc-700 w-full mb-6">
               <span className="uppercase text-xs tracking-widest text-amber-500/80 mb-2">D.FAITH</span>
               <div className="text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 drop-shadow-sm">
-                {isLoadingBalances ? "..." : (dfaithBalance ? dfaithBalance.displayValue : "0.00")}
+                {dfaithBalance ? dfaithBalance.displayValue : "0.00"}
+                {(isLoadingBalances || isRefreshing) && (
+                  <span className="ml-2 text-xs text-amber-500/60 animate-pulse">↻</span>
+                )}
               </div>
               {/* Nur EUR-Wert anzeigen, wenn Preisquote vorhanden ist */}
               {dfaithPriceEur > 0 && (
