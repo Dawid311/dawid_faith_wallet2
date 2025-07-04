@@ -186,13 +186,30 @@ export default function StakeTab() {
 
   // Stake Function (echtes Staking mit Approval-Check)
   const handleStake = async () => {
-    if (!stakeAmount || parseInt(stakeAmount) <= 0 || !account?.address) return;
+    if (!stakeAmount || parseInt(stakeAmount) <= 0 || !account?.address) {
+      console.log("Ungültige Eingabe oder keine Wallet verbunden");
+      return;
+    }
+    
+    const amountToStakeNum = parseInt(stakeAmount);
+    const availableNum = parseInt(available);
+    
+    if (amountToStakeNum > availableNum) {
+      setTxStatus("error");
+      console.log("Nicht genügend Token verfügbar");
+      return;
+    }
+    
     setTxStatus("pending");
+    
     try {
       const staking = getContract({ client, chain: polygon, address: STAKING_CONTRACT });
       const dinvest = getContract({ client, chain: polygon, address: DINVEST_TOKEN });
-      const amountToStake = BigInt(parseInt(stakeAmount));
-      // 1. Allowance prüfen
+      const amountToStake = BigInt(amountToStakeNum);
+      
+      console.log("Staking Betrag:", amountToStakeNum);
+      
+      // 1. Aktuelle Allowance prüfen
       let allowance = BigInt(0);
       try {
         allowance = await readContract({
@@ -200,72 +217,161 @@ export default function StakeTab() {
           method: "function allowance(address,address) view returns (uint256)",
           params: [account.address, STAKING_CONTRACT]
         });
+        console.log("Aktuelle Allowance:", allowance.toString());
       } catch (e) {
+        console.error("Fehler beim Abrufen der Allowance:", e);
         allowance = BigInt(0);
       }
-      // 2. Approve, falls nötig
+      
+      // 2. Approve, falls nötig (mit etwas Puffer)
       if (allowance < amountToStake) {
+        console.log("Approval erforderlich");
         setTxStatus("approving");
+        
         const approveTx = prepareContractCall({
           contract: dinvest,
           method: "function approve(address,uint256) returns (bool)",
-          params: [STAKING_CONTRACT, amountToStake]
+          params: [STAKING_CONTRACT, amountToStake * BigInt(2)] // Etwas mehr für zukünftige Transaktionen
         });
-        await sendTransaction(approveTx);
+        
+        await new Promise<void>((resolve, reject) => {
+          sendTransaction(approveTx, {
+            onSuccess: () => {
+              console.log("Approval erfolgreich");
+              resolve();
+            },
+            onError: (error) => {
+              console.error("Approval fehlgeschlagen:", error);
+              reject(error);
+            }
+          });
+        });
+        
+        // Kurz warten für Blockchain-Bestätigung
+        await new Promise(resolve => setTimeout(resolve, 2000));
       }
+      
       // 3. Stake die Token
+      console.log("Staking wird durchgeführt...");
       setTxStatus("staking");
+      
       const stakeTx = prepareContractCall({
         contract: staking,
         method: "function stake(uint256)",
         params: [amountToStake]
       });
-      await sendTransaction(stakeTx);
-      setTxStatus("success");
-      setStakeAmount("");
+      
+      await new Promise<void>((resolve, reject) => {
+        sendTransaction(stakeTx, {
+          onSuccess: () => {
+            console.log("Staking erfolgreich");
+            setTxStatus("success");
+            setStakeAmount("");
+            // Status nach 3 Sekunden zurücksetzen
+            setTimeout(() => setTxStatus(null), 3000);
+            resolve();
+          },
+          onError: (error) => {
+            console.error("Staking fehlgeschlagen:", error);
+            setTxStatus("error");
+            setTimeout(() => setTxStatus(null), 5000);
+            reject(error);
+          }
+        });
+      });
+      
     } catch (e) {
       console.error("Stake Fehler:", e);
       setTxStatus("error");
+      setTimeout(() => setTxStatus(null), 5000);
     }
   };
 
   // Unstake Function (unstakes all)
   const handleUnstake = async () => {
+    if (!account?.address || staked === "0") {
+      console.log("Keine Token zum Unstaken verfügbar");
+      return;
+    }
+    
     setTxStatus("pending");
+    
     try {
       const staking = getContract({ client, chain: polygon, address: STAKING_CONTRACT });
+      
+      console.log("Unstaking alle Token:", staked);
       
       const unstakeTx = prepareContractCall({
         contract: staking,
         method: "function unstake()",
         params: []
       });
-      await sendTransaction(unstakeTx);
       
-      setTxStatus("success");
+      await new Promise<void>((resolve, reject) => {
+        sendTransaction(unstakeTx, {
+          onSuccess: () => {
+            console.log("Unstaking erfolgreich");
+            setTxStatus("success");
+            setTimeout(() => setTxStatus(null), 3000);
+            resolve();
+          },
+          onError: (error) => {
+            console.error("Unstaking fehlgeschlagen:", error);
+            setTxStatus("error");
+            setTimeout(() => setTxStatus(null), 5000);
+            reject(error);
+          }
+        });
+      });
+      
     } catch (e) {
       console.error("Unstake Fehler:", e);
       setTxStatus("error");
+      setTimeout(() => setTxStatus(null), 5000);
     }
   };
 
   // Claim Rewards Function
   const handleClaim = async () => {
+    if (!account?.address || parseFloat(claimableRewards) <= 0) {
+      console.log("Keine Rewards zum Einfordern verfügbar");
+      return;
+    }
+    
     setTxStatus("pending");
+    
     try {
       const staking = getContract({ client, chain: polygon, address: STAKING_CONTRACT });
+      
+      console.log("Claim Rewards:", claimableRewards);
       
       const claimTx = prepareContractCall({
         contract: staking,
         method: "function claimReward()",
         params: []
       });
-      await sendTransaction(claimTx);
       
-      setTxStatus("success");
+      await new Promise<void>((resolve, reject) => {
+        sendTransaction(claimTx, {
+          onSuccess: () => {
+            console.log("Claim erfolgreich");
+            setTxStatus("success");
+            setTimeout(() => setTxStatus(null), 3000);
+            resolve();
+          },
+          onError: (error) => {
+            console.error("Claim fehlgeschlagen:", error);
+            setTxStatus("error");
+            setTimeout(() => setTxStatus(null), 5000);
+            reject(error);
+          }
+        });
+      });
+      
     } catch (e) {
       console.error("Claim Fehler:", e);
       setTxStatus("error");
+      setTimeout(() => setTxStatus(null), 5000);
     }
   };
 
@@ -381,7 +487,15 @@ export default function StakeTab() {
               placeholder="0"
               className="w-full bg-zinc-900/80 border border-zinc-600 rounded-xl py-4 px-4 text-lg font-bold text-amber-400 focus:border-amber-500 focus:outline-none"
               value={stakeAmount}
-              onChange={(e) => setStakeAmount(Math.floor(Number(e.target.value)).toString())}
+              onChange={(e) => {
+                const value = e.target.value;
+                // Nur positive ganze Zahlen erlauben
+                if (value === "" || (Number(value) >= 0 && Number.isInteger(Number(value)))) {
+                  setStakeAmount(value);
+                }
+              }}
+              min="0"
+              step="1"
             />
           </div>
 
@@ -394,31 +508,43 @@ export default function StakeTab() {
           )}
 
           <Button
-            className="w-full bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-3 rounded-xl hover:opacity-90 transition-opacity mt-2"
-            disabled={!stakeAmount || parseInt(stakeAmount) <= 0}
+            className="w-full bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-3 rounded-xl hover:opacity-90 transition-opacity mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={!stakeAmount || parseInt(stakeAmount) <= 0 || parseInt(stakeAmount) > parseInt(available) || loading || txStatus === "pending" || txStatus === "approving" || txStatus === "staking"}
             onClick={handleStake}
           >
             <FaLock className="inline mr-2" />
-            {!stakeAmount || parseInt(stakeAmount) <= 0 ? "Betrag eingeben" : `${stakeAmount} D.INVEST staken`}
+            {txStatus === "approving" && "Approval läuft..."}
+            {txStatus === "staking" && "Staking läuft..."}
+            {txStatus === "pending" && "Wird verarbeitet..."}
+            {!txStatus && (!stakeAmount || parseInt(stakeAmount) <= 0) && "Betrag eingeben"}
+            {!txStatus && stakeAmount && parseInt(stakeAmount) > parseInt(available) && "Nicht genügend Token"}
+            {!txStatus && stakeAmount && parseInt(stakeAmount) > 0 && parseInt(stakeAmount) <= parseInt(available) && `${stakeAmount} D.INVEST staken`}
           </Button>
 
-          {/* Status kompakt als Info-Box */}
-          {(txStatus === "success" || txStatus === "error" || txStatus === "pending" || txStatus === "approving" || txStatus === "staking") && (
-            <div className={`mt-4 p-2 rounded text-center text-sm font-medium ${
-              txStatus === "success" ? "bg-green-500/20 text-green-400" :
-              txStatus === "error" ? "bg-red-500/20 text-red-400" :
-              txStatus === "pending" ? "bg-yellow-500/20 text-yellow-400" :
-              txStatus === "approving" ? "bg-orange-500/20 text-orange-400" :
-              txStatus === "staking" ? "bg-purple-500/20 text-purple-400" :
-              ""
-            }`}>
-              {txStatus === "success" && "Transaktion erfolgreich!"}
-              {txStatus === "error" && "Transaktion fehlgeschlagen!"}
-              {txStatus === "pending" && "Transaktion läuft..."}
-              {txStatus === "approving" && "Approval wird durchgeführt..."}
-              {txStatus === "staking" && "Staking wird durchgeführt..."}
+        {/* Status kompakt als Info-Box */}
+        {(txStatus === "success" || txStatus === "error" || txStatus === "pending" || txStatus === "approving" || txStatus === "staking") && (
+          <div className={`mt-4 p-3 rounded-lg text-center text-sm font-medium border ${
+            txStatus === "success" ? "bg-green-500/20 text-green-400 border-green-500/30" :
+            txStatus === "error" ? "bg-red-500/20 text-red-400 border-red-500/30" :
+            txStatus === "pending" ? "bg-yellow-500/20 text-yellow-400 border-yellow-500/30" :
+            txStatus === "approving" ? "bg-orange-500/20 text-orange-400 border-orange-500/30" :
+            txStatus === "staking" ? "bg-purple-500/20 text-purple-400 border-purple-500/30" :
+            ""
+          }`}>
+            <div className="flex items-center justify-center gap-2">
+              {(txStatus === "pending" || txStatus === "approving" || txStatus === "staking") && (
+                <div className="animate-spin rounded-full h-4 w-4 border-2 border-current border-t-transparent"></div>
+              )}
+              <span>
+                {txStatus === "success" && "✅ Transaktion erfolgreich abgeschlossen!"}
+                {txStatus === "error" && "❌ Transaktion fehlgeschlagen! Bitte versuchen Sie es erneut."}
+                {txStatus === "pending" && "⏳ Transaktion wird verarbeitet..."}
+                {txStatus === "approving" && "🔐 Token-Genehmigung wird erteilt..."}
+                {txStatus === "staking" && "🔒 Staking-Vorgang läuft..."}
+              </span>
             </div>
-          )}
+          </div>
+        )}
         </div>
       )}
 
@@ -454,12 +580,14 @@ export default function StakeTab() {
           )}
 
           <Button 
-            className="w-full bg-zinc-700/50 hover:bg-zinc-600/50 text-zinc-300 font-bold py-3 rounded-xl border border-zinc-600 transition-all"
-            disabled={staked === "0"}
+            className="w-full bg-zinc-700/50 hover:bg-zinc-600/50 text-zinc-300 font-bold py-3 rounded-xl border border-zinc-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={staked === "0" || loading || txStatus === "pending"}
             onClick={handleUnstake}
           >
             <FaUnlock className="inline mr-2" />
-            {staked === "0" ? "Keine Token gestaked" : `Alle ${staked} D.INVEST unstaken`}
+            {txStatus === "pending" && "Wird verarbeitet..."}
+            {!txStatus && staked === "0" && "Keine Token gestaked"}
+            {!txStatus && staked !== "0" && `Alle ${staked} D.INVEST unstaken`}
           </Button>
         </div>
       )}
@@ -483,19 +611,32 @@ export default function StakeTab() {
         </div>
         
         <Button 
-          className="w-full bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-3 rounded-xl hover:opacity-90 transition-opacity"
-          disabled={parseFloat(claimableRewards) <= 0 || isPending}
+          className="w-full bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-3 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+          disabled={parseFloat(claimableRewards) <= 0 || loading || txStatus === "pending"}
           onClick={handleClaim}
         >
           <FaCoins className="inline mr-2" />
-          {isPending ? "Wird ausgeführt..." : "Belohnungen einfordern"}
+          {txStatus === "pending" ? "Wird verarbeitet..." : "Belohnungen einfordern"}
         </Button>
         {/* Erfolgsmeldung hier ENTFERNT */}
-        {txStatus === "error" && (
-          <div className="mt-2 text-red-400 text-sm text-center">Transaktion fehlgeschlagen!</div>
-        )}
-        {txStatus === "pending" && (
-          <div className="mt-2 text-yellow-400 text-sm text-center">Transaktion läuft...</div>
+        {(txStatus === "success" || txStatus === "error" || txStatus === "pending") && (
+          <div className={`mt-3 p-3 rounded-lg text-center text-sm font-medium border ${
+            txStatus === "success" ? "bg-green-500/20 text-green-400 border-green-500/30" :
+            txStatus === "error" ? "bg-red-500/20 text-red-400 border-red-500/30" :
+            txStatus === "pending" ? "bg-yellow-500/20 text-yellow-400 border-yellow-500/30" :
+            ""
+          }`}>
+            <div className="flex items-center justify-center gap-2">
+              {txStatus === "pending" && (
+                <div className="animate-spin rounded-full h-4 w-4 border-2 border-current border-t-transparent"></div>
+              )}
+              <span>
+                {txStatus === "success" && "✅ Belohnungen erfolgreich eingefordert!"}
+                {txStatus === "error" && "❌ Fehler beim Einfordern der Belohnungen!"}
+                {txStatus === "pending" && "⏳ Belohnungen werden eingefordert..."}
+              </span>
+            </div>
+          </div>
         )}
       </div>
 
