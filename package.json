@@ -9,13 +9,15 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@coinbase/onchainkit": "^0.38.15",
     "@tanstack/react-query": "^5.81.5",
     "axios": "^1.10.0",
     "next": "14.1.0",
     "react": "^18.3",
     "react-dom": "^18.3",
     "react-icons": "^5.5.0",
-    "thirdweb": "^5"
+    "viem": "^2.31.7",
+    "wagmi": "^2.15.6"
   },
   "devDependencies": {
     "@types/axios": "^0.14.4",

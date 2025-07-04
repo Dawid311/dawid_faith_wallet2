@@ -1,15 +1,20 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { ThirdwebProvider } from "thirdweb/react";
-import QueryProvider from "./QueryProvider";
+import { OnchainKitProvider } from '@coinbase/onchainkit';
+import { WagmiProvider } from 'wagmi';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { config, ONCHAIN_CONFIG } from './onchainConfig';
+import { base } from 'wagmi/chains';
+
+const queryClient = new QueryClient();
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "thirdweb SDK + Next starter",
+  title: "Dawid Faith Wallet - Base",
   description:
-    "Starter template for using thirdweb SDK with Next.js App router",
+    "Dawid Faith Wallet auf dem Base-Netzwerk mit OnchainKit",
 };
 
 export default function RootLayout({
@@ -20,9 +25,17 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <ThirdwebProvider>
-          <QueryProvider>{children}</QueryProvider>
-        </ThirdwebProvider>
+        <WagmiProvider config={config}>
+          <QueryClientProvider client={queryClient}>
+            <OnchainKitProvider
+              apiKey={ONCHAIN_CONFIG.apiKey}
+              chain={base}
+              schemaId={ONCHAIN_CONFIG.schemaId}
+            >
+              {children}
+            </OnchainKitProvider>
+          </QueryClientProvider>
+        </WagmiProvider>
       </body>
     </html>
   );
