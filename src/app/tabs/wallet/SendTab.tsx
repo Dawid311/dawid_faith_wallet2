@@ -42,14 +42,14 @@ export default function SendTab() {
       try {
         const balances = await fetchAllBalances(account.address);
         console.log("SendTab: Geladene Balances:", balances);
-        setDfaithBalance(balances.dfaith);
-        setDinvestBalance(balances.dinvest);
-        setPolBalance(balances.pol);
+        
+        // Nur die Balances aktualisieren wenn sie erfolgreich geladen wurden
+        if (balances.dfaith !== undefined) setDfaithBalance(balances.dfaith);
+        if (balances.dinvest !== undefined) setDinvestBalance(balances.dinvest);
+        if (balances.pol !== undefined) setPolBalance(balances.pol);
       } catch (error) {
         console.error("Fehler beim Laden der Balances:", error);
-        setDfaithBalance("0.00");
-        setDinvestBalance("0");
-        setPolBalance("0.0000");
+        // Bei Fehlern die alten Werte beibehalten, nicht auf "0" setzen
       } finally {
         setIsLoadingBalances(false);
       }
@@ -58,7 +58,7 @@ export default function SendTab() {
     loadBalances();
     const interval = setInterval(loadBalances, 10000); // Update alle 10 Sekunden
     return () => clearInterval(interval);
-  }, [account?.address, isSending]);
+  }, [account?.address]);
 
   const handleSend = async () => {
     if (!sendAmount || !sendToAddress) return;
@@ -102,39 +102,51 @@ export default function SendTab() {
         Token senden
       </h2>
 
-      {/* Token-Auswahl als Buttons mit verbesserter Balance-Anzeige */}
-      <div className="space-y-3 mb-4">
-        <div className="text-sm font-medium text-zinc-300 mb-2">Token auswählen:</div>
-        <div className="grid grid-cols-1 gap-2">
-          {tokenOptions.map((t) => (
-            <button
-              key={t.key}
-              className={`w-full p-3 rounded-lg font-medium text-sm transition border flex justify-between items-center
-                ${selectedToken === t.key
-                  ? "bg-amber-500/20 text-amber-400 border-amber-400"
-                  : "bg-zinc-800 text-zinc-300 border-zinc-700 hover:bg-zinc-700/60"}
-              `}
-              onClick={() => setSelectedToken(t.key)}
-              type="button"
-            >
-              <div className="flex items-center gap-2">
-                <div className={`w-3 h-3 rounded-full ${
-                  selectedToken === t.key ? 'bg-amber-400' : 'bg-zinc-600'
-                }`}></div>
-                <span className="font-semibold">{t.label}</span>
-              </div>
-              <div className="text-right">
-                <div className={`font-bold ${selectedToken === t.key ? 'text-amber-300' : 'text-zinc-200'}`}>
-                  {isLoadingBalances ? (
-                    <span className="animate-pulse">Laden...</span>
-                  ) : (
-                    t.balance
-                  )}
-                </div>
-                <div className="text-xs text-zinc-500">Verfügbar</div>
-              </div>
-            </button>
-          ))}
+      {/* Token-Auswahl als Dropdown */}
+      <div className="space-y-2">
+        <label className="text-sm font-medium text-zinc-300">Token auswählen:</label>
+        <div className="relative">
+          <select
+            value={selectedToken}
+            onChange={(e) => setSelectedToken(e.target.value)}
+            className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-3 text-zinc-200 focus:border-amber-500 focus:outline-none appearance-none cursor-pointer"
+          >
+            {tokenOptions.map((t) => (
+              <option key={t.key} value={t.key} className="bg-zinc-900 text-zinc-200">
+                {t.label} - {isLoadingBalances ? "Laden..." : t.balance} verfügbar
+              </option>
+            ))}
+          </select>
+          {/* Custom Dropdown Arrow */}
+          <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+            <svg className="w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </div>
+        </div>
+        {/* Balance-Info für den ausgewählten Token */}
+        <div className="flex items-center justify-between p-2 bg-zinc-800/50 rounded-lg border border-zinc-700/50">
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 bg-amber-400 rounded-full"></div>
+            <span className="text-sm font-medium text-zinc-300">
+              {tokenOptions.find(t => t.key === selectedToken)?.label}
+            </span>
+          </div>
+          <div className="text-right">
+            <div className="text-sm font-bold text-amber-400">
+              {isLoadingBalances ? (
+                <span className="inline-flex items-center gap-1">
+                  <span className="opacity-75">
+                    {tokenOptions.find(t => t.key === selectedToken)?.balance}
+                  </span>
+                  <span className="animate-spin text-xs">↻</span>
+                </span>
+              ) : (
+                tokenOptions.find(t => t.key === selectedToken)?.balance
+              )}
+            </div>
+            <div className="text-xs text-zinc-500">Verfügbar</div>
+          </div>
         </div>
       </div>
 
@@ -144,8 +156,20 @@ export default function SendTab() {
           <label className="text-sm font-medium text-zinc-300">Betrag:</label>
           <div className="text-xs text-zinc-500">
             Verfügbar: <span className="text-amber-400 font-semibold">
-              {selectedToken === "DFAITH" ? dfaithBalance : 
-               selectedToken === "DINVEST" ? dinvestBalance : polBalance} {selectedToken}
+              {isLoadingBalances ? (
+                <span className="inline-flex items-center gap-1">
+                  <span className="opacity-75">
+                    {selectedToken === "DFAITH" ? dfaithBalance : 
+                     selectedToken === "DINVEST" ? dinvestBalance : polBalance}
+                  </span>
+                  <span className="animate-spin text-xs">↻</span>
+                </span>
+              ) : (
+                <>
+                  {selectedToken === "DFAITH" ? dfaithBalance : 
+                   selectedToken === "DINVEST" ? dinvestBalance : polBalance} {selectedToken}
+                </>
+              )}
             </span>
           </div>
         </div>
