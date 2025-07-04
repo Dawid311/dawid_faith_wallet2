@@ -7,7 +7,7 @@ import { polygon } from "thirdweb/chains";
 import { useSendTransaction } from "thirdweb/react";
 import { balanceOf, approve } from "thirdweb/extensions/erc20";
 
-const STAKING_CONTRACT = "0x651BACc1A1579f2FaaeDA2450CE59bB5E7D26e7d"; // Neue Staking Contract-Adresse
+const STAKING_CONTRACT = "0x89E0ED96e21E73e1F47260cdF72e7E7cb878A2B2"; // Aktualisierte Staking Contract-Adresse
 const DFAITH_TOKEN = "0xF051E3B0335eB332a7ef0dc308BB4F0c10301060";
 const DFAITH_DECIMALS = 2;
 const DINVEST_TOKEN = "0x90aCC32F7b0B1CACc3958a260c096c10CCfa0383";
@@ -101,18 +101,18 @@ export default function StakeTab() {
           setLastClaimed(0);
         }
         
-        // Claimable Rewards abrufen
+        // Claimable Rewards abrufen (neue Funktion)
         try {
           const claimable = await readContract({
             contract: staking,
-            method: "function getClaimableReward(address) view returns (uint256)",
+            method: "function getPendingReward(address) view returns (uint256)",
             params: [account.address]
           });
           // Rewards sind in D.FAITH mit 2 Decimals
           const rewardsFormatted = Number(claimable) / Math.pow(10, 2);
           setClaimableRewards(rewardsFormatted.toFixed(2));
         } catch (e) {
-          console.error("Fehler beim Abrufen der Claimable Rewards:", e);
+          console.error("Fehler beim Abrufen der Pending Rewards:", e);
           setClaimableRewards("0.00");
         }
         
@@ -214,13 +214,6 @@ export default function StakeTab() {
       return;
     }
 
-    // Wenn der Contract einen Stake erwartet, aber keiner vorhanden ist, verhindere den Aufruf
-    if (staked === "0" && parseInt(stakeAmount) <= 0) {
-      setTxStatus("error");
-      console.log("Du hast keinen Stake. Bitte gib einen gültigen Betrag ein.");
-      return;
-    }
-
     const amountToStakeNum = parseInt(stakeAmount);
     const availableNum = parseInt(available);
 
@@ -246,9 +239,6 @@ export default function StakeTab() {
 
       console.log("Staking Betrag:", amountToStakeNum);
       console.log("Aktuell gestaked:", staked);
-      
-      // Der Contract hat nur stake() - diese Funktion addiert automatisch zum bestehenden Stake
-      // und claimed automatisch Rewards vor dem neuen Staking
       
       // 1. Aktuelle Allowance prüfen
       let allowance = BigInt(0);
@@ -292,7 +282,7 @@ export default function StakeTab() {
         await new Promise(resolve => setTimeout(resolve, 2000));
       }
       
-      // 3. Stake die Token (Contract addiert automatisch zum bestehenden Stake)
+      // 3. Stake die Token
       console.log("Staking wird durchgeführt...");
       setTxStatus("staking");
       
@@ -313,15 +303,9 @@ export default function StakeTab() {
             resolve();
           },
           onError: (error) => {
-            // Fehlerausgabe für den Nutzer
-            if (error && error.message && error.message.includes("No stake")) {
-              setTxStatus("error");
-              alert("Fehler: Du hast keinen Stake. Bitte stake zuerst einen Betrag.");
-            } else {
-              setTxStatus("error");
-            }
-            setTimeout(() => setTxStatus(null), 5000);
             console.error("Staking fehlgeschlagen:", error);
+            setTxStatus("error");
+            setTimeout(() => setTxStatus(null), 5000);
             reject(error);
           }
         });
@@ -336,8 +320,8 @@ export default function StakeTab() {
 
   // Unstake Function (unstakes all)
   const handleUnstake = async () => {
-    if (!account?.address || staked === "0" || !weekPassed) {
-      console.log("Keine Token zum Unstaken verfügbar oder Mindestzeit nicht erreicht");
+    if (!account?.address || staked === "0") {
+      console.log("Keine Token zum Unstaken verfügbar");
       return;
     }
     
@@ -434,11 +418,26 @@ export default function StakeTab() {
     return ((stakedNum * currentRewardRate) / 100).toFixed(2);
   };
 
-  // Hilfsfunktion: Ist eine Woche vorbei?
+  // Hilfsfunktion: Ist eine Woche seit dem letzten Claim vorbei?
   const weekPassed = useMemo(() => {
-    if (!lastClaimed) return false;
-    return blockTimestamp >= lastClaimed + 7 * 24 * 60 * 60;
-  }, [blockTimestamp, lastClaimed]);
+    if (!lastClaimed || !blockTimestamp) return false;
+    return blockTimestamp >= lastClaimed + 7 * 24 * 60 * 60; // 1 Woche = 604800 Sekunden
+  }, [lastClaimed, blockTimestamp]);
+
+  // Hilfsfunktion: Zeit bis zum nächsten Claim
+  const getTimeUntilNextClaim = () => {
+    if (!lastClaimed || !blockTimestamp || weekPassed) return null;
+    const nextClaimTime = lastClaimed + 7 * 24 * 60 * 60;
+    const timeLeft = nextClaimTime - blockTimestamp;
+    
+    const days = Math.floor(timeLeft / (24 * 60 * 60));
+    const hours = Math.floor((timeLeft % (24 * 60 * 60)) / (60 * 60));
+    const minutes = Math.floor((timeLeft % (60 * 60)) / 60);
+    
+    if (days > 0) return `${days}d ${hours}h ${minutes}m`;
+    if (hours > 0) return `${hours}h ${minutes}m`;
+    return `${minutes}m`;
+  };
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -633,8 +632,8 @@ export default function StakeTab() {
               <div className="text-sm text-zinc-300">
                 <div className="font-medium">Vollständiges Unstaking</div>
                 <div className="text-xs text-zinc-500 mt-1">
-                  Alle gestakten Token ({staked} D.INVEST) werden unstaked. 
-                  Mindestens 1 Woche Staking-Zeit erforderlich.
+                  Alle gestakten Token ({staked} D.INVEST) werden unstaked.
+                  Rewards werden automatisch ausgezahlt.
                 </div>
               </div>
             </div>
@@ -655,14 +654,13 @@ export default function StakeTab() {
 
           <Button 
             className="w-full bg-zinc-700/50 hover:bg-zinc-600/50 text-zinc-300 font-bold py-3 rounded-xl border border-zinc-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={staked === "0" || loading || txStatus === "pending" || !weekPassed}
+            disabled={staked === "0" || loading || txStatus === "pending"}
             onClick={handleUnstake}
           >
             <FaUnlock className="inline mr-2" />
             {txStatus === "pending" && "Wird verarbeitet..."}
             {!txStatus && staked === "0" && "Keine Token gestaked"}
-            {!txStatus && staked !== "0" && !weekPassed && "Mindestens 1 Woche Staking-Zeit erforderlich"}
-            {!txStatus && staked !== "0" && weekPassed && `Alle ${staked} D.INVEST unstaken`}
+            {!txStatus && staked !== "0" && `Alle ${staked} D.INVEST unstaken`}
           </Button>
         </div>
       )}
@@ -676,7 +674,12 @@ export default function StakeTab() {
             </div>
             <div>
               <h3 className="font-bold text-amber-400">Verfügbare Belohnungen</h3>
-              <p className="text-xs text-zinc-500">Verdiente D.FAITH Token (wöchentlich)</p>
+              <p className="text-xs text-zinc-500">
+                {!weekPassed && lastClaimed > 0 
+                  ? `Nächster Claim in: ${getTimeUntilNextClaim()}`
+                  : "Verdiente D.FAITH Token (wöchentlich)"
+                }
+              </p>
             </div>
           </div>
           <div className="text-right">
@@ -691,7 +694,10 @@ export default function StakeTab() {
           onClick={handleClaim}
         >
           <FaCoins className="inline mr-2" />
-          {txStatus === "pending" ? "Wird verarbeitet..." : !weekPassed ? "Mindestens 1 Woche Staking-Zeit erforderlich" : "Belohnungen einfordern"}
+          {txStatus === "pending" ? "Wird verarbeitet..." : 
+           !weekPassed ? `Warten: ${getTimeUntilNextClaim()}` : 
+           parseFloat(claimableRewards) <= 0 ? "Keine Rewards verfügbar" : 
+           "Belohnungen einfordern"}
         </Button>
         {/* Erfolgsmeldung hier ENTFERNT */}
         {(txStatus === "success" || txStatus === "error" || txStatus === "pending") && (
@@ -726,7 +732,7 @@ export default function StakeTab() {
           <div>Network: Polygon (MATIC)</div>
           <div>Staking Token: D.INVEST (0 Decimals)</div>
           <div>Reward Token: D.FAITH (2 Decimals)</div>
-          <div>Reward System: Wöchentlich, stufenbasiert</div>
+          <div>Reward System: Automatische Mehrwochen-Berechnung</div>
           <div>Total Staked: {totalStakedTokens} D.INVEST</div>
         </div>
       </div>
