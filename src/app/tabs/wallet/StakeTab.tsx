@@ -360,13 +360,15 @@ export default function StakeTab() {
       {/* Stake Interface */}
       {activeTab === "stake" && (
         <div className="bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl p-6 border border-zinc-700 space-y-6">
-          <div>
-            <div className="flex justify-between items-center mb-3">
+          {/* Eingabe und verfügbare Balance in einer Zeile */}
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between mb-1">
               <label className="text-sm font-medium text-zinc-300">D.INVEST Betrag</label>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-zinc-500">Verfügbar: {loading ? "Laden..." : available}</span>
+              <div className="flex items-center gap-2 bg-zinc-800/60 px-2 py-1 rounded-lg">
+                <span className="text-xs text-zinc-500">Verfügbar:</span>
+                <span className="text-xs font-bold text-amber-400">{loading ? "Laden..." : available}</span>
                 <button 
-                  className="text-xs px-2 py-1 bg-amber-500/20 text-amber-400 rounded hover:bg-amber-500/30 transition"
+                  className="text-xs px-2 py-1 bg-amber-500/20 text-amber-400 rounded hover:bg-amber-500/30 transition ml-2"
                   onClick={() => setStakeAmount(available)}
                   disabled={loading || parseInt(available) <= 0}
                 >
@@ -385,39 +387,37 @@ export default function StakeTab() {
 
           {/* Reward Vorschau für Eingabe */}
           {stakeAmount && parseInt(stakeAmount) > 0 && (
-            <div className="bg-zinc-800/50 rounded-xl p-4 border border-zinc-700">
-              <div className="text-xs text-zinc-400 mb-1">
-                Ihr wöchentlicher Reward (Stufe {currentStage}):
-              </div>
-              <div className="text-lg font-bold text-amber-400">
-                {(parseInt(stakeAmount) * (currentRewardRate / 100)).toFixed(2)} D.FAITH
-              </div>
+            <div className="bg-zinc-800/60 rounded-xl p-4 border border-zinc-700 flex flex-col items-center mt-2">
+              <div className="text-xs text-zinc-400 mb-1">Ihr wöchentlicher Reward (Stufe {currentStage}):</div>
+              <div className="text-2xl font-bold text-amber-400">{(parseInt(stakeAmount) * (currentRewardRate / 100)).toFixed(2)} D.FAITH</div>
             </div>
           )}
 
           <Button
-            className="w-full bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-3 rounded-xl hover:opacity-90 transition-opacity"
+            className="w-full bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-3 rounded-xl hover:opacity-90 transition-opacity mt-2"
             disabled={!stakeAmount || parseInt(stakeAmount) <= 0}
             onClick={handleStake}
           >
             <FaLock className="inline mr-2" />
             {!stakeAmount || parseInt(stakeAmount) <= 0 ? "Betrag eingeben" : `${stakeAmount} D.INVEST staken`}
           </Button>
-          {/* Erfolgsmeldung NUR beim Stake */}
-          {txStatus === "success" && (
-            <div className="mt-2 text-green-400 text-sm text-center">Transaktion erfolgreich!</div>
-          )}
-          {txStatus === "error" && (
-            <div className="mt-2 text-red-400 text-sm text-center">Transaktion fehlgeschlagen!</div>
-          )}
-          {txStatus === "pending" && (
-            <div className="mt-2 text-yellow-400 text-sm text-center">Transaktion läuft...</div>
-          )}
-          {txStatus === "approving" && (
-            <div className="mt-2 text-orange-400 text-sm text-center">Approval wird durchgeführt...</div>
-          )}
-          {txStatus === "staking" && (
-            <div className="mt-2 text-purple-400 text-sm text-center">Staking wird durchgeführt...</div>
+
+          {/* Status kompakt als Info-Box */}
+          {(txStatus === "success" || txStatus === "error" || txStatus === "pending" || txStatus === "approving" || txStatus === "staking") && (
+            <div className={`mt-4 p-2 rounded text-center text-sm font-medium ${
+              txStatus === "success" ? "bg-green-500/20 text-green-400" :
+              txStatus === "error" ? "bg-red-500/20 text-red-400" :
+              txStatus === "pending" ? "bg-yellow-500/20 text-yellow-400" :
+              txStatus === "approving" ? "bg-orange-500/20 text-orange-400" :
+              txStatus === "staking" ? "bg-purple-500/20 text-purple-400" :
+              ""
+            }`}>
+              {txStatus === "success" && "Transaktion erfolgreich!"}
+              {txStatus === "error" && "Transaktion fehlgeschlagen!"}
+              {txStatus === "pending" && "Transaktion läuft..."}
+              {txStatus === "approving" && "Approval wird durchgeführt..."}
+              {txStatus === "staking" && "Staking wird durchgeführt..."}
+            </div>
           )}
         </div>
       )}
