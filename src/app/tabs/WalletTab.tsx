@@ -577,33 +577,30 @@ export default function WalletTab() {
 
   const formatAddress = (address: string) => `${address.slice(0, 6)}...${address.slice(-4)}`;
 
-  // Zentrale Funktion zur EUR-Wert-Berechnung
+  // Zentrale Funktion zur EUR-Wert-Berechnung (wie BuyTab/SellTab)
   const calculateEurValue = (balance: string): string => {
     const balanceFloat = parseFloat(balance);
     if (balanceFloat <= 0) return "0.00";
 
-    // Verwende alle verfügbaren Preisquellen
-    let priceToUse = 0;
-    
-    // 1. Aktueller Preis im State
-    if (dfaithPriceEur > 0) {
-      priceToUse = dfaithPriceEur;
+    // Hole aktuelle D.FAITH pro 1 ETH und ETH/EUR Preis
+    let dfaithPerEth = 0;
+    let ethEur = 0;
+
+    // 1. Aktuelle Werte im State
+    if (lastKnownPrices && lastKnownPrices.dfaith && lastKnownPrices.ethEur) {
+      dfaithPerEth = lastKnownPrices.dfaith;
+      ethEur = lastKnownPrices.ethEur;
     }
-    // 2. Preis aus lastKnownPrices
-    else if (lastKnownPrices.dfaithEur && lastKnownPrices.dfaithEur > 0) {
-      priceToUse = lastKnownPrices.dfaithEur;
-    }
-    // 3. Fallback: direkt aus localStorage
+    // 2. Fallback: localStorage
     else {
       try {
         const stored = localStorage.getItem('dawid_faith_prices');
         if (stored) {
           const parsed = JSON.parse(stored);
           const now = Date.now();
-          // Verwende Preis wenn er weniger als 24 Stunden alt ist
-          if (parsed.dfaithEur && parsed.dfaithEur > 0 && 
-              parsed.timestamp && (now - parsed.timestamp) < 24 * 60 * 60 * 1000) {
-            priceToUse = parsed.dfaithEur;
+          if (parsed.dfaith && parsed.ethEur && parsed.timestamp && (now - parsed.timestamp) < 24 * 60 * 60 * 1000) {
+            dfaithPerEth = parsed.dfaith;
+            ethEur = parsed.ethEur;
           }
         }
       } catch (e) {
@@ -611,13 +608,17 @@ export default function WalletTab() {
       }
     }
 
-    if (priceToUse > 0) {
-      const eurValue = balanceFloat * priceToUse;
-      console.log('EUR-Wert berechnet:', { 
-        balance, 
-        priceUsed: priceToUse, 
-        eurValue: eurValue.toFixed(2),
-        source: dfaithPriceEur > 0 ? 'current' : 'stored'
+    // Berechne EUR-Wert wie in BuyTab/SellTab
+    if (dfaithPerEth > 0 && ethEur > 0) {
+      // 1 D.FAITH = (1 / dfaithPerEth) * ethEur
+      const dfaithEur = (1 / dfaithPerEth) * ethEur;
+      const eurValue = balanceFloat * dfaithEur;
+      console.log('EUR-Wert berechnet (BuyTab/SellTab Methode):', {
+        balance,
+        dfaithPerEth,
+        ethEur,
+        dfaithEur,
+        eurValue: eurValue.toFixed(2)
       });
       return eurValue.toFixed(2);
     }
