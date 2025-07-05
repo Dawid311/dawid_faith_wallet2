@@ -8,7 +8,7 @@ import { base } from "thirdweb/chains";
 import { useSendTransaction } from "thirdweb/react";
 import { balanceOf, approve } from "thirdweb/extensions/erc20";
 
-const STAKING_CONTRACT = "0xE97b88AbE228310216acd2B9C8Bde7d3dC41a551"; // Staking Contract auf Base
+const STAKING_CONTRACT = "0xdb1f760C528b241AeA93BEADce63f9eeF65426C2"; // Staking Contract auf Base
 const DFAITH_TOKEN = "0xEE27258975a2DA946CD5025134D70E5E24F6789F"; // D.FAITH Token auf Base
 const DFAITH_DECIMALS = 2;
 const DINVEST_TOKEN = "0x14d9889892849a1D161c9272a07Fa16Fef79f1AE"; // D.INVEST Token auf Base
@@ -32,8 +32,12 @@ export default function StakeTab() {
   const [userCount, setUserCount] = useState(0);
   const [dfaithBalance, setDfaithBalance] = useState("0.00");
   const [dinvestBalance, setDinvestBalance] = useState("0");
-  const [lastClaimed, setLastClaimed] = useState<number>(0);
-  const [blockTimestamp, setBlockTimestamp] = useState<number>(0);
+  const [stakeTimestamp, setStakeTimestamp] = useState<number>(0);
+  const [canUnstake, setCanUnstake] = useState(false);
+  const [timeUntilUnstake, setTimeUntilUnstake] = useState<number>(0);
+  const [canClaim, setCanClaim] = useState(false);
+  const [timeUntilNextClaim, setTimeUntilNextClaim] = useState<number>(0);
+  const [minClaimAmount, setMinClaimAmount] = useState("0.01");
 
   // Korrekte API-Funktion für Balance-Abfrage auf Base Chain
   const fetchTokenBalanceViaInsightApi = async (
@@ -87,34 +91,44 @@ export default function StakeTab() {
         // Staking Contract Daten abrufen
         const staking = getContract({ client, chain: base, address: STAKING_CONTRACT });
         
-        // User's Stake Info abrufen
+        // Minimum Claim Amount abrufen
         try {
-          const stakeInfo = await readContract({
+          const minClaim = await readContract({
             contract: staking,
-            method: "function stakers(address) view returns (uint256, uint256)",
-            params: [account.address]
+            method: "function getMinClaimAmount() view returns (uint256)",
+            params: []
           });
-          setStaked(stakeInfo[0].toString());
-          setLastClaimed(Number(stakeInfo[1]));
+          setMinClaimAmount((Number(minClaim) / Math.pow(10, 2)).toFixed(2));
         } catch (e) {
-          console.error("Fehler beim Abrufen der Stake Info:", e);
-          setStaked("0");
-          setLastClaimed(0);
+          console.error("Fehler beim Abrufen des Min Claim Amount:", e);
+          setMinClaimAmount("0.01");
         }
         
-        // Claimable Rewards abrufen (korrigierte Funktion)
+        // User's Complete Stake Info abrufen (neue Funktion)
         try {
-          const claimable = await readContract({
+          const userInfo = await readContract({
             contract: staking,
-            method: "function getClaimableReward(address) view returns (uint256)",
+            method: "function getUserStakeInfo(address) view returns (uint256, uint256, uint256, uint256, bool, uint256, bool)",
             params: [account.address]
           });
-          // Rewards sind in D.FAITH mit 2 Decimals
-          const rewardsFormatted = Number(claimable) / Math.pow(10, 2);
-          setClaimableRewards(rewardsFormatted.toFixed(2));
+          
+          // userInfo = [stakedAmount, claimableReward, stakeTimestamp, timeUntilUnstake, canUnstake, timeUntilNextClaim, canClaim]
+          setStaked(userInfo[0].toString());
+          setClaimableRewards((Number(userInfo[1]) / Math.pow(10, 2)).toFixed(2));
+          setStakeTimestamp(Number(userInfo[2]));
+          setTimeUntilUnstake(Number(userInfo[3]));
+          setCanUnstake(userInfo[4]);
+          setTimeUntilNextClaim(Number(userInfo[5]));
+          setCanClaim(userInfo[6]);
         } catch (e) {
-          console.error("Fehler beim Abrufen der Claimable Rewards:", e);
+          console.error("Fehler beim Abrufen der User Stake Info:", e);
+          setStaked("0");
           setClaimableRewards("0.00");
+          setStakeTimestamp(0);
+          setTimeUntilUnstake(0);
+          setCanUnstake(false);
+          setTimeUntilNextClaim(0);
+          setCanClaim(false);
         }
         
         // Staking Status abrufen
@@ -150,31 +164,16 @@ export default function StakeTab() {
           console.error("Fehler beim Abrufen der Contract Stats:", e);
         }
         
-        // Hole aktuellen Blocktimestamp (für Zeitberechnung)
-        try {
-          const res = await fetch("https://mainnet.base.org", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              jsonrpc: "2.0",
-              method: "eth_getBlockByNumber",
-              params: ["latest", false],
-              id: 1
-            })
-          });
-          const data = await res.json();
-          setBlockTimestamp(parseInt(data.result.timestamp, 16));
-        } catch (e) {
-          setBlockTimestamp(Math.floor(Date.now() / 1000));
-        }
-        
       } catch (e) {
         console.error("Fehler beim Abrufen der Daten:", e);
         setAvailable("0"); 
         setStaked("0"); 
         setClaimableRewards("0.00");
-        setLastClaimed(0);
-        setBlockTimestamp(Math.floor(Date.now() / 1000));
+        setStakeTimestamp(0);
+        setTimeUntilUnstake(0);
+        setCanUnstake(false);
+        setTimeUntilNextClaim(0);
+        setCanClaim(false);
       } finally {
         setLoading(false);
       }
@@ -321,8 +320,8 @@ export default function StakeTab() {
 
   // Unstake Function (unstakes all)
   const handleUnstake = async () => {
-    if (!account?.address || staked === "0") {
-      console.log("Keine Token zum Unstaken verfügbar");
+    if (!account?.address || staked === "0" || !canUnstake) {
+      console.log("Keine Token zum Unstaken verfügbar oder Mindestzeit nicht erreicht");
       return;
     }
     
@@ -365,8 +364,8 @@ export default function StakeTab() {
 
   // Claim Rewards Function
   const handleClaim = async () => {
-    if (!account?.address || parseFloat(claimableRewards) <= 0 || !weekPassed) {
-      console.log("Keine Rewards zum Einfordern verfügbar oder Mindestzeit nicht erreicht");
+    if (!account?.address || !canClaim) {
+      console.log("Keine Rewards zum Einfordern verfügbar oder Mindestbetrag nicht erreicht");
       return;
     }
     
@@ -419,21 +418,13 @@ export default function StakeTab() {
     return ((stakedNum * currentRewardRate) / 100).toFixed(2);
   };
 
-  // Hilfsfunktion: Ist eine Woche seit dem letzten Claim vorbei?
-  const weekPassed = useMemo(() => {
-    if (!lastClaimed || !blockTimestamp) return false;
-    return blockTimestamp >= lastClaimed + 7 * 24 * 60 * 60; // 1 Woche = 604800 Sekunden
-  }, [lastClaimed, blockTimestamp]);
-
-  // Hilfsfunktion: Zeit bis zum nächsten Claim
-  const getTimeUntilNextClaim = () => {
-    if (!lastClaimed || !blockTimestamp || weekPassed) return null;
-    const nextClaimTime = lastClaimed + 7 * 24 * 60 * 60;
-    const timeLeft = nextClaimTime - blockTimestamp;
+  // Hilfsfunktion: Formatiere Zeit in Sekunden zu lesbarer Form
+  const formatTime = (seconds: number) => {
+    if (seconds <= 0) return "Jetzt verfügbar";
     
-    const days = Math.floor(timeLeft / (24 * 60 * 60));
-    const hours = Math.floor((timeLeft % (24 * 60 * 60)) / (60 * 60));
-    const minutes = Math.floor((timeLeft % (60 * 60)) / 60);
+    const days = Math.floor(seconds / (24 * 60 * 60));
+    const hours = Math.floor((seconds % (24 * 60 * 60)) / (60 * 60));
+    const minutes = Math.floor((seconds % (60 * 60)) / 60);
     
     if (days > 0) return `${days}d ${hours}h ${minutes}m`;
     if (hours > 0) return `${hours}h ${minutes}m`;
@@ -446,7 +437,7 @@ export default function StakeTab() {
         <h2 className="text-2xl font-bold bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 bg-clip-text text-transparent mb-2">
           D.INVEST Staking
         </h2>
-        <p className="text-zinc-400">Verdienen Sie wöchentlich D.FAITH Token durch Staking</p>
+        <p className="text-zinc-400">Verdienen Sie kontinuierlich D.FAITH Token durch Staking</p>
       </div>
 
       {/* Staking Overview: Verfügbar, Gestaked, Reward */}
@@ -466,9 +457,9 @@ export default function StakeTab() {
           <div className="text-xs text-zinc-500">D.INVEST</div>
         </div>
         <div className="bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl p-4 border border-zinc-700 text-center flex flex-col items-center justify-center">
-          <div className="text-sm text-zinc-500 mb-1 whitespace-nowrap">Reward/Woche</div>
+          <div className="text-sm text-zinc-500 mb-1 whitespace-nowrap">Verfügbare Rewards</div>
           <div className="text-xl font-bold text-green-400 break-words max-w-full" style={{wordBreak:'break-word'}}>
-            {getUserWeeklyReward()}
+            {claimableRewards}
           </div>
           <div className="text-xs text-zinc-500">D.FAITH</div>
         </div>
@@ -480,7 +471,7 @@ export default function StakeTab() {
           <div>
             <div className="text-sm font-medium text-blue-400">Aktuelle Reward-Stufe</div>
             <div className="text-xs text-zinc-500">
-              {formatRewardRate(currentRewardRate)} D.FAITH pro D.INVEST pro Woche
+              {formatRewardRate(currentRewardRate)}% D.FAITH pro D.INVEST pro Woche
             </div>
           </div>
           <div className="text-right">
@@ -519,17 +510,18 @@ export default function StakeTab() {
       {/* Stake Interface */}
       {activeTab === "stake" && (
         <div className="bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl p-6 border border-zinc-700 space-y-6">
-          {/* Wichtiger Hinweis über Auto-Claim */}
-          {parseInt(staked) > 0 && parseFloat(claimableRewards) > 0 && (
+          {/* Wichtiger Hinweis über kontinuierliche Rewards */}
+          {parseInt(staked) > 0 && (
             <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4 mb-4">
               <div className="flex items-center gap-3">
                 <div className="w-5 h-5 rounded-full bg-blue-500/20 flex items-center justify-center">
                   <span className="text-blue-400 text-xs">ℹ</span>
                 </div>
                 <div className="text-sm text-zinc-300">
-                  <div className="font-medium">Auto-Claim Feature</div>
+                  <div className="font-medium">Kontinuierliche Rewards</div>
                   <div className="text-xs text-zinc-500 mt-1">
-                    Beim Hinzufügen von Token werden verfügbare Rewards ({claimableRewards} D.FAITH) automatisch ausgezahlt.
+                    Sie verdienen kontinuierlich Rewards basierend auf Ihrer gestakten Menge. 
+                    Mindest-Claim: {minClaimAmount} D.FAITH
                   </div>
                 </div>
               </div>
@@ -634,10 +626,10 @@ export default function StakeTab() {
                 <div className="font-medium">Vollständiges Unstaking</div>
                 <div className="text-xs text-zinc-500 mt-1">
                   Alle gestakten Token ({staked} D.INVEST) werden unstaked.
-                  Unstaking ist nur nach mindestens 1 Woche möglich.
-                  {!weekPassed && lastClaimed > 0 && (
+                  Unstaking ist nur nach mindestens 7 Tagen möglich.
+                  {!canUnstake && timeUntilUnstake > 0 && (
                     <span className="block text-orange-400 mt-1">
-                      Unstaking möglich in: {getTimeUntilNextClaim()}
+                      Unstaking möglich in: {formatTime(timeUntilUnstake)}
                     </span>
                   )}
                 </div>
@@ -660,14 +652,14 @@ export default function StakeTab() {
 
           <Button 
             className="w-full bg-zinc-700/50 hover:bg-zinc-600/50 text-zinc-300 font-bold py-3 rounded-xl border border-zinc-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={staked === "0" || loading || txStatus === "pending" || !weekPassed}
+            disabled={staked === "0" || loading || txStatus === "pending" || !canUnstake}
             onClick={handleUnstake}
           >
             <FaUnlock className="inline mr-2" />
             {txStatus === "pending" && "Wird verarbeitet..."}
             {!txStatus && staked === "0" && "Keine Token gestaked"}
-            {!txStatus && staked !== "0" && !weekPassed && `Warten: ${getTimeUntilNextClaim()}`}
-            {!txStatus && staked !== "0" && weekPassed && `Alle ${staked} D.INVEST unstaken`}
+            {!txStatus && staked !== "0" && !canUnstake && `Warten: ${formatTime(timeUntilUnstake)}`}
+            {!txStatus && staked !== "0" && canUnstake && `Alle ${staked} D.INVEST unstaken`}
           </Button>
         </div>
       )}
@@ -682,9 +674,9 @@ export default function StakeTab() {
             <div>
               <h3 className="font-bold text-amber-400">Verfügbare Belohnungen</h3>
               <p className="text-xs text-zinc-500">
-                {!weekPassed && lastClaimed > 0 
-                  ? `Nächster Claim in: ${getTimeUntilNextClaim()}`
-                  : "Verdiente D.FAITH Token (wöchentlich)"
+                {!canClaim && timeUntilNextClaim > 0 
+                  ? `Nächster Claim in: ${formatTime(timeUntilNextClaim)}`
+                  : `Kontinuierliche D.FAITH Belohnungen (min. ${minClaimAmount})`
                 }
               </p>
             </div>
@@ -697,16 +689,16 @@ export default function StakeTab() {
         
         <Button 
           className="w-full bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-3 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
-          disabled={parseFloat(claimableRewards) <= 0 || loading || txStatus === "pending" || !weekPassed}
+          disabled={!canClaim || loading || txStatus === "pending"}
           onClick={handleClaim}
         >
           <FaCoins className="inline mr-2" />
           {txStatus === "pending" ? "Wird verarbeitet..." : 
-           !weekPassed ? `Warten: ${getTimeUntilNextClaim()}` : 
-           parseFloat(claimableRewards) <= 0 ? "Keine Rewards verfügbar" : 
+           !canClaim && timeUntilNextClaim > 0 ? `Warten: ${formatTime(timeUntilNextClaim)}` : 
+           !canClaim ? `Mindestbetrag: ${minClaimAmount} D.FAITH` : 
            "Belohnungen einfordern"}
         </Button>
-        {/* Erfolgsmeldung hier ENTFERNT */}
+        {/* Status-Meldungen */}
         {(txStatus === "success" || txStatus === "error" || txStatus === "pending") && (
           <div className={`mt-3 p-3 rounded-lg text-center text-sm font-medium border ${
             txStatus === "success" ? "bg-green-500/20 text-green-400 border-green-500/30" :
@@ -739,7 +731,9 @@ export default function StakeTab() {
           <div>Network: Base (ETH)</div>
           <div>Staking Token: D.INVEST (0 Decimals)</div>
           <div>Reward Token: D.FAITH (2 Decimals)</div>
-          <div>Reward System: Automatische Mehrwochen-Berechnung</div>
+          <div>Reward System: Kontinuierliche Berechnung pro Sekunde</div>
+          <div>Mindest-Claim: {minClaimAmount} D.FAITH</div>
+          <div>Mindest-Staking-Zeit: 7 Tage</div>
           <div>Total Staked: {totalStakedTokens} D.INVEST</div>
         </div>
       </div>
