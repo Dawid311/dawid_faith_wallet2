@@ -207,198 +207,201 @@ export default function SendTab() {
             </div>
           </div>
 
-          {/* Ausgewählter Token Info */}
+          {/* Eingabefelder nur anzeigen wenn Token ausgewählt */}
           {selectedToken && (
-            <div className="bg-gradient-to-r from-zinc-800/80 to-zinc-900/80 rounded-xl p-4 border border-zinc-700">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-full bg-gradient-to-r ${tokenOptions.find(t => t.key === selectedToken)?.color} flex items-center justify-center`}>
-                    {getTokenIcon(selectedToken)}
+            <>
+              {/* Ausgewählter Token Info */}
+              <div className="bg-gradient-to-r from-zinc-800/80 to-zinc-900/80 rounded-xl p-4 border border-zinc-700">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-10 h-10 rounded-full bg-gradient-to-r ${tokenOptions.find(t => t.key === selectedToken)?.color} flex items-center justify-center`}>
+                      {getTokenIcon(selectedToken)}
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-white">
+                        {tokenOptions.find(t => t.key === selectedToken)?.label}
+                      </h4>
+                      <p className="text-zinc-400 text-xs">Ausgewählt zum Senden</p>
+                    </div>
                   </div>
-                  <div>
-                    <h4 className="font-semibold text-white">
-                      {tokenOptions.find(t => t.key === selectedToken)?.label}
-                    </h4>
-                    <p className="text-zinc-400 text-xs">Ausgewählt zum Senden</p>
+                  <div className="text-right">
+                    <div className="text-amber-400 font-bold flex items-center gap-1">
+                      {isLoadingBalances ? (
+                        <span className="animate-spin">↻</span>
+                      ) : (
+                        tokenOptions.find(t => t.key === selectedToken)?.balance
+                      )}
+                    </div>
+                    <div className="text-zinc-500 text-xs">Verfügbar</div>
                   </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-amber-400 font-bold flex items-center gap-1">
-                    {isLoadingBalances ? (
-                      <span className="animate-spin">↻</span>
-                    ) : (
-                      tokenOptions.find(t => t.key === selectedToken)?.balance
-                    )}
-                  </div>
-                  <div className="text-zinc-500 text-xs">Verfügbar</div>
                 </div>
               </div>
-            </div>
-          )}
 
-          {/* Betrag Eingabe */}
-          <div className="space-y-3">
-            <label className="text-sm font-semibold text-zinc-300 flex items-center gap-2">
-              <FaExchangeAlt className="text-amber-400" />
-              Betrag eingeben:
-            </label>
-            
-            <div className="bg-zinc-900/80 rounded-xl border border-zinc-700 p-4">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="flex-1">
+              {/* Betrag Eingabe */}
+              <div className="space-y-3">
+                <label className="text-sm font-semibold text-zinc-300 flex items-center gap-2">
+                  <FaExchangeAlt className="text-amber-400" />
+                  Betrag eingeben:
+                </label>
+                
+                <div className="bg-zinc-900/80 rounded-xl border border-zinc-700 p-4">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="flex-1">
+                      <input
+                        type="number"
+                        placeholder="0.00"
+                        min="0"
+                        step={selectedToken === "DINVEST" ? "1" : "0.000001"}
+                        className={`w-full bg-transparent text-2xl font-bold text-white placeholder-zinc-500 focus:outline-none ${
+                          sendAmount && parseFloat(sendAmount) > parseFloat(
+                            selectedToken === "DFAITH" ? dfaithBalance.replace(",", ".") : 
+                            selectedToken === "DINVEST" ? dinvestBalance.replace(",", ".") : 
+                            ethBalance.replace(",", ".")
+                          ) ? 'text-red-400' : 'text-white'
+                        }`}
+                        value={sendAmount}
+                        onChange={e => {
+                          let val = e.target.value.replace(",", ".");
+                          if (selectedToken === "DINVEST") val = val.replace(/\..*$/, "");
+                          setSendAmount(val);
+                        }}
+                      />
+                      <div className="flex items-center justify-between mt-1">
+                        <span className="text-zinc-400 text-sm">
+                          Verfügbar: {tokenOptions.find(t => t.key === selectedToken)?.balance} {selectedToken}
+                        </span>
+                        <button
+                          className="bg-gradient-to-r from-amber-500 to-yellow-600 text-black px-4 py-1 rounded-lg text-sm font-bold hover:opacity-90 transition-opacity"
+                          type="button"
+                          onClick={handleMax}
+                        >
+                          MAX
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Balance-Validierung */}
+                  {sendAmount && parseFloat(sendAmount) > parseFloat(
+                    selectedToken === "DFAITH" ? dfaithBalance.replace(",", ".") : 
+                    selectedToken === "DINVEST" ? dinvestBalance.replace(",", ".") : 
+                    ethBalance.replace(",", ".")
+                  ) && (
+                    <div className="mt-2 text-sm text-red-400 bg-red-500/20 border border-red-500/30 rounded-lg p-2 flex items-center gap-2">
+                      <span>❌</span>
+                      <span>Nicht genügend {selectedToken} verfügbar</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Empfänger Eingabe */}
+              <div className="space-y-3">
+                <label className="text-sm font-semibold text-zinc-300 flex items-center gap-2">
+                  <FaWallet className="text-amber-400" />
+                  Empfänger Adresse:
+                </label>
+                <div className="bg-zinc-900/80 rounded-xl border border-zinc-700 p-4">
                   <input
-                    type="number"
-                    placeholder="0.00"
-                    min="0"
-                    step={selectedToken === "DINVEST" ? "1" : "0.000001"}
-                    className={`w-full bg-transparent text-2xl font-bold text-white placeholder-zinc-500 focus:outline-none ${
-                      sendAmount && parseFloat(sendAmount) > parseFloat(
-                        selectedToken === "DFAITH" ? dfaithBalance.replace(",", ".") : 
-                        selectedToken === "DINVEST" ? dinvestBalance.replace(",", ".") : 
-                        ethBalance.replace(",", ".")
-                      ) ? 'text-red-400' : 'text-white'
-                    }`}
-                    value={sendAmount}
-                    onChange={e => {
-                      let val = e.target.value.replace(",", ".");
-                      if (selectedToken === "DINVEST") val = val.replace(/\..*$/, "");
-                      setSendAmount(val);
-                    }}
+                    type="text"
+                    placeholder="0x... oder ENS Name"
+                    className="w-full bg-transparent text-white placeholder-zinc-500 focus:outline-none font-mono"
+                    value={sendToAddress}
+                    onChange={e => setSendToAddress(e.target.value)}
+                    autoComplete="off"
+                    inputMode="text"
                   />
-                  <div className="flex items-center justify-between mt-1">
-                    <span className="text-zinc-400 text-sm">
-                      Verfügbar: {tokenOptions.find(t => t.key === selectedToken)?.balance} {selectedToken}
-                    </span>
-                    <button
-                      className="bg-gradient-to-r from-amber-500 to-yellow-600 text-black px-4 py-1 rounded-lg text-sm font-bold hover:opacity-90 transition-opacity"
-                      type="button"
-                      onClick={handleMax}
-                    >
-                      MAX
-                    </button>
+                  <div className="text-xs text-zinc-500 mt-2">
+                    Base Network Adresse eingeben
                   </div>
                 </div>
               </div>
-              
-              {/* Balance-Validierung */}
-              {sendAmount && parseFloat(sendAmount) > parseFloat(
-                selectedToken === "DFAITH" ? dfaithBalance.replace(",", ".") : 
-                selectedToken === "DINVEST" ? dinvestBalance.replace(",", ".") : 
-                ethBalance.replace(",", ".")
-              ) && (
-                <div className="mt-2 text-sm text-red-400 bg-red-500/20 border border-red-500/30 rounded-lg p-2 flex items-center gap-2">
-                  <span>❌</span>
-                  <span>Nicht genügend {selectedToken} verfügbar</span>
+
+              {/* Transaktionsübersicht */}
+              {sendAmount && sendToAddress && (
+                <div className="bg-gradient-to-r from-zinc-800/60 to-zinc-900/60 rounded-xl p-4 border border-zinc-600/50">
+                  <h4 className="font-semibold text-white mb-3 flex items-center gap-2">
+                    <FaPaperPlane className="text-amber-400" />
+                    Transaktionsübersicht
+                  </h4>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-zinc-400">Du sendest:</span>
+                      <span className="text-white font-semibold">{sendAmount} {selectedToken}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-zinc-400">An:</span>
+                      <span className="text-amber-400 font-mono text-xs">
+                        {sendToAddress.slice(0, 8)}...{sendToAddress.slice(-6)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-zinc-400">Netzwerkgebühr:</span>
+                      <span className="text-zinc-300">~0.001 ETH</span>
+                    </div>
+                    <div className="border-t border-zinc-600 pt-2 flex justify-between">
+                      <span className="text-zinc-300 font-semibold">Geschätzte Zeit:</span>
+                      <span className="text-green-400 font-semibold">~30 Sekunden</span>
+                    </div>
+                  </div>
                 </div>
               )}
-            </div>
-          </div>
 
-          {/* Empfänger Eingabe */}
-          <div className="space-y-3">
-            <label className="text-sm font-semibold text-zinc-300 flex items-center gap-2">
-              <FaWallet className="text-amber-400" />
-              Empfänger Adresse:
-            </label>
-            <div className="bg-zinc-900/80 rounded-xl border border-zinc-700 p-4">
-              <input
-                type="text"
-                placeholder="0x... oder ENS Name"
-                className="w-full bg-transparent text-white placeholder-zinc-500 focus:outline-none font-mono"
-                value={sendToAddress}
-                onChange={e => setSendToAddress(e.target.value)}
-                autoComplete="off"
-                inputMode="text"
-              />
-              <div className="text-xs text-zinc-500 mt-2">
-                Base Network Adresse eingeben
-              </div>
-            </div>
-          </div>
+              {/* Senden Button */}
+              <Button
+                className={`w-full py-4 font-bold rounded-xl text-lg shadow-lg transition-all ${
+                  parseFloat(sendAmount) > 0 && 
+                  sendToAddress && 
+                  !isSending &&
+                  parseFloat(sendAmount) <= parseFloat(
+                    selectedToken === "DFAITH" ? dfaithBalance.replace(",", ".") : 
+                    selectedToken === "DINVEST" ? dinvestBalance.replace(",", ".") : 
+                    ethBalance.replace(",", ".")
+                  )
+                    ? `bg-gradient-to-r ${tokenOptions.find(t => t.key === selectedToken)?.color} text-black hover:opacity-90 transform hover:scale-[1.02]`
+                    : "bg-zinc-700 text-zinc-400 cursor-not-allowed"
+                }`}
+                onClick={handleSend}
+                disabled={
+                  parseFloat(sendAmount) <= 0 || 
+                  !sendToAddress || 
+                  isSending ||
+                  parseFloat(sendAmount) > parseFloat(
+                    selectedToken === "DFAITH" ? dfaithBalance.replace(",", ".") : 
+                    selectedToken === "DINVEST" ? dinvestBalance.replace(",", ".") : 
+                    ethBalance.replace(",", ".")
+                  )
+                }
+              >
+                {isSending ? (
+                  <div className="flex items-center justify-center gap-2">
+                    <span className="animate-spin">↻</span>
+                    <span>Wird gesendet...</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center gap-2">
+                    <FaPaperPlane />
+                    <span>
+                      {sendAmount || "0"} {selectedToken} senden
+                    </span>
+                  </div>
+                )}
+              </Button>
 
-          {/* Transaktionsübersicht */}
-          {sendAmount && sendToAddress && (
-            <div className="bg-gradient-to-r from-zinc-800/60 to-zinc-900/60 rounded-xl p-4 border border-zinc-600/50">
-              <h4 className="font-semibold text-white mb-3 flex items-center gap-2">
-                <FaPaperPlane className="text-amber-400" />
-                Transaktionsübersicht
-              </h4>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-zinc-400">Du sendest:</span>
-                  <span className="text-white font-semibold">{sendAmount} {selectedToken}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-zinc-400">An:</span>
-                  <span className="text-amber-400 font-mono text-xs">
-                    {sendToAddress.slice(0, 8)}...{sendToAddress.slice(-6)}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-zinc-400">Netzwerkgebühr:</span>
-                  <span className="text-zinc-300">~0.001 ETH</span>
-                </div>
-                <div className="border-t border-zinc-600 pt-2 flex justify-between">
-                  <span className="text-zinc-300 font-semibold">Geschätzte Zeit:</span>
-                  <span className="text-green-400 font-semibold">~30 Sekunden</span>
+              {/* Sicherheitshinweis */}
+              <div className="bg-yellow-500/20 border border-yellow-500/40 rounded-xl p-4 text-sm">
+                <div className="flex items-start gap-3">
+                  <span className="text-yellow-400 text-lg">⚠️</span>
+                  <div>
+                    <p className="text-yellow-200 font-semibold mb-1">Wichtiger Sicherheitshinweis</p>
+                    <p className="text-yellow-100 text-xs leading-relaxed">
+                      Überprüfe die Empfängeradresse sorgfältig. Blockchain-Transaktionen sind irreversibel und können nicht rückgängig gemacht werden.
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
+            </>
           )}
-
-          {/* Senden Button */}
-          <Button
-            className={`w-full py-4 font-bold rounded-xl text-lg shadow-lg transition-all ${
-              parseFloat(sendAmount) > 0 && 
-              sendToAddress && 
-              !isSending &&
-              parseFloat(sendAmount) <= parseFloat(
-                selectedToken === "DFAITH" ? dfaithBalance.replace(",", ".") : 
-                selectedToken === "DINVEST" ? dinvestBalance.replace(",", ".") : 
-                ethBalance.replace(",", ".")
-              )
-                ? `bg-gradient-to-r ${tokenOptions.find(t => t.key === selectedToken)?.color} text-black hover:opacity-90 transform hover:scale-[1.02]`
-                : "bg-zinc-700 text-zinc-400 cursor-not-allowed"
-            }`}
-            onClick={handleSend}
-            disabled={
-              parseFloat(sendAmount) <= 0 || 
-              !sendToAddress || 
-              isSending ||
-              parseFloat(sendAmount) > parseFloat(
-                selectedToken === "DFAITH" ? dfaithBalance.replace(",", ".") : 
-                selectedToken === "DINVEST" ? dinvestBalance.replace(",", ".") : 
-                ethBalance.replace(",", ".")
-              )
-            }
-          >
-            {isSending ? (
-              <div className="flex items-center justify-center gap-2">
-                <span className="animate-spin">↻</span>
-                <span>Wird gesendet...</span>
-              </div>
-            ) : (
-              <div className="flex items-center justify-center gap-2">
-                <FaPaperPlane />
-                <span>
-                  {sendAmount || "0"} {selectedToken} senden
-                </span>
-              </div>
-            )}
-          </Button>
-
-          {/* Sicherheitshinweis */}
-          <div className="bg-yellow-500/20 border border-yellow-500/40 rounded-xl p-4 text-sm">
-            <div className="flex items-start gap-3">
-              <span className="text-yellow-400 text-lg">⚠️</span>
-              <div>
-                <p className="text-yellow-200 font-semibold mb-1">Wichtiger Sicherheitshinweis</p>
-                <p className="text-yellow-100 text-xs leading-relaxed">
-                  Überprüfe die Empfängeradresse sorgfältig. Blockchain-Transaktionen sind irreversibel und können nicht rückgängig gemacht werden.
-                </p>
-              </div>
-            </div>
-          </div>
         </>
       )}
     </div>

@@ -43,13 +43,15 @@ export default function HistoryTab() {
           throw new Error("Basescan API-Key nicht konfiguriert");
         }
         
-        // API-Endpunkte für Basescan
+        console.log("Using Basescan API Key:", apiKey ? "✓ Configured" : "✗ Missing");
+        
+        // API-Endpunkte für Basescan (Base Network)
         const endpoints = [
-          // Native ETH Transaktionen
+          // Native ETH Transaktionen auf Base
           `https://api.basescan.org/api?module=account&action=txlist&address=${userAddress}&startblock=0&endblock=99999999&sort=desc&apikey=${apiKey}`,
-          // ERC20 Token Transaktionen
+          // ERC20 Token Transaktionen auf Base
           `https://api.basescan.org/api?module=account&action=tokentx&address=${userAddress}&startblock=0&endblock=99999999&sort=desc&apikey=${apiKey}`,
-          // Interne Transaktionen
+          // Interne Transaktionen auf Base
           `https://api.basescan.org/api?module=account&action=txlistinternal&address=${userAddress}&startblock=0&endblock=99999999&sort=desc&apikey=${apiKey}`
         ];
 
@@ -133,8 +135,8 @@ export default function HistoryTab() {
             address = isReceived ? (tx.from || "") : (tx.to || "");
             
           } else {
-            // Normal POL transaction
-            token = "POL";
+            // Normal ETH transaction on Base
+            token = "ETH";
             const value = Number(tx.value) / Math.pow(10, 18);
             const isReceived = tx.to?.toLowerCase() === userAddress.toLowerCase();
             
@@ -217,7 +219,7 @@ export default function HistoryTab() {
         <h2 className="text-2xl font-bold bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 bg-clip-text text-transparent mb-2">
           Transaktionshistorie
         </h2>
-        <p className="text-zinc-400">Polygonscan API Integration - Live Daten</p>
+        <p className="text-zinc-400">Basescan API Integration - Live Daten</p>
       </div>
 
       {/* Loading State */}
@@ -242,7 +244,7 @@ export default function HistoryTab() {
             <FaCoins className="text-4xl text-zinc-500 mx-auto mb-4" />
             <p className="text-zinc-400 text-lg mb-2">Keine Transaktionen gefunden</p>
             <p className="text-zinc-500 text-sm">
-              Diese Wallet-Adresse hat noch keine aufgezeichneten Transaktionen auf Polygon.
+              Diese Wallet-Adresse hat noch keine aufgezeichneten Transaktionen auf Base Network.
             </p>
           </div>
         </div>
@@ -305,12 +307,12 @@ export default function HistoryTab() {
                   {tx.status === "failed" && "✗ Fehlgeschlagen"}
                 </span>
                 <a
-                  href={`https://polygonscan.com/tx/${tx.hash}`}
+                  href={`https://basescan.org/tx/${tx.hash}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-sm text-amber-400 hover:text-amber-300 transition underline font-medium bg-amber-500/10 px-3 py-1 rounded-lg border border-amber-500/20 hover:border-amber-500/40"
                 >
-                  Polygonscan ↗
+                  Basescan ↗
                 </a>
               </div>
             </div>
