@@ -898,19 +898,16 @@ export default function BuyTab() {
               </>
             )}
             {selectedToken === "ETH" && (
-              <>
-                <div className="mb-4 text-blue-400 text-2xl font-bold">ETH kaufen</div>
-                <div className="w-full flex-1 flex items-center justify-center">
-                  <BuyWidget
-                    client={client}
-                    tokenAddress={NATIVE_TOKEN_ADDRESS}
-                    chain={base}
-                    amount="1"
-                    theme="dark"
-                    className="w-full"
-                  />
-                </div>
-              </>
+              <div className="w-full flex-1 flex items-center justify-center">
+                <BuyWidget
+                  client={client}
+                  tokenAddress={NATIVE_TOKEN_ADDRESS}
+                  chain={base}
+                  amount="1"
+                  theme="dark"
+                  className="w-full"
+                />
+              </div>
             )}
             <Button
               className="w-full bg-zinc-600 hover:bg-zinc-700 text-white font-bold py-2 rounded-lg text-xs mt-4"
