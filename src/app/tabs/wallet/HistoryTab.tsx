@@ -44,9 +44,12 @@ export default function HistoryTab() {
         const apiKey = basescanApiKey || etherscanApiKey;
         
         if (!apiKey) {
-          throw new Error("Weder Basescan noch Etherscan API-Key konfiguriert");
+          // Fallback: Zeige Info, aber breche nicht mit Error ab
+          setError("Kein Basescan/Etherscan API-Key konfiguriert. Bitte API-Key in .env Datei hinterlegen, sonst sind keine Transaktionsdaten möglich.");
+          setIsLoading(false);
+          setTransactions([]);
+          return;
         }
-        
         console.log("Using API Key:", apiKey ? "✓ Configured" : "✗ Missing");
         console.log("API Key source:", basescanApiKey ? "Basescan" : "Etherscan");
         
