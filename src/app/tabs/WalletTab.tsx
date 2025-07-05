@@ -114,7 +114,7 @@ export default function WalletTab() {
   };
 
   const STAKING_CONTRACT = {
-    address: "0xE97b88AbE228310216acd2B9C8Bde7d3dC41a551", // D.INVEST Staking Contract auf Base
+    address: "0x3A09B55c8B43560ffcc6ced692c5c1d0C56d128A", // D.INVEST Staking Contract auf Base
     name: "D.INVEST Staking"
   };
 
