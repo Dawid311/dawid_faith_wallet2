@@ -187,11 +187,13 @@ export default function SellTab() {
       // Erster Schritt: Quote von OpenOcean API holen
       console.log("1. Quote anfordern für", sellAmount, "D.FAITH");
       
+      const sellAmountRaw = (parseFloat(sellAmount) * Math.pow(10, DFAITH_DECIMALS)).toString();
+      
       const params = new URLSearchParams({
         chain: "base",
         inTokenAddress: DFAITH_TOKEN,
         outTokenAddress: "0x0000000000000000000000000000000000000000", // Native ETH
-        amount: sellAmount,
+        amount: sellAmountRaw,
         slippage: slippage,
         gasPrice: "0.001", // Base Chain: 0.001 Gwei
         account: account.address,
@@ -251,14 +253,12 @@ export default function SellTab() {
           currentAllowance = BigInt(0);
         }
         
-        // Korrigiere die Berechnung - sellAmount muss mit den korrekten Decimals multipliziert werden
-        const sellAmountInWei = (parseFloat(sellAmount) * Math.pow(10, DFAITH_DECIMALS)).toFixed(0);
-        const requiredAmount = BigInt(sellAmountInWei); // Jetzt mit korrekten Decimals
+        const requiredAmount = BigInt(sellAmountRaw);
 
         console.log("Benötigte Allowance:", requiredAmount.toString());
         console.log("Aktuelle Allowance:", currentAllowance.toString());
         console.log("Sell Amount:", sellAmount);
-        console.log("Sell Amount in Wei:", sellAmountInWei);
+        console.log("Sell Amount in Wei:", sellAmountRaw);
         
         if (currentAllowance < requiredAmount) {
           console.log("Approval nötig");
@@ -282,7 +282,7 @@ export default function SellTab() {
     }
   };
 
-  // Funktion um die Tokens für den Swap freizugeben (Approve)
+  // Funktion um die Tokens für den Swap freizugeben (Approve) - immer mit max approve
   const handleApprove = async () => {
     if (!spenderAddress || !account?.address) return;
     setSwapTxStatus("approving");
@@ -295,7 +295,7 @@ export default function SellTab() {
         address: DFAITH_TOKEN
       });
       
-      // Maximaler Approve-Betrag (type(uint256).max) - bleibt unverändert
+      // Maximaler Approve-Betrag (type(uint256).max)
       const maxApproval = BigInt("115792089237316195423570985008687907853269984665640564039457584007913129639935");
       
       console.log("Verkaufsbetrag:", sellAmount);
@@ -584,39 +584,10 @@ export default function SellTab() {
   }
 };
 
-// Alle Schritte in einer Funktion
-const handleSellAllInOne = async () => {
-  if (!sellAmount || parseFloat(sellAmount) <= 0 || isSwapping || parseFloat(sellAmount) > parseFloat(dfaithBalance)) return;
-  
-  try {
-    // Erster Schritt
-    console.log("Start des Verkaufsprozesses");
-    
-    // Nur weitere Schritte ausführen, wenn Quote erfolgreich war
-    if (sellStep === 'initial') {
-      setIsSwapping(true);
-      await handleGetQuote();
-    }
-    
-    // Nur Approve ausführen, wenn nötig
-    if (sellStep === 'quoteFetched' && needsApproval) {
-      await handleApprove();
-    }
-    
-    // Swap ausführen wenn Quote vorhanden und Approve erledigt/nicht nötig
-    if ((sellStep === 'quoteFetched' && !needsApproval) || sellStep === 'approved') {
-      await handleSellSwap();
-    }
-    
-  } catch (e: any) {
-    console.error("Verkaufsprozess Fehler:", e);
-    setQuoteError(e.message || "Fehler beim Verkauf");
-    setSwapTxStatus("error");
-    setTimeout(() => setSwapTxStatus(null), 4000);
-  } finally {
-    setIsSwapping(false);
-  }
-};
+// Alle Schritte in einer Funktion - ENTFERNT, da wir separate Buttons wollen
+// const handleSellAllInOne = async () => {
+//   // Diese Funktion wird entfernt da wir separate Schritte wollen
+// };
 
   // Token-Auswahl wie im BuyTab
   const tokenOptions = [
@@ -913,49 +884,58 @@ const handleSellAllInOne = async () => {
                 </div>
               )}
 
-              {/* Action Buttons */}
+              {/* Action Buttons - Überarbeitet für sequenzielle Schritte */}
               <div className="space-y-2">
+                {/* Schritt 1: Quote holen */}
                 {sellStep === 'initial' && (
                   <Button
-                    className="w-full bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-black font-bold py-3 rounded-xl text-base transition-all transform hover:scale-[1.02]"
+                    className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-bold py-3 rounded-xl text-base transition-all transform hover:scale-[1.02]"
                     onClick={handleGetQuote}
                     disabled={
                       !sellAmount || 
                       parseFloat(sellAmount) <= 0 || 
-                      isSwapping || 
+                      swapTxStatus === "pending" || 
                       !account?.address || 
                       parseFloat(dfaithBalance) <= 0 ||
                       parseFloat(sellAmount) > parseFloat(dfaithBalance) ||
                       parseFloat(sellAmount) < 0.01
                     }
                   >
-                    {isSwapping ? "Processing..." : "Get Quote"}
+                    {swapTxStatus === "pending" ? "Getting Quote..." : "Get Quote"}
                   </Button>
                 )}
 
+                {/* Schritt 2: Approve (nur wenn nötig) */}
                 {sellStep === 'quoteFetched' && needsApproval && (
                   <Button
-                    className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 rounded-xl text-base transition-all"
+                    className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-bold py-3 rounded-xl text-base transition-all transform hover:scale-[1.02]"
                     onClick={handleApprove}
-                    disabled={isSwapping}
+                    disabled={swapTxStatus === "approving" || swapTxStatus === "waiting_approval"}
                   >
-                    {isSwapping ? "Approving..." : "Approve D.FAITH"}
+                    {swapTxStatus === "approving" ? "Approving..." : 
+                     swapTxStatus === "waiting_approval" ? "Waiting for Approval..." : 
+                     "Approve D.FAITH"}
                   </Button>
                 )}
 
+                {/* Schritt 3: Sell (wenn Quote da ist und Approval nicht nötig oder bereits erledigt) */}
                 {((sellStep === 'quoteFetched' && !needsApproval) || sellStep === 'approved') && (
                   <Button
                     className="w-full bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-bold py-3 rounded-xl text-base transition-all transform hover:scale-[1.02]"
                     onClick={handleSellSwap}
-                    disabled={isSwapping}
+                    disabled={swapTxStatus === "swapping" || swapTxStatus === "confirming" || swapTxStatus === "verifying"}
                   >
-                    {isSwapping ? "Processing Sale..." : `Sell ${sellAmount || "0"} D.FAITH`}
+                    {swapTxStatus === "swapping" ? "Processing Sale..." : 
+                     swapTxStatus === "confirming" ? "Confirming..." : 
+                     swapTxStatus === "verifying" ? "Verifying..." : 
+                     `Sell ${sellAmount || "0"} D.FAITH`}
                   </Button>
                 )}
 
+                {/* Schritt 4: Neuer Verkauf nach Abschluss */}
                 {sellStep === 'completed' && (
                   <Button
-                    className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-bold py-3 rounded-xl text-base transition-all"
+                    className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-bold py-3 rounded-xl text-base transition-all"
                     onClick={() => {
                       setSellStep('initial');
                       setQuoteTxData(null);
@@ -966,7 +946,6 @@ const handleSellAllInOne = async () => {
                       setSwapTxStatus(null);
                       setSlippage("1");
                     }}
-                    disabled={isSwapping}
                   >
                     Make Another Sale
                   </Button>

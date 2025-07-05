@@ -697,10 +697,10 @@ export default function BuyTab() {
 
       {/* Kauf-Modal zentral - Mobile Optimiert und zentriert */}
       {showBuyModal && selectedToken && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 overflow-y-auto p-4 pt-8 sm:pt-16">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 overflow-y-auto p-4">
           <div
             ref={buyModalRef}
-            className="bg-zinc-900 rounded-xl p-3 sm:p-6 max-w-sm w-full border border-amber-400 max-h-[calc(100vh-8rem)] sm:max-h-[85vh] overflow-y-auto flex flex-col mt-4 sm:mt-0"
+            className="bg-zinc-900 rounded-xl p-3 sm:p-6 max-w-sm w-full border border-amber-400 max-h-[90vh] overflow-y-auto my-4"
             style={{ boxSizing: 'border-box' }}
           >
             {/* Modal-Header */}
