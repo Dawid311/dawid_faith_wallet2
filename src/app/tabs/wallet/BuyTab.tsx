@@ -835,10 +835,24 @@ export default function BuyTab() {
                   </div>
                 </div>
 
-                {/* Advanced Settings */}
+                {/* Advanced Settings - Kompakt */}
                 <div className="bg-zinc-800/30 rounded-xl p-3 border border-zinc-700">
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm font-medium text-zinc-300">Slippage Tolerance</span>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 flex-1">
+                      <span className="text-sm font-medium text-zinc-300 whitespace-nowrap">Slippage</span>
+                      <input
+                        type="number"
+                        placeholder="1.0"
+                        min="0.1"
+                        max="50"
+                        step="0.1"
+                        className="w-16 bg-zinc-700 border border-zinc-600 rounded-lg py-1 px-2 text-sm text-zinc-300 focus:border-amber-500 focus:outline-none"
+                        value={slippage}
+                        onChange={(e) => setSlippage(e.target.value)}
+                        disabled={isSwapping || buyStep !== 'initial'}
+                      />
+                      <span className="text-xs text-zinc-500">%</span>
+                    </div>
                     <div className="flex gap-1">
                       {["0.5", "1", "3"].map((value) => (
                         <button
@@ -856,17 +870,6 @@ export default function BuyTab() {
                       ))}
                     </div>
                   </div>
-                  <input
-                    type="number"
-                    placeholder="Custom"
-                    min="0.1"
-                    max="50"
-                    step="0.1"
-                    className="w-full bg-zinc-700 border border-zinc-600 rounded-lg py-2 px-3 text-sm text-zinc-300 focus:border-amber-500 focus:outline-none"
-                    value={slippage}
-                    onChange={(e) => setSlippage(e.target.value)}
-                    disabled={isSwapping || buyStep !== 'initial'}
-                  />
                 </div>
 
                 {/* Status Display */}
