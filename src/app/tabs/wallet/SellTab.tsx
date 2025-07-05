@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { Button } from "../../../../components/ui/button";
-import { FaCoins, FaExchangeAlt, FaArrowDown, FaEthereum } from "react-icons/fa";
-import { useRouter } from "next/navigation";
+import { FaCoins, FaExchangeAlt, FaArrowDown } from "react-icons/fa";
 import { useActiveAccount, useSendTransaction } from "thirdweb/react";
 import { base } from "thirdweb/chains";
 import { getContract, prepareContractCall } from "thirdweb";
@@ -10,15 +9,12 @@ import { balanceOf } from "thirdweb/extensions/erc20";
 
 const DFAITH_TOKEN = "0x64E112CAd8FE56B8553cd5025efC29f2F8893792"; // D.FAITH auf Base
 const DFAITH_DECIMALS = 2;
-const DINVEST_TOKEN = "0x5983D2b3A4c1cE75b0A158C32CdD64d4BEC45eD1"; // D.INVEST auf Base
-const DINVEST_DECIMALS = 0;
-const ETH_TOKEN = "ETH";
 
 export default function SellTab() {
-  const [selectedToken, setSelectedToken] = useState<string | null>(null);
+  const [selectedToken, setSelectedToken] = useState<"DFAITH" | "ETH" | null>(null);
   const [sellAmount, setSellAmount] = useState("");
-  const [dfaithBalance, setDfaithBalance] = useState("0");
-  const [dinvestBalance, setDinvestBalance] = useState("0");
+  const [dfaithBalance, setDfaithBalance] = useState("0.00");
+  // const [dinvestBalance, setDinvestBalance] = useState("0");
   const [dfaithPrice, setDfaithPrice] = useState<number | null>(null);
   const [ethPriceEur, setEthPriceEur] = useState<number | null>(null);
   const [showSellModal, setShowSellModal] = useState(false);
@@ -34,7 +30,6 @@ export default function SellTab() {
   const [sellStep, setSellStep] = useState<'initial' | 'quoteFetched' | 'approved' | 'completed'>('initial');
   const account = useActiveAccount();
   const { mutateAsync: sendTransaction } = useSendTransaction();
-  const router = useRouter();
   
   // Korrekte API-Funktion für Balance-Abfrage
   const fetchTokenBalanceViaInsightApi = async (
@@ -84,7 +79,7 @@ export default function SellTab() {
       const requestId = ++latestRequest;
       if (!account?.address) {
         if (isMounted) setDfaithBalance("0");
-        if (isMounted) setDinvestBalance("0");
+        // entfernt: setDinvestBalance("0");
         return;
       }
       try {
@@ -95,16 +90,12 @@ export default function SellTab() {
         if (isMounted && requestId === latestRequest) {
           setDfaithBalance(dfaithDisplay);
         }
-        // D.INVEST
-        const dinvestValue = await fetchTokenBalanceViaInsightApi(DINVEST_TOKEN, account.address);
-        if (isMounted && requestId === latestRequest) {
-          setDinvestBalance(Math.floor(Number(dinvestValue)).toString());
-        }
+        // D.INVEST entfernt, da nicht benötigt und Konstante fehlt
       } catch (error) {
         console.error("Fehler beim Laden der Balances:", error);
         if (isMounted) {
           setDfaithBalance("0");
-          setDinvestBalance("0");
+          // entfernt: setDinvestBalance("0");
         }
       }
     };
@@ -159,7 +150,12 @@ export default function SellTab() {
   }, []);
 
   // Token-Auswahl-Handler
-  const handleTokenSelect = (token: string) => {
+  const handleTokenSelect = (token: "DFAITH" | "ETH") => {
+    if (!account?.address) {
+      alert('Bitte Wallet verbinden!');
+      return;
+    }
+    
     setSelectedToken(token);
     setSellAmount("");
     setQuoteTxData(null);
@@ -168,9 +164,10 @@ export default function SellTab() {
     setQuoteError(null);
     setSwapTxStatus(null);
     setSellStep('initial');
-    if (token === ETH_TOKEN) {
-      // Weiterleitung an globale Transaktionsseite
-      router.push("/global-transact?type=sell&token=ETH");
+    
+    if (token === "ETH") {
+      // Öffne externe Seite
+      window.open('https://global.transak.com/', '_blank');
     } else {
       setShowSellModal(true);
     }
@@ -617,172 +614,393 @@ const handleSellAllInOne = async () => {
   }
 };
 
+  // Token-Auswahl wie im BuyTab
+  const tokenOptions = [
+    {
+      key: "DFAITH",
+      label: "D.FAITH",
+      symbol: "DFAITH",
+      balance: dfaithBalance,
+      color: "from-amber-400 to-yellow-500",
+      description: "Faith Utility Token",
+      price: dfaithPrice && ethPriceEur ? `~${(dfaithPrice * ethPriceEur).toFixed(4)}€ pro D.FAITH` : (isLoadingPrice ? "Laden..." : (priceError || "Preis nicht verfügbar")),
+      sub: dfaithPrice ? `1 D.FAITH = ${dfaithPrice.toFixed(6)} ETH` : "Wird geladen...",
+      icon: <FaCoins className="text-amber-400" />,
+    },
+    {
+      key: "ETH",
+      label: "ETH",
+      symbol: "ETH",
+      balance: "–",
+      color: "from-blue-500 to-blue-700",
+      description: "Ethereum Native Token",
+      price: ethPriceEur ? `${ethPriceEur.toFixed(2)}€ pro ETH` : "~3000€ pro ETH",
+      sub: "via Transak verkaufen",
+      icon: <span className="text-white text-lg font-bold">⟠</span>,
+    },
+  ];
+
   return (
-    <div className="flex flex-col gap-6 p-6">
+    <div className="flex flex-col gap-6 p-6 max-w-lg mx-auto">
       <div className="text-center mb-6">
         <h2 className="text-2xl font-bold bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 bg-clip-text text-transparent mb-2">
           Token verkaufen
         </h2>
-        <p className="text-zinc-400">Wähle den Token, den du verkaufen möchtest</p>
+        <p className="text-zinc-400">Wähle einen Token und verkaufe ihn direkt</p>
       </div>
 
-      {/* Token Auswahl Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {/* D.FAITH */}
-        <button
-          className={`flex flex-col items-center justify-center gap-2 p-5 rounded-xl border-2 transition-all ${selectedToken === DFAITH_TOKEN ? "border-amber-400 bg-zinc-800/80" : "border-zinc-700 bg-zinc-900/80 hover:border-amber-400"}`}
-          onClick={() => handleTokenSelect(DFAITH_TOKEN)}
-          disabled={!account?.address || parseFloat(dfaithBalance) <= 0}
-        >
-          <div className="p-2 bg-gradient-to-r from-yellow-400 to-amber-600 rounded-full">
-            <FaCoins className="text-black text-lg" />
-          </div>
-          <div className="font-bold text-amber-400">D.FAITH</div>
-          <div className="text-xs text-zinc-500">{dfaithBalance} verfügbar</div>
-        </button>
-        {/* ETH */}
-        <a
-          href="https://global.transak.com/"
-          target="_blank"
-          rel="noopener noreferrer"
-          className={`flex flex-col items-center justify-center gap-2 p-5 rounded-xl border-2 transition-all cursor-pointer ${selectedToken === ETH_TOKEN ? "border-blue-400 bg-zinc-800/80" : "border-zinc-700 bg-zinc-900/80 hover:border-blue-400"}`}
-        >
-          <div className="p-2 bg-gradient-to-r from-blue-400 to-blue-600 rounded-full">
-            <FaEthereum className="text-white text-lg" />
-          </div>
-          <div className="font-bold text-blue-400">ETH</div>
-          <div className="text-xs text-zinc-500">Verkauf/Kauf über Transak</div>
-        </a>
+      {/* Token-Auswahl Grid */}
+      <div className="space-y-3">
+        <label className="text-sm font-semibold text-zinc-300 flex items-center gap-2">
+          <FaExchangeAlt className="text-red-400" />
+          Token auswählen:
+        </label>
+        <div className="grid gap-3">
+          {tokenOptions.map((token) => (
+            <div
+              key={token.key}
+              onClick={() => {
+                if (account?.address) {
+                  handleTokenSelect(token.key as "DFAITH" | "ETH");
+                } else {
+                  alert('Bitte Wallet verbinden!');
+                }
+              }}
+              className="relative cursor-pointer rounded-xl p-4 border-2 transition-all duration-200 bg-zinc-800/50 border-zinc-700 hover:border-zinc-600 hover:bg-zinc-800/70 hover:scale-[1.02]"
+            >
+              <div className="flex items-center gap-3">
+                <div className={`w-12 h-12 rounded-full bg-gradient-to-r ${token.color} flex items-center justify-center text-white font-bold text-lg shadow-lg`}>
+                  {token.icon}
+                </div>
+                <div>
+                  <h3 className="font-bold text-white text-lg">{token.label}</h3>
+                  <p className="text-zinc-400 text-xs">{token.description}</p>
+                </div>
+              </div>
+              <div className="flex justify-between mt-2 text-xs">
+                <span className="text-zinc-400">{token.price}</span>
+                <span className="text-zinc-400">{token.sub}</span>
+              </div>
+              {token.key === "DFAITH" && (
+                <div className="mt-2 text-xs text-zinc-500">
+                  Balance: {token.balance} D.FAITH
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
       </div>
 
-      {/* Modal für D.FAITH */}
-      {showSellModal && selectedToken === DFAITH_TOKEN && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center min-h-screen bg-black/60 overflow-y-auto">
-          <div className="bg-zinc-900 rounded-xl p-6 max-w-md w-full mx-4 border border-red-500 my-8">
-            <div className="mb-6 text-red-400 text-2xl font-bold text-center">D.FAITH verkaufen</div>
-            {/* ...EXISTING MODAL CONTENT FÜR D.FAITH... */}
-            {/* Prozessschritte anzeigen */}
-            <div className="mb-4 flex justify-between">
-              <div className={`text-xs ${sellStep !== 'initial' ? 'text-green-400' : 'text-zinc-500'}`}>1. Quote {sellStep !== 'initial' ? '✓' : ''}</div>
-              <div className={`text-xs ${sellStep === 'approved' || sellStep === 'completed' ? 'text-green-400' : 'text-zinc-500'}`}>2. Approve {sellStep === 'approved' || sellStep === 'completed' ? '✓' : ''}</div>
-              <div className={`text-xs ${sellStep === 'completed' ? 'text-green-400' : 'text-zinc-500'}`}>3. Swap {sellStep === 'completed' ? '✓' : ''}</div>
+      {/* Verkaufs-Modal zentral - Mobile Optimiert und zentriert */}
+      {showSellModal && selectedToken === "DFAITH" && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 overflow-y-auto p-4">
+          <div
+            className="bg-zinc-900 rounded-xl p-4 sm:p-6 max-w-sm w-full border border-red-500 max-h-[85vh] overflow-y-auto flex flex-col"
+            style={{ boxSizing: 'border-box' }}
+          >
+            {/* Modal-Header */}
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-base sm:text-xl font-bold text-red-400">
+                {/* Keine Überschrift mehr */}
+              </h3>
+              <button
+                onClick={() => {
+                  setShowSellModal(false);
+                  setSelectedToken(null);
+                  setSellAmount("");
+                  setSlippage("1");
+                  setSwapTxStatus(null);
+                  setSellStep('initial');
+                  setQuoteTxData(null);
+                  setSpenderAddress(null);
+                  setNeedsApproval(false);
+                  setQuoteError(null);
+                }}
+                className="p-2 text-red-400 hover:text-red-300 hover:bg-zinc-800 rounded-lg transition-all flex-shrink-0"
+                disabled={isSwapping}
+              >
+                <span className="text-lg">✕</span>
+              </button>
             </div>
-            {/* D.FAITH Balance */}
-            <div className="mb-4 p-3 bg-zinc-800/50 rounded-lg">
-              <div className="flex justify-between text-sm">
-                <span className="text-zinc-400">Verfügbare D.FAITH:</span>
-                <span className="text-amber-400 font-bold">{dfaithBalance}</span>
+
+            {/* Modal-Inhalt für D.FAITH Verkauf */}
+            <div className="w-full space-y-4">
+              {/* Professional Sell Widget Header */}
+              <div className="text-center pb-3 border-b border-zinc-700">
+                <div className="w-12 h-12 bg-gradient-to-r from-red-500 to-red-600 rounded-full mx-auto mb-2 flex items-center justify-center shadow-lg">
+                  <FaArrowDown className="text-white text-lg" />
+                </div>
+                <h4 className="text-lg font-bold text-white mb-1">D.FAITH Token verkaufen</h4>
+                <p className="text-zinc-400 text-xs">Verkaufe D.FAITH für ETH auf Base Network</p>
+                {dfaithPrice && ethPriceEur && (
+                  <div className="mt-2 px-2 py-1 bg-red-500/10 border border-red-500/20 rounded-full inline-block">
+                    <span className="text-red-400 text-xs font-semibold">
+                      €{(dfaithPrice * ethPriceEur).toFixed(4)} / D.FAITH
+                    </span>
+                  </div>
+                )}
               </div>
-              <div className="text-xs text-zinc-500 mt-1">Ihre D.FAITH Token zum Verkaufen</div>
-            </div>
-            {/* Sell Input */}
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-zinc-300 mb-2">D.FAITH Betrag</label>
-              <div className="relative">
-                <input
-                  type="number"
-                  placeholder="0.0"
-                  max={dfaithBalance}
-                  className="w-full bg-zinc-800 border border-zinc-600 rounded-xl py-3 px-4 text-lg font-bold text-amber-400 focus:border-red-500 focus:outline-none"
-                  value={sellAmount}
-                  onChange={(e) => setSellAmount(e.target.value)}
-                  disabled={isSwapping || sellStep !== 'initial'}
-                />
-                <button
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-xs px-2 py-1 bg-amber-500/20 text-amber-400 rounded hover:bg-amber-500/30 transition"
-                  onClick={() => setSellAmount((parseFloat(dfaithBalance) * 0.95).toFixed(2))}
-                  disabled={isSwapping || parseFloat(dfaithBalance) <= 0 || sellStep !== 'initial'}
-                >MAX</button>
-              </div>
-            </div>
-            {/* Slippage */}
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-zinc-300 mb-2">Slippage Toleranz (%)</label>
-              <div className="flex gap-2">
-                <input
-                  type="number"
-                  placeholder="1"
-                  min="0.1"
-                  max="50"
-                  step="0.1"
-                  className="flex-1 bg-zinc-800 border border-zinc-600 rounded-xl py-2 px-3 text-sm text-zinc-300 focus:border-red-500 focus:outline-none"
-                  value={slippage}
-                  onChange={(e) => setSlippage(e.target.value)}
-                  disabled={isSwapping || sellStep !== 'initial'}
-                />
-                <div className="flex gap-1">
-                  <button className="text-xs px-2 py-1 bg-zinc-700/50 text-zinc-400 rounded hover:bg-zinc-600/50 transition" onClick={() => setSlippage("0.5")} disabled={isSwapping || sellStep !== 'initial'}>0.5%</button>
-                  <button className="text-xs px-2 py-1 bg-zinc-700/50 text-zinc-400 rounded hover:bg-zinc-600/50 transition" onClick={() => setSlippage("1")} disabled={isSwapping || sellStep !== 'initial'}>1%</button>
-                  <button className="text-xs px-2 py-1 bg-zinc-700/50 text-zinc-400 rounded hover:bg-zinc-600/50 transition" onClick={() => setSlippage("3")} disabled={isSwapping || sellStep !== 'initial'}>3%</button>
+
+              {/* Sell Widget Steps Indicator */}
+              <div className="flex justify-between items-center px-2">
+                <div className={`flex items-center space-x-1 ${sellStep !== 'initial' ? 'text-green-400' : 'text-zinc-500'}`}>
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${sellStep !== 'initial' ? 'bg-green-500 text-white' : 'bg-zinc-700 text-zinc-400'}`}>
+                    {sellStep !== 'initial' ? '✓' : '1'}
+                  </div>
+                  <span className="text-xs font-medium">Quote</span>
+                </div>
+                <div className={`w-8 h-0.5 ${sellStep === 'approved' || sellStep === 'completed' ? 'bg-green-500' : 'bg-zinc-700'}`}></div>
+                <div className={`flex items-center space-x-1 ${sellStep === 'approved' || sellStep === 'completed' ? 'text-green-400' : 'text-zinc-500'}`}>
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${sellStep === 'approved' || sellStep === 'completed' ? 'bg-green-500 text-white' : 'bg-zinc-700 text-zinc-400'}`}>
+                    {sellStep === 'approved' || sellStep === 'completed' ? '✓' : '2'}
+                  </div>
+                  <span className="text-xs font-medium">Approve</span>
+                </div>
+                <div className={`w-8 h-0.5 ${sellStep === 'completed' ? 'bg-green-500' : 'bg-zinc-700'}`}></div>
+                <div className={`flex items-center space-x-1 ${sellStep === 'completed' ? 'text-green-400' : 'text-zinc-500'}`}>
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${sellStep === 'completed' ? 'bg-green-500 text-white' : 'bg-zinc-700 text-zinc-400'}`}>
+                    {sellStep === 'completed' ? '✓' : '3'}
+                  </div>
+                  <span className="text-xs font-medium">Sell</span>
                 </div>
               </div>
-            </div>
-            {/* Estimated Output */}
-            {sellAmount && parseFloat(sellAmount) > 0 && dfaithPrice && (
-              <div className="mb-4 p-3 bg-zinc-800/50 rounded-lg">
-                <div className="flex justify-between text-sm">
-                  <span className="text-zinc-400">Geschätzte ETH:</span>
-                  <span className="text-blue-400 font-bold">~{(parseFloat(sellAmount) * dfaithPrice).toFixed(6)}</span>
+
+              {/* Amount Input Section */}
+              <div className="space-y-3">
+                <div className="bg-zinc-800/50 rounded-xl p-3 border border-zinc-700">
+                  <label className="block text-sm font-medium text-zinc-300 mb-2">You Sell</label>
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="flex items-center gap-2 bg-amber-500/20 rounded-lg px-2 py-1 border border-amber-500/30 flex-shrink-0">
+                      <FaCoins className="text-amber-400 text-sm" />
+                      <span className="text-amber-300 font-semibold text-xs">D.FAITH</span>
+                    </div>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="0.0"
+                      className="flex-1 bg-transparent text-lg sm:text-xl font-bold text-white focus:outline-none min-w-0"
+                      value={sellAmount}
+                      onChange={e => setSellAmount(e.target.value)}
+                      disabled={isSwapping || sellStep !== 'initial'}
+                    />
+                  </div>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-zinc-500">Balance: {dfaithBalance} D.FAITH</span>
+                    <button
+                      className="text-amber-400 hover:text-amber-300 font-medium px-2 py-1 rounded"
+                      onClick={() => setSellAmount((parseFloat(dfaithBalance) * 0.95).toFixed(2))}
+                      disabled={isSwapping || parseFloat(dfaithBalance) <= 0 || sellStep !== 'initial'}
+                    >
+                      MAX
+                    </button>
+                  </div>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-zinc-400">Geschätzter Wert:</span>
-                  <span className="text-green-400 font-bold">~{(parseFloat(sellAmount) * dfaithPrice * (ethPriceEur || 3000)).toFixed(3)}€</span>
+
+                {/* You Receive Section mit Exchange Rate */}
+                <div className="bg-zinc-800/50 rounded-xl p-3 border border-zinc-700">
+                  <label className="block text-sm font-medium text-zinc-300 mb-2">You Receive</label>
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="flex items-center gap-2 bg-blue-500/20 rounded-lg px-2 py-1 border border-blue-500/30 flex-shrink-0">
+                      <span className="text-blue-400 text-sm">⟠</span>
+                      <span className="text-blue-300 font-semibold text-xs">ETH</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-lg sm:text-xl font-bold text-blue-400">
+                        {sellAmount && parseFloat(sellAmount) > 0 && dfaithPrice 
+                          ? (parseFloat(sellAmount) * dfaithPrice).toFixed(6)
+                          : "0.000000"
+                        }
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-zinc-500">
+                      {dfaithPrice ? `1 D.FAITH = ${dfaithPrice.toFixed(6)} ETH` : "Loading..."}
+                    </span>
+                    <span className="text-zinc-500">
+                      {sellAmount && parseFloat(sellAmount) > 0 && dfaithPrice && ethPriceEur
+                        ? `≈ €${(parseFloat(sellAmount) * dfaithPrice * ethPriceEur).toFixed(2)}`
+                        : ""
+                      }
+                    </span>
+                  </div>
                 </div>
               </div>
-            )}
-            {/* Transaction Status */}
-            {swapTxStatus && (
-              <div className={`mb-4 p-3 rounded-lg text-center ${
-                swapTxStatus === "success" ? "bg-green-500/20 text-green-400" :
-                swapTxStatus === "error" ? "bg-red-500/20 text-red-400" :
-                swapTxStatus === "confirming" ? "bg-blue-500/20 text-blue-400" :
-                swapTxStatus === "verifying" ? "bg-blue-500/20 text-blue-400" :
-                swapTxStatus === "approving" ? "bg-orange-500/20 text-orange-400" :
-                swapTxStatus === "swapping" ? "bg-purple-500/20 text-purple-400" :
-                "bg-yellow-500/20 text-yellow-400"
-              }`}>
-                {swapTxStatus === "success" && (<><div>🎉 Verkauf erfolgreich!</div><div className="text-xs mt-1">Ihre D.FAITH wurden erfolgreich in ETH getauscht und verifiziert</div></>)}
-                {swapTxStatus === "error" && (<><div>❌ Verkauf fehlgeschlagen!</div><div className="text-xs mt-1">{quoteError || "Ein Fehler ist aufgetreten"}</div></>)}
-                {swapTxStatus === "confirming" && (<><div>⏳ Blockchain-Bestätigung...</div><div className="text-xs mt-1">Warte auf Transaktionsbestätigung</div></>)}
-                {swapTxStatus === "verifying" && (<><div>🔍 Verifiziere Swap...</div><div className="text-xs mt-1">Prüfe Balance-Änderung zur Bestätigung</div></>)}
-                {swapTxStatus === "approving" && (<><div>🔐 Token-Berechtigung wird gesetzt...</div><div className="text-xs mt-1">Bitte bestätigen Sie in Ihrem Wallet</div></>)}
-                {swapTxStatus === "waiting_approval" && (<><div>⌛ Approval wird bestätigt...</div><div className="text-xs mt-1">Warte auf Blockchain-Bestätigung</div></>)}
-                {swapTxStatus === "swapping" && (<><div>🔄 Swap wird durchgeführt...</div><div className="text-xs mt-1">Bitte bestätigen Sie in Ihrem Wallet</div></>)}
-                {swapTxStatus === "pending" && (<><div>📝 Quote wird abgefragt...</div><div className="text-xs mt-1">Bitte warten Sie einen Moment</div></>)}
+
+              {/* Advanced Settings - Kompakt */}
+              <div className="bg-zinc-800/30 rounded-xl p-3 border border-zinc-700">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 flex-1">
+                    <span className="text-sm font-medium text-zinc-300 whitespace-nowrap">Slippage</span>
+                    <input
+                      type="number"
+                      placeholder="1.0"
+                      min="0.1"
+                      max="50"
+                      step="0.1"
+                      className="w-16 bg-zinc-700 border border-zinc-600 rounded-lg py-1 px-2 text-sm text-zinc-300 focus:border-red-500 focus:outline-none"
+                      value={slippage}
+                      onChange={(e) => setSlippage(e.target.value)}
+                      disabled={isSwapping || sellStep !== 'initial'}
+                    />
+                    <span className="text-xs text-zinc-500">%</span>
+                  </div>
+                  <div className="flex gap-1">
+                    {["0.5", "1", "3"].map((value) => (
+                      <button
+                        key={value}
+                        className={`px-2 py-1 rounded text-xs font-medium transition ${
+                          slippage === value 
+                            ? "bg-red-500 text-white" 
+                            : "bg-zinc-700 text-zinc-400 hover:bg-zinc-600"
+                        }`}
+                        onClick={() => setSlippage(value)}
+                        disabled={isSwapping || sellStep !== 'initial'}
+                      >
+                        {value}%
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
-            )}
-            {/* Buttons */}
-            <div className="space-y-3">
-              {sellStep === 'initial' && (
-                <Button className="w-full bg-gradient-to-r from-red-500 to-red-600 text-white font-bold py-3 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50" onClick={handleGetQuote} disabled={!sellAmount || parseFloat(sellAmount) <= 0 || isSwapping || parseFloat(sellAmount) > parseFloat(dfaithBalance)}>
-                  <FaExchangeAlt className="inline mr-2" />
-                  {isSwapping ? "Lade Quote..." : `Quote für ${sellAmount || "0"} D.FAITH holen`}
-                </Button>
+
+              {/* Status Display */}
+              {swapTxStatus && (
+                <div className={`rounded-xl p-3 border text-center ${
+                  swapTxStatus === "success" ? "bg-green-500/10 border-green-500/30 text-green-400" :
+                  swapTxStatus === "error" ? "bg-red-500/10 border-red-500/30 text-red-400" :
+                  "bg-blue-500/10 border-blue-500/30 text-blue-400"
+                }`}>
+                  <div className="flex items-center justify-center gap-2 mb-1">
+                    {swapTxStatus === "success" && <span className="text-xl">🎉</span>}
+                    {swapTxStatus === "error" && <span className="text-xl">❌</span>}
+                    {swapTxStatus === "pending" && <span className="text-xl">📝</span>}
+                    {swapTxStatus === "confirming" && <span className="text-xl">⏳</span>}
+                    {swapTxStatus === "verifying" && <span className="text-xl">🔎</span>}
+                    {swapTxStatus === "swapping" && <span className="text-xl">🔄</span>}
+                    {swapTxStatus === "approving" && <span className="text-xl">🔐</span>}
+                    {swapTxStatus === "waiting_approval" && <span className="text-xl">⌛</span>}
+                    <span className="font-semibold text-sm">
+                      {swapTxStatus === "success" && "Sale Successful!"}
+                      {swapTxStatus === "error" && "Sale Failed"}
+                      {swapTxStatus === "pending" && "Getting Quote..."}
+                      {swapTxStatus === "confirming" && "Confirming..."}
+                      {swapTxStatus === "verifying" && "Verifying..."}
+                      {swapTxStatus === "swapping" && "Processing Sale..."}
+                      {swapTxStatus === "approving" && "Approving Tokens..."}
+                      {swapTxStatus === "waiting_approval" && "Waiting for Approval..."}
+                    </span>
+                  </div>
+                  {swapTxStatus === "error" && quoteError && (
+                    <p className="text-sm opacity-80">{quoteError}</p>
+                  )}
+                </div>
               )}
-              {sellStep === 'quoteFetched' && (
-                <Button className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 rounded-xl mb-2" onClick={handleApprove} disabled={isSwapping}>
-                  <FaExchangeAlt className="inline mr-2" />
-                  {isSwapping ? "Approval läuft..." : "D.FAITH Token für Verkauf freigeben"}
-                </Button>
+
+              {/* Validation Warnings */}
+              {parseFloat(sellAmount) > parseFloat(dfaithBalance) && (
+                <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-2 text-red-400 text-sm">
+                  <div className="flex items-center gap-2">
+                    <span>⚠️</span>
+                    <span>Insufficient D.FAITH balance</span>
+                  </div>
+                </div>
               )}
-              {sellStep === 'approved' && (
-                <Button className="w-full bg-gradient-to-r from-red-500 to-red-600 text-white font-bold py-3 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50" onClick={handleSellSwap} disabled={isSwapping}>
-                  <FaExchangeAlt className="inline mr-2" />
-                  {isSwapping ? "Verkaufe..." : `${sellAmount || "0"} D.FAITH jetzt verkaufen`}
-                </Button>
+
+              {parseFloat(sellAmount) > 0 && parseFloat(sellAmount) < 0.01 && (
+                <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-2 text-yellow-400 text-sm">
+                  <div className="flex items-center gap-2">
+                    <span>💡</span>
+                    <span>Minimum sale: 0.01 D.FAITH</span>
+                  </div>
+                </div>
               )}
-              {sellStep === 'completed' && (
-                <Button className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold py-3 rounded-xl hover:opacity-90 transition-opacity" onClick={() => { setSellStep('initial'); setQuoteTxData(null); setSpenderAddress(null); setNeedsApproval(false); setQuoteError(null); setSellAmount(""); setSwapTxStatus(null); }} disabled={isSwapping}>Neuer Verkauf</Button>
-              )}
-              {quoteError && (<div className="text-red-400 text-sm text-center">{quoteError}</div>)}
-              <Button className="w-full bg-zinc-600 hover:bg-zinc-700 text-white font-bold py-2 rounded-xl" onClick={() => { setShowSellModal(false); setSellAmount(""); setSlippage("1"); setSwapTxStatus(null); setQuoteTxData(null); setSpenderAddress(null); setNeedsApproval(false); setQuoteError(null); setSellStep('initial'); }} disabled={isSwapping}>Schließen</Button>
+
+              {/* Action Buttons */}
+              <div className="space-y-2">
+                {sellStep === 'initial' && (
+                  <Button
+                    className="w-full bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-bold py-3 rounded-xl text-base transition-all transform hover:scale-[1.02]"
+                    onClick={handleGetQuote}
+                    disabled={
+                      !sellAmount || 
+                      parseFloat(sellAmount) <= 0 || 
+                      isSwapping || 
+                      !account?.address || 
+                      parseFloat(dfaithBalance) <= 0 ||
+                      parseFloat(sellAmount) > parseFloat(dfaithBalance) ||
+                      parseFloat(sellAmount) < 0.01
+                    }
+                  >
+                    {isSwapping ? "Processing..." : "Get Quote"}
+                  </Button>
+                )}
+
+                {sellStep === 'quoteFetched' && needsApproval && (
+                  <Button
+                    className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 rounded-xl text-base transition-all"
+                    onClick={handleApprove}
+                    disabled={isSwapping}
+                  >
+                    {isSwapping ? "Approving..." : "Approve D.FAITH"}
+                  </Button>
+                )}
+
+                {((sellStep === 'quoteFetched' && !needsApproval) || sellStep === 'approved') && (
+                  <Button
+                    className="w-full bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-bold py-3 rounded-xl text-base transition-all transform hover:scale-[1.02]"
+                    onClick={handleSellSwap}
+                    disabled={isSwapping}
+                  >
+                    {isSwapping ? "Processing Sale..." : `Sell ${sellAmount || "0"} D.FAITH`}
+                  </Button>
+                )}
+
+                {sellStep === 'completed' && (
+                  <Button
+                    className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-bold py-3 rounded-xl text-base transition-all"
+                    onClick={() => {
+                      setSellStep('initial');
+                      setQuoteTxData(null);
+                      setSpenderAddress(null);
+                      setNeedsApproval(false);
+                      setQuoteError(null);
+                      setSellAmount("");
+                      setSwapTxStatus(null);
+                      setSlippage("1");
+                    }}
+                    disabled={isSwapping}
+                  >
+                    Make Another Sale
+                  </Button>
+                )}
+              </div>
             </div>
+
+            <Button
+              className="w-full bg-zinc-600 hover:bg-zinc-700 text-white font-bold py-2 rounded-lg text-xs mt-2"
+              onClick={() => {
+                setShowSellModal(false);
+                setSelectedToken(null);
+                setSellAmount("");
+                setSlippage("1");
+                setSwapTxStatus(null);
+                setSellStep('initial');
+                setQuoteTxData(null);
+                setSpenderAddress(null);
+                setNeedsApproval(false);
+                setQuoteError(null);
+              }}
+              disabled={isSwapping}
+            >
+              Schließen
+            </Button>
           </div>
         </div>
       )}
 
-      {/* Modal für D.INVEST entfernt */}
-
+      {/* Hinweis */}
       <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 mt-6">
         <div className="flex items-start gap-3">
           <div className="w-5 h-5 rounded-full bg-yellow-500/20 flex items-center justify-center mt-0.5">
@@ -790,7 +1008,9 @@ const handleSellAllInOne = async () => {
           </div>
           <div>
             <div className="font-medium text-yellow-400 mb-1">Wichtiger Hinweis</div>
-            <div className="text-sm text-zinc-400">Beim Verkauf von Token können Slippage und Gebühren anfallen. Überprüfen Sie die Details vor der Bestätigung.</div>
+            <div className="text-sm text-zinc-400">
+              Beim Verkauf von Token können Slippage und Gebühren anfallen. Überprüfen Sie die Details vor der Bestätigung.
+            </div>
           </div>
         </div>
       </div>
