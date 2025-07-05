@@ -138,11 +138,13 @@ export default function BuyTab() {
         
         // 2. Hole D.FAITH Preis von OpenOcean für Base Chain
         try {
+          // amount in Wei (1 ETH = 1e18)
+          const amountWei = (1n * 10n ** 18n).toString();
           const params = new URLSearchParams({
             chain: "base",
             inTokenAddress: "0x0000000000000000000000000000000000000000", // Native ETH
             outTokenAddress: DFAITH_TOKEN,
-            amount: "1", // 1 ETH
+            amount: amountWei, // 1 ETH in Wei
             gasPrice: "0.001", // Base Chain: 0.001 Gwei statt 50 Gwei
           });
           
@@ -155,9 +157,11 @@ export default function BuyTab() {
               // outAmount ist in D.FAITH (mit 2 Decimals)
               const dfaithAmount = Number(data.data.outAmount) / Math.pow(10, DFAITH_DECIMALS);
               setDfaithPrice(dfaithAmount);
-              // Berechne EUR Preis: (D.FAITH pro ETH) * (ETH Preis in EUR) = D.FAITH Preis in EUR
-              if (ethEur) {
-                dfaithPriceEur = ethEur / dfaithAmount; // 1 D.FAITH = ETH_EUR / DFAITH_PER_ETH
+              // Berechne EUR Preis: 1 D.FAITH = ETH_EUR / DFAITH_PER_ETH
+              if (ethEur && dfaithAmount > 0) {
+                dfaithPriceEur = ethEur / dfaithAmount;
+              } else {
+                dfaithPriceEur = null;
               }
             } else {
               errorMsg = "OpenOcean: Keine Liquidität verfügbar";
@@ -196,7 +200,7 @@ export default function BuyTab() {
       
       // Setze Preise (entweder neue oder Fallback)
       if (ethEur) setEthPriceEur(ethEur);
-      if (dfaithPriceEur) setDfaithPriceEur(dfaithPriceEur);
+      if (dfaithPriceEur !== null && dfaithPriceEur !== undefined) setDfaithPriceEur(dfaithPriceEur);
       
       // Speichere erfolgreiche Preise
       if (dfaithPrice && dfaithPriceEur && ethEur) {

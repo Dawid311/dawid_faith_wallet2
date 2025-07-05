@@ -101,14 +101,15 @@ export default function WalletTab() {
   const [showStakeModal, setShowStakeModal] = useState(false);
   
   // Konstanten für Token mit BASE-Contract-Adressen
+
   const DFAITH_TOKEN = {
-    address: "0x9D7a06c24F114f987d8C08f0fc8Aa422910F3902", // D.FAITH Token NEU
+    address: "0xeB6f60E08AaAd7951896BdefC65cB789633BbeAd", // D.FAITH Token NEU (getauscht)
     decimals: 2, 
     symbol: "D.FAITH"
   };
 
   const DINVEST_TOKEN = {
-    address: "0x6Ea0f270FfE448D85cCf68F90B5405F30b1bA479", // D.INVEST Token NEU
+    address: "0x9D7a06c24F114f987d8C08f0fc8Aa422910F3902", // D.INVEST Token NEU (getauscht)
     decimals: 0, 
     symbol: "D.INVEST"
   };

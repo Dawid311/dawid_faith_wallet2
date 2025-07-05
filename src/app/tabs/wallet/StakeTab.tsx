@@ -9,9 +9,9 @@ import { useSendTransaction } from "thirdweb/react";
 import { balanceOf, approve } from "thirdweb/extensions/erc20";
 
 const STAKING_CONTRACT = "0xeB6f60E08AaAd7951896BdefC65cB789633BbeAd"; // Staking Contract NEU
-const DFAITH_TOKEN = "0x9D7a06c24F114f987d8C08f0fc8Aa422910F3902"; // D.FAITH Token NEU
+const DFAITH_TOKEN = "0xeB6f60E08AaAd7951896BdefC65cB789633BbeAd"; // D.FAITH Token NEU (getauscht)
 const DFAITH_DECIMALS = 2;
-const DINVEST_TOKEN = "0x6Ea0f270FfE448D85cCf68F90B5405F30b1bA479"; // D.INVEST Token NEU
+const DINVEST_TOKEN = "0x9D7a06c24F114f987d8C08f0fc8Aa422910F3902"; // D.INVEST Token NEU (getauscht)
 const DINVEST_DECIMALS = 0;
 const client = createThirdwebClient({ clientId: process.env.NEXT_PUBLIC_TEMPLATE_CLIENT_ID! });
 
