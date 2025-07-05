@@ -223,6 +223,8 @@ export default function SellTab() {
       const allowanceUrl = `https://open-api.openocean.finance/v3/base/allowance?${allowanceParams}`;
       const allowanceResponse = await fetch(allowanceUrl);
       let allowanceValue = "0";
+      let currentAllowance: bigint = BigInt(0);
+      
       if (allowanceResponse.ok) {
         const allowanceData = await allowanceResponse.json();
         console.log("Allowance Daten:", allowanceData);
@@ -246,7 +248,6 @@ export default function SellTab() {
         
         console.log("Aktuelle Allowance:", allowanceValue);
         
-        let currentAllowance: bigint;
         try {
           currentAllowance = BigInt(allowanceValue);
         } catch {
@@ -269,6 +270,13 @@ export default function SellTab() {
         }
       } else {
         console.log("Fehler beim Abrufen der Allowance - setze Approval als nötig");
+        setNeedsApproval(true);
+      }
+      
+      // Zusätzliche Sicherheitsmaßnahme: Immer Approval anfordern bei ersten Verkäufen
+      // Dies gewährleistet, dass der Approve-Button immer angezeigt wird
+      if (currentAllowance === BigInt(0)) {
+        console.log("Keine vorherige Allowance gefunden - Approval erforderlich");
         setNeedsApproval(true);
       }
       
@@ -886,6 +894,13 @@ export default function SellTab() {
 
               {/* Action Buttons - Überarbeitet für sequenzielle Schritte */}
               <div className="space-y-2">
+                {/* Debug Info - nur in Entwicklung */}
+                {process.env.NODE_ENV === 'development' && (
+                  <div className="bg-gray-800 p-2 rounded text-xs text-gray-400">
+                    Debug: sellStep={sellStep}, needsApproval={needsApproval.toString()}, quoteTxData={quoteTxData ? 'present' : 'null'}
+                  </div>
+                )}
+                
                 {/* Schritt 1: Quote holen */}
                 {sellStep === 'initial' && (
                   <Button
