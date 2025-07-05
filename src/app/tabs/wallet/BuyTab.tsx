@@ -396,7 +396,7 @@ export default function BuyTab() {
         chain: "base",
         inTokenAddress: "0x0000000000000000000000000000000000000000", // Native ETH
         outTokenAddress: DFAITH_TOKEN, // D.FAITH
-        amount: swapAmountEth,
+        amount: (parseFloat(swapAmountEth) * Math.pow(10, 18)).toString(), // ETH in Wei
         slippage: slippage,
         gasPrice: "0.001", // Base Chain: 0.001 Gwei
         account: account.address,
