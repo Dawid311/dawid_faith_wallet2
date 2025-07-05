@@ -282,9 +282,10 @@ export default function SendTab() {
   const { mutateAsync: sendTransaction } = useSendTransaction();
 
   // Token-Konstanten mit neuen Adressen auf Base
-  const DFAITH_TOKEN = TOKEN_ADDRESSES.DFAITH;
+  // Neue Token-Adressen (Stand: Juli 2025)
+  const DFAITH_TOKEN = "0xeB6f60E08AaAd7951896BdefC65cB789633BbeAd";
   const DFAITH_DECIMALS = TOKEN_DECIMALS.DFAITH;
-  const DINVEST_TOKEN = TOKEN_ADDRESSES.DINVEST;
+  const DINVEST_TOKEN = "0x9D7a06c24F114f987d8C08f0fc8Aa422910F3902";
   const DINVEST_DECIMALS = TOKEN_DECIMALS.DINVEST;
   const ETH_TOKEN = TOKEN_ADDRESSES.NATIVE_ETH;
   const ETH_DECIMALS = TOKEN_DECIMALS.ETH;

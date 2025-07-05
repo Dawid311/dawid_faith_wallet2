@@ -8,10 +8,10 @@ import { base } from "thirdweb/chains";
 import { useSendTransaction } from "thirdweb/react";
 import { balanceOf, approve } from "thirdweb/extensions/erc20";
 
-const STAKING_CONTRACT = "0x3A09B55c8B43560ffcc6ced692c5c1d0C56d128A"; // Staking Contract auf Base
-const DFAITH_TOKEN = "0x64E112CAd8FE56B8553cd5025efC29f2F8893792"; // D.FAITH Token auf Base
+const STAKING_CONTRACT = "0xeB6f60E08AaAd7951896BdefC65cB789633BbeAd"; // Staking Contract NEU
+const DFAITH_TOKEN = "0x9D7a06c24F114f987d8C08f0fc8Aa422910F3902"; // D.FAITH Token NEU
 const DFAITH_DECIMALS = 2;
-const DINVEST_TOKEN = "0x5983D2b3A4c1cE75b0A158C32CdD64d4BEC45eD1"; // D.INVEST Token auf Base
+const DINVEST_TOKEN = "0x6Ea0f270FfE448D85cCf68F90B5405F30b1bA479"; // D.INVEST Token NEU
 const DINVEST_DECIMALS = 0;
 const client = createThirdwebClient({ clientId: process.env.NEXT_PUBLIC_TEMPLATE_CLIENT_ID! });
 

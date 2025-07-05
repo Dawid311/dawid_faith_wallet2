@@ -102,19 +102,19 @@ export default function WalletTab() {
   
   // Konstanten für Token mit BASE-Contract-Adressen
   const DFAITH_TOKEN = {
-    address: "0x64E112CAd8FE56B8553cd5025efC29f2F8893792", // D.FAITH Token auf Base
+    address: "0x9D7a06c24F114f987d8C08f0fc8Aa422910F3902", // D.FAITH Token NEU
     decimals: 2, 
     symbol: "D.FAITH"
   };
 
   const DINVEST_TOKEN = {
-    address: "0x5983D2b3A4c1cE75b0A158C32CdD64d4BEC45eD1", // D.INVEST Token auf Base
+    address: "0x6Ea0f270FfE448D85cCf68F90B5405F30b1bA479", // D.INVEST Token NEU
     decimals: 0, 
     symbol: "D.INVEST"
   };
 
   const STAKING_CONTRACT = {
-    address: "0x3A09B55c8B43560ffcc6ced692c5c1d0C56d128A", // D.INVEST Staking Contract auf Base
+    address: "0xeB6f60E08AaAd7951896BdefC65cB789633BbeAd", // D.INVEST Staking Contract NEU
     name: "D.INVEST Staking"
   };
 

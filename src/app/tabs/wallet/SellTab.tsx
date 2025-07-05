@@ -7,7 +7,7 @@ import { getContract, prepareContractCall } from "thirdweb";
 import { client } from "../../client";
 import { balanceOf } from "thirdweb/extensions/erc20";
 
-const DFAITH_TOKEN = "0x64E112CAd8FE56B8553cd5025efC29f2F8893792"; // D.FAITH auf Base
+const DFAITH_TOKEN = "0xeB6f60E08AaAd7951896BdefC65cB789633BbeAd"; // D.FAITH auf Base (NEU Juli 2025)
 const DFAITH_DECIMALS = 2;
 
 export default function SellTab() {
