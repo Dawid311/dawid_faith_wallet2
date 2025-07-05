@@ -579,16 +579,28 @@ export default function StakeTab() {
           {stakeAmount && parseInt(stakeAmount) > 0 && (
             <div className="bg-zinc-800/60 rounded-xl p-4 border border-zinc-700 flex flex-col items-center mt-2">
               <div className="text-xs text-zinc-400 mb-1">Ihr wöchentlicher Reward (Stufe {currentStage}):</div>
-              <div className="text-2xl font-bold text-amber-400">{(parseInt(stakeAmount) * (currentRewardRate / 100)).toFixed(2)} D.FAITH</div>
+              <div className="text-2xl font-bold text-amber-400">
+                {/* Reward pro Woche nach Contract-Logik: (amount * rate) / 100 */}
+                {(() => {
+                  const amount = parseInt(stakeAmount);
+                  const rate = currentRewardRate;
+                  if (isNaN(amount) || isNaN(rate)) return "-";
+                  return ((amount * rate) / 100).toFixed(2);
+                })()} D.FAITH
+              </div>
               {/* Nächster Reward verfügbar in ... */}
               <div className="text-xs text-zinc-500 mt-2">
                 {(() => {
-                  // Reward pro Sekunde wie im Smart Contract
-                  const rewardPerSecond = (parseInt(stakeAmount) * currentRewardRate) / (100 * 604800);
-                  // Mindest-Claim Amount (z.B. 0.01 D.FAITH)
+                  // Contract-Logik: rewardPerSecond = (amount * rate) / (100 * SECONDS_PER_WEEK)
+                  const amount = parseInt(stakeAmount);
+                  const rate = currentRewardRate;
                   const minClaim = Number(minClaimAmount);
+                  const SECONDS_PER_WEEK = 604800;
+                  if (isNaN(amount) || isNaN(rate) || isNaN(minClaim)) return "Reward aktuell nicht verfügbar";
+                  const rewardPerSecond = (amount * rate) / (100 * SECONDS_PER_WEEK);
                   if (rewardPerSecond > 0) {
-                    const secondsToMinClaim = minClaim / rewardPerSecond;
+                    // Contract-Logik: Zeit bis minClaim = (MIN_CLAIM_AMOUNT * 100 * SECONDS_PER_WEEK) / (amount * rate)
+                    const secondsToMinClaim = (minClaim * 100 * SECONDS_PER_WEEK) / (amount * rate);
                     // Hilfsfunktion für Zeitformatierung (aus dem Code oben)
                     const formatTime = (seconds: number) => {
                       if (seconds <= 0) return "Jetzt verfügbar";
