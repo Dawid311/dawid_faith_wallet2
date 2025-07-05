@@ -159,6 +159,7 @@ export default function BuyTab() {
               setDfaithPrice(dfaithAmount);
               // Berechne EUR Preis wie im SellTab: 1 D.FAITH = (1 / D.FAITH pro 1 ETH) * ETH_EUR
               if (ethEur && dfaithAmount > 0) {
+                // Korrekte Formel: 1 D.FAITH = (1 / dfaithAmount) * ethEur
                 dfaithPriceEur = (1 / dfaithAmount) * ethEur;
               } else {
                 dfaithPriceEur = null;
