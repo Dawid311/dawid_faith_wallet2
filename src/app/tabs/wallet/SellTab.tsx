@@ -512,7 +512,7 @@ const handleSellAllInOne = async () => {
       </div>
 
       {/* Token Auswahl Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* D.FAITH */}
         <button
           className={`flex flex-col items-center justify-center gap-2 p-5 rounded-xl border-2 transition-all ${selectedToken === DFAITH_TOKEN ? "border-amber-400 bg-zinc-800/80" : "border-zinc-700 bg-zinc-900/80 hover:border-amber-400"}`}
@@ -525,29 +525,19 @@ const handleSellAllInOne = async () => {
           <div className="font-bold text-amber-400">D.FAITH</div>
           <div className="text-xs text-zinc-500">{dfaithBalance} verfügbar</div>
         </button>
-        {/* D.INVEST */}
-        <button
-          className={`flex flex-col items-center justify-center gap-2 p-5 rounded-xl border-2 transition-all ${selectedToken === DINVEST_TOKEN ? "border-green-400 bg-zinc-800/80" : "border-zinc-700 bg-zinc-900/80 hover:border-green-400"}`}
-          onClick={() => handleTokenSelect(DINVEST_TOKEN)}
-          disabled={!account?.address || parseFloat(dinvestBalance) <= 0}
-        >
-          <div className="p-2 bg-gradient-to-r from-green-400 to-emerald-600 rounded-full">
-            <FaCoins className="text-black text-lg" />
-          </div>
-          <div className="font-bold text-green-400">D.INVEST</div>
-          <div className="text-xs text-zinc-500">{dinvestBalance} verfügbar</div>
-        </button>
         {/* ETH */}
-        <button
-          className={`flex flex-col items-center justify-center gap-2 p-5 rounded-xl border-2 transition-all ${selectedToken === ETH_TOKEN ? "border-blue-400 bg-zinc-800/80" : "border-zinc-700 bg-zinc-900/80 hover:border-blue-400"}`}
-          onClick={() => handleTokenSelect(ETH_TOKEN)}
+        <a
+          href="https://global.transak.com/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`flex flex-col items-center justify-center gap-2 p-5 rounded-xl border-2 transition-all cursor-pointer ${selectedToken === ETH_TOKEN ? "border-blue-400 bg-zinc-800/80" : "border-zinc-700 bg-zinc-900/80 hover:border-blue-400"}`}
         >
           <div className="p-2 bg-gradient-to-r from-blue-400 to-blue-600 rounded-full">
             <FaEthereum className="text-white text-lg" />
           </div>
           <div className="font-bold text-blue-400">ETH</div>
-          <div className="text-xs text-zinc-500">Verkauf über globale Seite</div>
-        </button>
+          <div className="text-xs text-zinc-500">Verkauf/Kauf über Transak</div>
+        </a>
       </div>
 
       {/* Modal für D.FAITH */}
@@ -676,16 +666,7 @@ const handleSellAllInOne = async () => {
         </div>
       )}
 
-      {/* Modal für D.INVEST (Platzhalter, Logik analog zu D.FAITH integrierbar) */}
-      {showSellModal && selectedToken === DINVEST_TOKEN && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center min-h-screen bg-black/60 overflow-y-auto">
-          <div className="bg-zinc-900 rounded-xl p-6 max-w-md w-full mx-4 border border-green-500 my-8">
-            <div className="mb-6 text-green-400 text-2xl font-bold text-center">D.INVEST verkaufen</div>
-            <div className="text-zinc-400 text-center">Verkauf von D.INVEST ist bald verfügbar.</div>
-            <Button className="w-full mt-6 bg-zinc-600 hover:bg-zinc-700 text-white font-bold py-2 rounded-xl" onClick={() => { setShowSellModal(false); setSelectedToken(null); }}>Schließen</Button>
-          </div>
-        </div>
-      )}
+      {/* Modal für D.INVEST entfernt */}
 
       <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 mt-6">
         <div className="flex items-start gap-3">
