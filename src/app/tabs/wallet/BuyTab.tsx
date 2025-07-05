@@ -697,12 +697,12 @@ export default function BuyTab() {
         </div>
       </div>
 
-      {/* Kauf-Modal zentral - Mobile Optimiert */}
+      {/* Kauf-Modal zentral - Mobile Optimiert mit korrektem Spacing */}
       {showBuyModal && selectedToken && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 overflow-y-auto pt-1 pb-2 px-2">
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 overflow-y-auto pt-4 pb-4 px-4">
           <div
             ref={buyModalRef}
-            className="bg-zinc-900 rounded-xl p-3 sm:p-6 max-w-sm w-full border border-amber-400 max-h-[98vh] overflow-y-auto flex flex-col"
+            className="bg-zinc-900 rounded-xl p-4 sm:p-6 max-w-sm w-full border border-amber-400 max-h-[92vh] overflow-y-auto flex flex-col mt-4 mb-4"
             style={{ boxSizing: 'border-box' }}
           >
             {/* Modal-Header */}
@@ -807,7 +807,7 @@ export default function BuyTab() {
                     </div>
                   </div>
 
-                  {/* You Receive Section */}
+                  {/* You Receive Section mit Exchange Rate */}
                   <div className="bg-zinc-800/50 rounded-xl p-3 border border-zinc-700">
                     <label className="block text-sm font-medium text-zinc-300 mb-2">You Receive</label>
                     <div className="flex items-center gap-3 mb-2">
@@ -824,8 +824,11 @@ export default function BuyTab() {
                         </div>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <span className="text-zinc-500 text-xs">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-zinc-500">
+                        {dfaithPrice ? `1 ETH = ${dfaithPrice.toFixed(2)} D.FAITH` : "Loading..."}
+                      </span>
+                      <span className="text-zinc-500">
                         {swapAmountEth && parseFloat(swapAmountEth) > 0 && dfaithPrice && dfaithPriceEur
                           ? `≈ €${(parseFloat(swapAmountEth) * dfaithPrice * dfaithPriceEur).toFixed(2)}`
                           : ""
@@ -980,18 +983,12 @@ export default function BuyTab() {
                   )}
                 </div>
 
-                {/* Market Info */}
+                {/* Market Info - Kompakt */}
                 <div className="bg-zinc-800/30 rounded-xl p-3 border border-zinc-700">
-                  <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="text-sm">
                     <div>
-                      <span className="text-zinc-500">Your D.FAITH Balance</span>
-                      <div className="text-amber-400 font-semibold">{dfaithBalance}</div>
-                    </div>
-                    <div>
-                      <span className="text-zinc-500">Exchange Rate</span>
-                      <div className="text-white font-semibold">
-                        {dfaithPrice ? `1 ETH = ${dfaithPrice.toFixed(2)} D.FAITH` : "Loading..."}
-                      </div>
+                      <span className="text-zinc-500">Your D.FAITH Balance: </span>
+                      <span className="text-amber-400 font-semibold">{dfaithBalance}</span>
                     </div>
                   </div>
                 </div>

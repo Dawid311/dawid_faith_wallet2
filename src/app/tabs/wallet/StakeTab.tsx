@@ -459,7 +459,7 @@ export default function StakeTab() {
           <div className="text-xs text-zinc-500">D.INVEST</div>
         </div>
         <div className="bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl p-4 border border-zinc-700 text-center flex flex-col items-center justify-center">
-          <div className="text-sm text-zinc-500 mb-1 whitespace-nowrap">Verfügbare Rewards</div>
+          <div className="text-sm text-zinc-500 mb-1">Rewards</div>
           <div className="text-xl font-bold text-green-400 break-words max-w-full" style={{wordBreak:'break-word'}}>
             {claimableRewards}
           </div>
