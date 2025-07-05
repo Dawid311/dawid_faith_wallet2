@@ -37,7 +37,11 @@ export default function HistoryTab() {
       setError("");
       
       try {
-        const apiKey = "V6Q5223DMWPP3HQJE9IJ8UIHSP3NUHID5K"; // Hier deinen Basescan API-Key eintragen
+        const apiKey = process.env.NEXT_PUBLIC_BASESCAN_API_KEY;
+        
+        if (!apiKey) {
+          throw new Error("Basescan API-Key nicht konfiguriert");
+        }
         
         // API-Endpunkte für Basescan
         const endpoints = [
