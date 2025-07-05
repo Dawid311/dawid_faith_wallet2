@@ -2,14 +2,14 @@ import { useEffect, useState } from "react";
 import { Button } from "../../../../components/ui/button";
 import { FaCoins, FaExchangeAlt, FaArrowDown } from "react-icons/fa";
 import { useActiveAccount, useSendTransaction } from "thirdweb/react";
-import { polygon } from "thirdweb/chains";
+import { base } from "thirdweb/chains";
 import { getContract, prepareContractCall } from "thirdweb";
 import { client } from "../../client";
 import { balanceOf } from "thirdweb/extensions/erc20";
 
-const DFAITH_TOKEN = "0xD05903dF2E1465e2bDEbB8979104204D1c48698d";
+const DFAITH_TOKEN = "0xEE27258975a2DA946CD5025134D70E5E24F6789F"; // D.FAITH auf Base
 const DFAITH_DECIMALS = 2;
-const DINVEST_TOKEN = "0x90aCC32F7b0B1CACc3958a260c096c10CCfa0383";
+const DINVEST_TOKEN = "0x14d9889892849a1D161c9272a07Fa16Fef79f1AE"; // D.INVEST auf Base
 const DINVEST_DECIMALS = 0;
 
 export default function SellTab() {
@@ -17,7 +17,7 @@ export default function SellTab() {
   const [dfaithBalance, setDfaithBalance] = useState("0");
   const [dinvestBalance, setDinvestBalance] = useState("0");
   const [dfaithPrice, setDfaithPrice] = useState<number | null>(null);
-  const [polPriceEur, setPolPriceEur] = useState<number | null>(null);
+  const [ethPriceEur, setEthPriceEur] = useState<number | null>(null);
   const [showSellModal, setShowSellModal] = useState(false);
   const [slippage, setSlippage] = useState("1");
   const [isSwapping, setIsSwapping] = useState(false);
@@ -43,7 +43,7 @@ export default function SellTab() {
     if (!accountAddress) return "0";
     try {
       const params = new URLSearchParams({
-        chain_id: "137",
+        chain_id: "8453", // Base Chain ID
         token_address: tokenAddress,
         owner_address: accountAddress,
         include_native: "true",
@@ -119,30 +119,30 @@ export default function SellTab() {
     };
   }, [account?.address]);
 
-  // Preis laden (umgekehrte Richtung - D.FAITH zu POL)
+  // Preis laden (umgekehrte Richtung - D.FAITH zu ETH)
   useEffect(() => {
     const fetchPrice = async () => {
       setIsLoadingPrice(true);
       setPriceError(null);
       try {
-        const polResponse = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=polygon-ecosystem-token&vs_currencies=eur');
-        if (polResponse.ok) {
-          const polData = await polResponse.json();
-          setPolPriceEur(polData['polygon-ecosystem-token']?.eur || 0.50);
+        const ethResponse = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=eur');
+        if (ethResponse.ok) {
+          const ethData = await ethResponse.json();
+          setEthPriceEur(ethData['ethereum']?.eur || 3000);
         }
         const params = new URLSearchParams({
-          chain: "polygon",
+          chain: "base",
           inTokenAddress: DFAITH_TOKEN,
-          outTokenAddress: "0x0000000000000000000000000000000000001010",
+          outTokenAddress: "0x0000000000000000000000000000000000000000", // Native ETH
           amount: "1",
           gasPrice: "50",
         });
-        const response = await fetch(`https://open-api.openocean.finance/v3/polygon/quote?${params}`);
+        const response = await fetch(`https://open-api.openocean.finance/v3/base/quote?${params}`);
         if (response.ok) {
           const data = await response.json();
           if (data && data.data && data.data.outAmount && data.data.outAmount !== "0") {
-            const polPerDfaith = Number(data.data.outAmount) / Math.pow(10, 18);
-            setDfaithPrice(polPerDfaith);
+            const ethPerDfaith = Number(data.data.outAmount) / Math.pow(10, 18);
+            setDfaithPrice(ethPerDfaith);
           } else {
             setPriceError("Keine Liquidität für Verkauf verfügbar");
           }
@@ -194,15 +194,15 @@ export default function SellTab() {
       console.log("1. Quote anfordern für", sellAmount, "D.FAITH");
       
       const params = new URLSearchParams({
-        chain: "polygon",
+        chain: "base",
         inTokenAddress: DFAITH_TOKEN,
-        outTokenAddress: "0x0000000000000000000000000000000000001010",
-        amount: sellAmount, // ← Ohne Dezimalstellen, wie in Docs beschrieben
+        outTokenAddress: "0x0000000000000000000000000000000000000000", // Native ETH
+        amount: sellAmount,
         slippage: slippage,
         gasPrice: "50",
         account: account.address,
       });
-      const url = `https://open-api.openocean.finance/v3/polygon/swap_quote?${params}`;
+      const url = `https://open-api.openocean.finance/v3/base/swap_quote?${params}`;
       const response = await fetch(url);
       if (!response.ok) throw new Error(`OpenOcean API Fehler: ${response.status}`);
       const data = await response.json();
@@ -211,8 +211,8 @@ export default function SellTab() {
       
       console.log("Quote erhalten:", txData);
 
-      // Spenderadresse fest auf die OpenOcean Router Adresse setzen
-      const spender = "0x6352a56caadC4F1E25CD6c75970Fa768A3304e64";
+      // Spenderadresse für Base Chain (OpenOcean Router)
+      const spender = "0x6352a56caadC4F1E25CD6c75970Fa768A3304e64"; // OpenOcean Router auf Base
       setQuoteTxData(txData);
       setSpenderAddress(spender);
 
@@ -220,11 +220,11 @@ export default function SellTab() {
       console.log("2. Prüfe Approval für", spender);
       
       const allowanceParams = new URLSearchParams({
-        chain: "polygon",
+        chain: "base",
         account: account.address,
         inTokenAddress: DFAITH_TOKEN
       });
-      const allowanceUrl = `https://open-api.openocean.finance/v3/polygon/allowance?${allowanceParams}`;
+      const allowanceUrl = `https://open-api.openocean.finance/v3/base/allowance?${allowanceParams}`;
       const allowanceResponse = await fetch(allowanceUrl);
       let allowanceValue = "0";
       if (allowanceResponse.ok) {
@@ -293,7 +293,7 @@ export default function SellTab() {
       
       const contract = getContract({
         client,
-        chain: polygon,
+        chain: base,
         address: DFAITH_TOKEN
       });
       
@@ -346,7 +346,7 @@ export default function SellTab() {
       
       // Aktuelle Nonce explizit abrufen
       const { getRpcClient } = await import("thirdweb");
-      const rpc = getRpcClient({ client, chain: polygon });
+      const rpc = getRpcClient({ client, chain: base });
       const nonce = await rpc({
         method: "eth_getTransactionCount",
         params: [account.address, "pending"]
@@ -358,7 +358,7 @@ export default function SellTab() {
       to: quoteTxData.to,
       data: quoteTxData.data,
       value: BigInt(quoteTxData.value || "0"),
-      chain: polygon,
+      chain: base,
       client,
       nonce: parseInt(nonce, 16), // Explizite Nonce setzen
       gas: BigInt(quoteTxData.gasLimit || "300000"), // Gas-Limit aus Quote verwenden
@@ -511,7 +511,7 @@ const handleSellAllInOne = async () => {
         <h2 className="text-2xl font-bold bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 bg-clip-text text-transparent mb-2">
           D.FAITH verkaufen
         </h2>
-        <p className="text-zinc-400">Tauschen Sie Ihre D.FAITH Token gegen POL</p>
+        <p className="text-zinc-400">Tauschen Sie Ihre D.FAITH Token gegen ETH</p>
       </div>
 
       {/* D.FAITH Token Karte */}
@@ -526,7 +526,7 @@ const handleSellAllInOne = async () => {
               <p className="text-xs text-zinc-500">Dawid Faith Utility Token</p>
             </div>
           </div>
-          <span className="text-xs text-zinc-400 bg-zinc-700/50 px-2 py-1 rounded">gegen POL verkaufen</span>
+          <span className="text-xs text-zinc-400 bg-zinc-700/50 px-2 py-1 rounded">gegen ETH verkaufen</span>
         </div>
         
         <div className="space-y-3">
@@ -542,7 +542,7 @@ const handleSellAllInOne = async () => {
               ) : priceError ? (
                 <span className="text-red-400">{priceError}</span>
               ) : dfaithPrice ? (
-                `1 D.FAITH = ${dfaithPrice.toFixed(6)} POL`
+                `1 D.FAITH = ${dfaithPrice.toFixed(6)} ETH`
               ) : (
                 "Preis nicht verfügbar"
               )}
@@ -663,15 +663,15 @@ const handleSellAllInOne = async () => {
             {sellAmount && parseFloat(sellAmount) > 0 && dfaithPrice && (
               <div className="mb-4 p-3 bg-zinc-800/50 rounded-lg">
                 <div className="flex justify-between text-sm">
-                  <span className="text-zinc-400">Geschätzte POL:</span>
-                  <span className="text-purple-400 font-bold">
+                  <span className="text-zinc-400">Geschätzte ETH:</span>
+                  <span className="text-blue-400 font-bold">
                     ~{(parseFloat(sellAmount) * dfaithPrice).toFixed(6)}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-zinc-400">Geschätzter Wert:</span>
                   <span className="text-green-400 font-bold">
-                    ~{(parseFloat(sellAmount) * dfaithPrice * (polPriceEur || 0.5)).toFixed(3)}€
+                    ~{(parseFloat(sellAmount) * dfaithPrice * (ethPriceEur || 3000)).toFixed(3)}€
                   </span>
                 </div>
               </div>
@@ -691,7 +691,7 @@ const handleSellAllInOne = async () => {
                 {swapTxStatus === "success" && (
                   <>
                     <div>🎉 Verkauf erfolgreich!</div>
-                    <div className="text-xs mt-1">Ihre D.FAITH wurden erfolgreich in POL getauscht und verifiziert</div>
+                    <div className="text-xs mt-1">Ihre D.FAITH wurden erfolgreich in ETH getauscht und verifiziert</div>
                   </>
                 )}
                 {swapTxStatus === "error" && (

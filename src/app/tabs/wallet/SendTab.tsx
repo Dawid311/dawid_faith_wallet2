@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Button } from "../../../../components/ui/button";
 import { FaPaperPlane, FaLock } from "react-icons/fa";
 import { useActiveAccount, useSendTransaction } from "thirdweb/react";
-import { polygon } from "thirdweb/chains";
+import { base } from "thirdweb/chains";
 import { getContract, prepareContractCall } from "thirdweb";
 import { client } from "../../client";
 import { fetchAllBalances, TOKEN_ADDRESSES, TOKEN_DECIMALS } from "../../utils/balanceUtils";
@@ -15,25 +15,25 @@ export default function SendTab() {
   const account = useActiveAccount();
   const { mutateAsync: sendTransaction } = useSendTransaction();
 
-  // Token-Konstanten mit neuen Adressen
+  // Token-Konstanten mit neuen Adressen auf Base
   const DFAITH_TOKEN = TOKEN_ADDRESSES.DFAITH;
   const DFAITH_DECIMALS = TOKEN_DECIMALS.DFAITH;
   const DINVEST_TOKEN = TOKEN_ADDRESSES.DINVEST;
   const DINVEST_DECIMALS = TOKEN_DECIMALS.DINVEST;
-  const POL_TOKEN = TOKEN_ADDRESSES.NATIVE_POL;
-  const POL_DECIMALS = TOKEN_DECIMALS.POL;
+  const ETH_TOKEN = TOKEN_ADDRESSES.NATIVE_ETH;
+  const ETH_DECIMALS = TOKEN_DECIMALS.ETH;
 
   // Balances
   const [dfaithBalance, setDfaithBalance] = useState("0.00");
   const [dinvestBalance, setDinvestBalance] = useState("0");
-  const [polBalance, setPolBalance] = useState("0.0000");
+  const [ethBalance, setEthBalance] = useState("0.0000");
   const [isLoadingBalances, setIsLoadingBalances] = useState(false);
 
   useEffect(() => {
     if (!account?.address) {
       setDfaithBalance("0.00");
       setDinvestBalance("0");
-      setPolBalance("0.0000");
+      setEthBalance("0.0000");
       return;
     }
 
@@ -46,7 +46,7 @@ export default function SendTab() {
         // Nur die Balances aktualisieren wenn sie erfolgreich geladen wurden
         if (balances.dfaith !== undefined) setDfaithBalance(balances.dfaith);
         if (balances.dinvest !== undefined) setDinvestBalance(balances.dinvest);
-        if (balances.pol !== undefined) setPolBalance(balances.pol);
+        if (balances.eth !== undefined) setEthBalance(balances.eth);
       } catch (error) {
         console.error("Fehler beim Laden der Balances:", error);
         // Bei Fehlern die alten Werte beibehalten, nicht auf "0" setzen
@@ -84,8 +84,8 @@ export default function SendTab() {
       maxValue = dfaithBalance.replace(",", ".");
     } else if (selectedToken === "DINVEST") {
       maxValue = dinvestBalance.replace(",", ".");
-    } else if (selectedToken === "POL") {
-      maxValue = polBalance.replace(",", ".");
+    } else if (selectedToken === "ETH") {
+      maxValue = ethBalance.replace(",", ".");
     }
     setSendAmount(maxValue);
   };
@@ -93,7 +93,7 @@ export default function SendTab() {
   const tokenOptions = [
     { key: "DFAITH", label: "D.FAITH", balance: dfaithBalance },
     { key: "DINVEST", label: "D.INVEST", balance: dinvestBalance },
-    { key: "POL", label: "POL", balance: polBalance },
+    { key: "ETH", label: "ETH", balance: ethBalance },
   ];
 
   return (
@@ -154,7 +154,7 @@ export default function SendTab() {
             Verfügbar: <span className="text-amber-400 font-semibold inline-flex items-center gap-1">
               <span>
                 {selectedToken === "DFAITH" ? dfaithBalance : 
-                 selectedToken === "DINVEST" ? dinvestBalance : polBalance} {selectedToken}
+                 selectedToken === "DINVEST" ? dinvestBalance : ethBalance} {selectedToken}
               </span>
               {isLoadingBalances && (
                 <span className="animate-spin text-xs opacity-60">↻</span>
@@ -172,7 +172,7 @@ export default function SendTab() {
               sendAmount && parseFloat(sendAmount) > parseFloat(
                 selectedToken === "DFAITH" ? dfaithBalance.replace(",", ".") : 
                 selectedToken === "DINVEST" ? dinvestBalance.replace(",", ".") : 
-                polBalance.replace(",", ".")
+                ethBalance.replace(",", ".")
               ) ? 'border-red-500 focus:border-red-400' : 'border-zinc-700 focus:border-amber-500'
             } focus:outline-none`}
             value={sendAmount}
@@ -194,7 +194,7 @@ export default function SendTab() {
         {sendAmount && parseFloat(sendAmount) > parseFloat(
           selectedToken === "DFAITH" ? dfaithBalance.replace(",", ".") : 
           selectedToken === "DINVEST" ? dinvestBalance.replace(",", ".") : 
-          polBalance.replace(",", ".")
+          ethBalance.replace(",", ".")
         ) && (
           <div className="text-xs text-red-400 bg-red-500/10 border border-red-500/30 rounded p-2">
             ❌ Nicht genügend {selectedToken} verfügbar
@@ -215,7 +215,7 @@ export default function SendTab() {
 
       {/* Kompakte Transaktionsdetails */}
       <div className="text-xs text-zinc-400 flex flex-wrap gap-x-4 gap-y-1 justify-between px-1">
-        <span>Netzwerkgebühr: ~0.001 POL</span>
+        <span>Netzwerkgebühr: ~0.001 ETH</span>
         <span>Gesamt: {sendAmount || "0.00"} {selectedToken}</span>
         <span>Zeit: ~30s</span>
       </div>
@@ -229,9 +229,9 @@ export default function SendTab() {
           parseFloat(sendAmount) <= parseFloat(
             selectedToken === "DFAITH" ? dfaithBalance.replace(",", ".") : 
             selectedToken === "DINVEST" ? dinvestBalance.replace(",", ".") : 
-            polBalance.replace(",", ".")
+            ethBalance.replace(",", ".")
           )
-            ? selectedToken === "POL"
+            ? selectedToken === "ETH"
               ? "bg-gradient-to-r from-purple-500 to-purple-600 text-white hover:opacity-90"
               : "bg-gradient-to-r from-amber-400 to-yellow-500 text-black hover:opacity-90"
             : "bg-zinc-700 text-zinc-400 cursor-not-allowed"
@@ -244,7 +244,7 @@ export default function SendTab() {
           parseFloat(sendAmount) > parseFloat(
             selectedToken === "DFAITH" ? dfaithBalance.replace(",", ".") : 
             selectedToken === "DINVEST" ? dinvestBalance.replace(",", ".") : 
-            polBalance.replace(",", ".")
+            ethBalance.replace(",", ".")
           )
         }
       >

@@ -37,16 +37,16 @@ export default function HistoryTab() {
       setError("");
       
       try {
-        const apiKey = "V6Q5223DMWPP3HQJE9IJ8UIHSP3NUHID5K";
+        const apiKey = "V6Q5223DMWPP3HQJE9IJ8UIHSP3NUHID5K"; // Hier deinen Basescan API-Key eintragen
         
-        // API-Endpunkte für Polygonscan
+        // API-Endpunkte für Basescan
         const endpoints = [
-          // Native POL/MATIC Transaktionen
-          `https://api.polygonscan.com/api?module=account&action=txlist&address=${userAddress}&startblock=0&endblock=99999999&sort=desc&apikey=${apiKey}`,
+          // Native ETH Transaktionen
+          `https://api.basescan.org/api?module=account&action=txlist&address=${userAddress}&startblock=0&endblock=99999999&sort=desc&apikey=${apiKey}`,
           // ERC20 Token Transaktionen
-          `https://api.polygonscan.com/api?module=account&action=tokentx&address=${userAddress}&startblock=0&endblock=99999999&sort=desc&apikey=${apiKey}`,
+          `https://api.basescan.org/api?module=account&action=tokentx&address=${userAddress}&startblock=0&endblock=99999999&sort=desc&apikey=${apiKey}`,
           // Interne Transaktionen
-          `https://api.polygonscan.com/api?module=account&action=txlistinternal&address=${userAddress}&startblock=0&endblock=99999999&sort=desc&apikey=${apiKey}`
+          `https://api.basescan.org/api?module=account&action=txlistinternal&address=${userAddress}&startblock=0&endblock=99999999&sort=desc&apikey=${apiKey}`
         ];
 
         // Parallele API-Aufrufe

@@ -1,16 +1,16 @@
 // Zentrale Balance-Utilities für alle Wallet-Tabs
 
 export const TOKEN_ADDRESSES = {
-  DFAITH: "0xD05903dF2E1465e2bDEbB8979104204D1c48698d",
-  DINVEST: "0x90aCC32F7b0B1CACc3958a260c096c10CCfa0383",
-  POL: "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270", // WMATIC
-  NATIVE_POL: "0x0000000000000000000000000000000000001010" // Native POL
+  DFAITH: "0xEE27258975a2DA946CD5025134D70E5E24F6789F", // D.FAITH auf Base
+  DINVEST: "0x14d9889892849a1D161c9272a07Fa16Fef79f1AE", // D.INVEST auf Base
+  ETH: "0x0000000000000000000000000000000000000000", // Native ETH
+  NATIVE_ETH: "0x0000000000000000000000000000000000000000" // Native ETH
 };
 
 export const TOKEN_DECIMALS = {
   DFAITH: 2,
   DINVEST: 0,
-  POL: 18
+  ETH: 18
 };
 
 // Zentrale API-Funktion für Token Balance Abfrage via Thirdweb Insight API
@@ -22,7 +22,7 @@ export const fetchTokenBalanceViaInsightApi = async (
   
   try {
     const params = new URLSearchParams({
-      chain_id: "137",
+      chain_id: "8453", // Base Chain ID
       token_address: tokenAddress,
       owner_address: accountAddress,
       include_native: "true",
@@ -65,12 +65,12 @@ export const formatDinvestBalance = (rawBalance: string): string => {
   return Math.floor(Number(rawBalance)).toString();
 };
 
-// Native POL Balance via RPC
-export const fetchNativePolBalance = async (accountAddress: string): Promise<string> => {
+// Native ETH Balance via RPC auf Base
+export const fetchNativeEthBalance = async (accountAddress: string): Promise<string> => {
   if (!accountAddress) return "0.0000";
   
   try {
-    const response = await fetch('https://polygon-rpc.com', {
+    const response = await fetch('https://mainnet.base.org', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -87,10 +87,10 @@ export const fetchNativePolBalance = async (accountAddress: string): Promise<str
     
     const data = await response.json();
     const balance = BigInt(data.result);
-    const polFormatted = Number(balance) / Math.pow(10, TOKEN_DECIMALS.POL);
-    return polFormatted.toFixed(4);
+    const ethFormatted = Number(balance) / Math.pow(10, TOKEN_DECIMALS.ETH);
+    return ethFormatted.toFixed(4);
   } catch (error) {
-    console.error("Fehler beim Laden der POL Balance:", error);
+    console.error("Fehler beim Laden der ETH Balance:", error);
     return "0.0000";
   }
 };
@@ -116,19 +116,19 @@ export const fetchPricesWithFallback = async () => {
   };
 
   const storedPrices = loadStoredPrices();
-  let polEur = storedPrices?.polEur || 0.50; // Fallback-Werte
+  let ethEur = storedPrices?.ethEur || 3000; // Fallback-Werte
   let dfaithEur = storedPrices?.dfaithEur || 0.001;
 
   try {
-    // Versuche CoinGecko für POL Preis
-    const polResponse = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=polygon-ecosystem-token&vs_currencies=eur');
-    if (polResponse.ok) {
-      const polData = await polResponse.json();
-      const newPolEur = polData['polygon-ecosystem-token']?.eur;
-      if (newPolEur) {
-        polEur = Math.round(newPolEur * 100) / 100;
+    // Versuche CoinGecko für ETH Preis
+    const ethResponse = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=eur');
+    if (ethResponse.ok) {
+      const ethData = await ethResponse.json();
+      const newEthEur = ethData['ethereum']?.eur;
+      if (newEthEur) {
+        ethEur = Math.round(newEthEur * 100) / 100;
       }
-    } else if (polResponse.status === 429) {
+    } else if (ethResponse.status === 429) {
       console.log('CoinGecko Rate Limit erreicht (429), verwende gespeicherte Preise');
     }
   } catch (e) {
@@ -136,22 +136,22 @@ export const fetchPricesWithFallback = async () => {
   }
 
   try {
-    // Versuche OpenOcean für D.FAITH Preis
+    // Versuche OpenOcean für D.FAITH Preis auf Base
     const params = new URLSearchParams({
-      chain: "polygon",
-      inTokenAddress: TOKEN_ADDRESSES.NATIVE_POL,
+      chain: "base",
+      inTokenAddress: TOKEN_ADDRESSES.NATIVE_ETH,
       outTokenAddress: TOKEN_ADDRESSES.DFAITH,
       amount: "1",
       gasPrice: "50",
     });
     
-    const response = await fetch(`https://open-api.openocean.finance/v3/polygon/quote?${params}`);
+    const response = await fetch(`https://open-api.openocean.finance/v3/base/quote?${params}`);
     
     if (response.ok) {
       const data = await response.json();
       if (data?.data?.outAmount && data.data.outAmount !== "0") {
-        const dfaithPerPol = Number(data.data.outAmount) / Math.pow(10, TOKEN_DECIMALS.DFAITH);
-        dfaithEur = polEur / dfaithPerPol;
+        const dfaithPerEth = Number(data.data.outAmount) / Math.pow(10, TOKEN_DECIMALS.DFAITH);
+        dfaithEur = ethEur / dfaithPerEth;
       }
     }
   } catch (e) {
@@ -162,7 +162,7 @@ export const fetchPricesWithFallback = async () => {
   try {
     const newPrices = {
       dfaithEur,
-      polEur,
+      ethEur,
       timestamp: Date.now()
     };
     localStorage.setItem('dawid_faith_prices', JSON.stringify(newPrices));
@@ -170,7 +170,7 @@ export const fetchPricesWithFallback = async () => {
     console.log('Fehler beim Speichern der Preise:', e);
   }
 
-  return { dfaithEur, polEur };
+  return { dfaithEur, ethEur };
 };
 
 // Alle Balances auf einmal laden
@@ -179,28 +179,28 @@ export const fetchAllBalances = async (accountAddress: string) => {
     return {
       dfaith: "0.00",
       dinvest: "0",
-      pol: "0.0000"
+      eth: "0.0000"
     };
   }
 
   try {
-    const [dfaithRaw, dinvestRaw, polBalance] = await Promise.all([
+    const [dfaithRaw, dinvestRaw, ethBalance] = await Promise.all([
       fetchTokenBalanceViaInsightApi(TOKEN_ADDRESSES.DFAITH, accountAddress),
       fetchTokenBalanceViaInsightApi(TOKEN_ADDRESSES.DINVEST, accountAddress),
-      fetchNativePolBalance(accountAddress)
+      fetchNativeEthBalance(accountAddress)
     ]);
 
     return {
       dfaith: formatDfaithBalance(dfaithRaw),
       dinvest: formatDinvestBalance(dinvestRaw),
-      pol: polBalance
+      eth: ethBalance
     };
   } catch (error) {
     console.error("Fehler beim Laden aller Balances:", error);
     return {
       dfaith: "0.00",
       dinvest: "0",
-      pol: "0.0000"
+      eth: "0.0000"
     };
   }
 };

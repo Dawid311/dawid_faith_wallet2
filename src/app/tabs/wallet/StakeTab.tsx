@@ -4,14 +4,14 @@ import { Card } from "../../../../components/ui/card";
 import { FaLock, FaUnlock, FaCoins, FaClock } from "react-icons/fa";
 import { useActiveAccount } from "thirdweb/react";
 import { createThirdwebClient, getContract, prepareContractCall, resolveMethod, readContract } from "thirdweb";
-import { polygon } from "thirdweb/chains";
+import { base } from "thirdweb/chains";
 import { useSendTransaction } from "thirdweb/react";
 import { balanceOf, approve } from "thirdweb/extensions/erc20";
 
-const STAKING_CONTRACT = "0x89E0ED96e21E73e1F47260cdF72e7E7cb878A2B2"; // Aktualisierte Staking Contract-Adresse
-const DFAITH_TOKEN = "0xD05903dF2E1465e2bDEbB8979104204D1c48698d";
+const STAKING_CONTRACT = "0xE97b88AbE228310216acd2B9C8Bde7d3dC41a551"; // Staking Contract auf Base
+const DFAITH_TOKEN = "0xEE27258975a2DA946CD5025134D70E5E24F6789F"; // D.FAITH Token auf Base
 const DFAITH_DECIMALS = 2;
-const DINVEST_TOKEN = "0x90aCC32F7b0B1CACc3958a260c096c10CCfa0383";
+const DINVEST_TOKEN = "0x14d9889892849a1D161c9272a07Fa16Fef79f1AE"; // D.INVEST Token auf Base
 const DINVEST_DECIMALS = 0;
 const client = createThirdwebClient({ clientId: process.env.NEXT_PUBLIC_TEMPLATE_CLIENT_ID! });
 
@@ -35,7 +35,7 @@ export default function StakeTab() {
   const [lastClaimed, setLastClaimed] = useState<number>(0);
   const [blockTimestamp, setBlockTimestamp] = useState<number>(0);
 
-  // Korrekte API-Funktion für Balance-Abfrage  
+  // Korrekte API-Funktion für Balance-Abfrage auf Base Chain
   const fetchTokenBalanceViaInsightApi = async (
     tokenAddress: string,
     accountAddress: string
@@ -43,7 +43,7 @@ export default function StakeTab() {
     if (!accountAddress) return "0";
     try {
       const params = new URLSearchParams({
-        chain_id: "137",
+        chain_id: "8453", // Base Chain ID
         token_address: tokenAddress,
         owner_address: accountAddress,
         include_native: "true",
@@ -85,7 +85,7 @@ export default function StakeTab() {
         setAvailable(Math.floor(Number(dinvestValue)).toString());
         
         // Staking Contract Daten abrufen
-        const staking = getContract({ client, chain: polygon, address: STAKING_CONTRACT });
+        const staking = getContract({ client, chain: base, address: STAKING_CONTRACT });
         
         // User's Stake Info abrufen
         try {
@@ -152,7 +152,7 @@ export default function StakeTab() {
         
         // Hole aktuellen Blocktimestamp (für Zeitberechnung)
         try {
-          const res = await fetch("https://polygon-rpc.com", {
+          const res = await fetch("https://mainnet.base.org", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -191,7 +191,7 @@ export default function StakeTab() {
     // D.FAITH
     (async () => {
       try {
-        const res = await fetch(`https://insight.thirdweb.com/v1/tokens?chain_id=137&token_address=${DFAITH_TOKEN}&owner_address=${account.address}&include_native=true`);
+        const res = await fetch(`https://insight.thirdweb.com/v1/tokens?chain_id=8453&token_address=${DFAITH_TOKEN}&owner_address=${account.address}&include_native=true`);
         const data = await res.json();
         const bal = data?.data?.[0]?.balance ?? "0";
         setDfaithBalance((Number(bal) / Math.pow(10, DFAITH_DECIMALS)).toFixed(DFAITH_DECIMALS));
@@ -200,7 +200,7 @@ export default function StakeTab() {
     // D.INVEST
     (async () => {
       try {
-        const res = await fetch(`https://insight.thirdweb.com/v1/tokens?chain_id=137&token_address=${DINVEST_TOKEN}&owner_address=${account.address}&include_native=true`);
+        const res = await fetch(`https://insight.thirdweb.com/v1/tokens?chain_id=8453&token_address=${DINVEST_TOKEN}&owner_address=${account.address}&include_native=true`);
         const data = await res.json();
         const bal = data?.data?.[0]?.balance ?? "0";
         setDinvestBalance(Math.floor(Number(bal)).toString());
@@ -234,8 +234,8 @@ export default function StakeTab() {
     setTxStatus("pending");
 
     try {
-      const staking = getContract({ client, chain: polygon, address: STAKING_CONTRACT });
-      const dinvest = getContract({ client, chain: polygon, address: DINVEST_TOKEN });
+      const staking = getContract({ client, chain: base, address: STAKING_CONTRACT });
+      const dinvest = getContract({ client, chain: base, address: DINVEST_TOKEN });
       const amountToStake = BigInt(amountToStakeNum);
 
       console.log("Staking Betrag:", amountToStakeNum);
@@ -329,7 +329,7 @@ export default function StakeTab() {
     setTxStatus("pending");
     
     try {
-      const staking = getContract({ client, chain: polygon, address: STAKING_CONTRACT });
+      const staking = getContract({ client, chain: base, address: STAKING_CONTRACT });
       
       console.log("Unstaking alle Token:", staked);
       
@@ -373,7 +373,7 @@ export default function StakeTab() {
     setTxStatus("pending");
     
     try {
-      const staking = getContract({ client, chain: polygon, address: STAKING_CONTRACT });
+      const staking = getContract({ client, chain: base, address: STAKING_CONTRACT });
       
       console.log("Claim Rewards:", claimableRewards);
       
@@ -736,7 +736,7 @@ export default function StakeTab() {
         </div>
         <div className="text-xs text-zinc-500 space-y-1">
           <div>Staking Contract: {STAKING_CONTRACT}</div>
-          <div>Network: Polygon (MATIC)</div>
+          <div>Network: Base (ETH)</div>
           <div>Staking Token: D.INVEST (0 Decimals)</div>
           <div>Reward Token: D.FAITH (2 Decimals)</div>
           <div>Reward System: Automatische Mehrwochen-Berechnung</div>
