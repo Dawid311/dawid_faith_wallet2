@@ -420,14 +420,14 @@ export default function StakeTab() {
     return ((stakedNum * currentRewardRate) / 100).toFixed(2);
   };
 
-  // Hilfsfunktion: Formatiere Zeit in Sekunden zu lesbarer Form
+  // Hilfsfunktion: Formatiere Zeit in Sekunden zu lesbarer Form, mit Schutz gegen zu große Werte
   const formatTime = (seconds: number) => {
     if (seconds <= 0) return "Jetzt verfügbar";
-    
+    // Wenn Zeitwert unrealistisch groß ist (z.B. > 10 Jahre), als nicht verfügbar anzeigen
+    if (seconds > 10 * 365 * 24 * 60 * 60) return "Nicht verfügbar";
     const days = Math.floor(seconds / (24 * 60 * 60));
     const hours = Math.floor((seconds % (24 * 60 * 60)) / (60 * 60));
     const minutes = Math.floor((seconds % (60 * 60)) / 60);
-    
     // Zeige nur die relevantesten Zeiteinheiten
     if (days > 0) {
       if (days >= 7) {

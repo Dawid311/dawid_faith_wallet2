@@ -699,18 +699,18 @@ export default function BuyTab() {
 
       {/* Kauf-Modal zentral - Mobile Optimiert und zentriert */}
       {showBuyModal && selectedToken && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 overflow-y-auto p-4">
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 overflow-y-auto p-4 pt-8 sm:pt-16">
           <div
             ref={buyModalRef}
-            className="bg-zinc-900 rounded-xl p-4 sm:p-6 max-w-sm w-full border border-amber-400 max-h-[85vh] overflow-y-auto flex flex-col"
+            className="bg-zinc-900 rounded-xl p-3 sm:p-6 max-w-sm w-full border border-amber-400 max-h-[calc(100vh-8rem)] sm:max-h-[85vh] overflow-y-auto flex flex-col mt-4 sm:mt-0"
             style={{ boxSizing: 'border-box' }}
           >
             {/* Modal-Header */}
             <div className="flex items-center justify-between mb-2">
-              <h3 className="text-base sm:text-xl font-bold text-amber-400">
-                {selectedToken === "DFAITH" && ""}
+              <h3 className="text-sm sm:text-xl font-bold text-amber-400">
+                {selectedToken === "DFAITH" && "D.FAITH kaufen"}
                 {selectedToken === "DINVEST" && "D.INVEST kaufen"}
-                {selectedToken === "ETH" && ""}
+                {selectedToken === "ETH" && "ETH kaufen"}
               </h3>
               <button
                 onClick={() => {
