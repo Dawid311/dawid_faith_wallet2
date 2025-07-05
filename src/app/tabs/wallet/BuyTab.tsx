@@ -627,21 +627,13 @@ export default function BuyTab() {
               }}
               className="relative cursor-pointer rounded-xl p-4 border-2 transition-all duration-200 bg-zinc-800/50 border-zinc-700 hover:border-zinc-600 hover:bg-zinc-800/70 hover:scale-[1.02]"
             >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className={`w-12 h-12 rounded-full bg-gradient-to-r ${token.color} flex items-center justify-center text-white font-bold text-lg shadow-lg`}>
-                    {token.icon}
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-white text-lg">{token.label}</h3>
-                    <p className="text-zinc-400 text-xs">{token.description}</p>
-                  </div>
+              <div className="flex items-center gap-3">
+                <div className={`w-12 h-12 rounded-full bg-gradient-to-r ${token.color} flex items-center justify-center text-white font-bold text-lg shadow-lg`}>
+                  {token.icon}
                 </div>
-                <div className="text-right">
-                  <div className="font-bold text-amber-400 text-lg flex items-center gap-1">
-                    {token.balance}
-                  </div>
-                  <div className="text-zinc-500 text-xs font-medium">{token.symbol}</div>
+                <div>
+                  <h3 className="font-bold text-white text-lg">{token.label}</h3>
+                  <p className="text-zinc-400 text-xs">{token.description}</p>
                 </div>
               </div>
               <div className="flex justify-between mt-2 text-xs">
