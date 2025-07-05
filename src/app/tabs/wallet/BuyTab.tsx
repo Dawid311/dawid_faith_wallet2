@@ -2,34 +2,33 @@ import { useEffect, useState, useRef } from "react";
 import { Button } from "../../../../components/ui/button";
 import { FaCoins, FaLock, FaExchangeAlt, FaSync, FaRegCopy } from "react-icons/fa";
 import { useActiveAccount, useSendTransaction, BuyWidget } from "thirdweb/react";
-import { polygon } from "thirdweb/chains";
+import { base } from "thirdweb/chains";
 import { NATIVE_TOKEN_ADDRESS, getContract, prepareContractCall, sendAndConfirmTransaction, readContract } from "thirdweb";
 import { client } from "../../client";
 import { balanceOf, approve } from "thirdweb/extensions/erc20";
 
-const DFAITH_TOKEN = "0xD05903dF2E1465e2bDEbB8979104204D1c48698d"; // Neue D.FAITH Token-Adresse
-const DFAITH_DECIMALS = 2; // Neue Dezimalstellen
-const DINVEST_TOKEN = "0x90aCC32F7b0B1CACc3958a260c096c10CCfa0383"; // D.INVEST Token Adresse
+const DFAITH_TOKEN = "0xEE27258975a2DA946CD5025134D70E5E24F6789F"; // D.FAITH Token auf Base
+const DFAITH_DECIMALS = 2; // Dezimalstellen
+const DINVEST_TOKEN = "0x90aCC32F7b0B1CACc3958a260c096c10CCfa0383"; // D.INVEST Token auf Base
 const DINVEST_DECIMALS = 0; // D.INVEST hat keine Dezimalstellen
-const POL_TOKEN = "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270"; // POL (WMATIC)
-const POL_DECIMALS = 18;
-const UNISWAP_ROUTER = "0xa5E0829CaCEd8fFDD4De3c43696c57F7D7A678ff"; // QuickSwap Router auf Polygon
+const ETH_TOKEN = "0x0000000000000000000000000000000000000000"; // Native ETH
+const ETH_DECIMALS = 18;
 
 export default function BuyTab() {
   const [dfaithPrice, setDfaithPrice] = useState<number | null>(null);
   const [dfaithPriceEur, setDfaithPriceEur] = useState<number | null>(null);
-  const [polPriceEur, setPolPriceEur] = useState<number | null>(null);
+  const [ethPriceEur, setEthPriceEur] = useState<number | null>(null);
   const [isLoadingPrice, setIsLoadingPrice] = useState(true);
   const [lastKnownPrices, setLastKnownPrices] = useState<{
     dfaith?: number;
     dfaithEur?: number;
-    polEur?: number;
+    ethEur?: number;
     timestamp?: number;
   }>({});
   const account = useActiveAccount();
   const [showInvestModal, setShowInvestModal] = useState(false);
   const [showBuyModal, setShowBuyModal] = useState(false);
-  const [showPolBuyModal, setShowPolBuyModal] = useState(false);
+  const [showEthBuyModal, setShowEthBuyModal] = useState(false);
   const [copied, setCopied] = useState(false);
   const [priceError, setPriceError] = useState<string | null>(null);
   const [swapAmount, setSwapAmount] = useState("");
@@ -60,7 +59,7 @@ export default function BuyTab() {
             setLastKnownPrices(parsed);
             if (parsed.dfaith) setDfaithPrice(parsed.dfaith);
             if (parsed.dfaithEur) setDfaithPriceEur(parsed.dfaithEur);
-            if (parsed.polEur) setPolPriceEur(parsed.polEur);
+            if (parsed.ethEur) setEthPriceEur(parsed.ethEur);
           }
         }
       } catch (e) {
@@ -73,54 +72,56 @@ export default function BuyTab() {
     const fetchDfaithPrice = async () => {
       setIsLoadingPrice(true);
       setPriceError(null);
-      let price: number | null = null;
-      let priceEur: number | null = null;
-      let polEur: number | null = null;
+      let ethEur: number | null = null;
+      let dfaithPriceEur: number | null = null;
       let errorMsg = "";
       
       try {
-        // 1. Hole POL/EUR Preis von CoinGecko
+        // 1. Hole ETH/EUR Preis von CoinGecko
         try {
-          const polResponse = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=polygon-ecosystem-token&vs_currencies=eur');
-          if (polResponse.ok) {
-            const polData = await polResponse.json();
-            polEur = polData['polygon-ecosystem-token']?.eur;
-            if (polEur) {
+          const ethResponse = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=eur');
+          if (ethResponse.ok) {
+            const ethData = await ethResponse.json();
+            ethEur = ethData['ethereum']?.eur;
+            if (ethEur) {
               // Auf 2 Dezimalstellen runden
-              polEur = Math.round(polEur * 100) / 100;
+              ethEur = Math.round(ethEur * 100) / 100;
             }
           }
         } catch (e) {
-          console.log('POL Preis Fehler:', e);
+          console.log('ETH Preis Fehler:', e);
         }
         
-        // Fallback auf letzten bekannten POL Preis
-        if (!polEur && lastKnownPrices.polEur) {
-          polEur = lastKnownPrices.polEur;
-        } else if (!polEur) {
-          polEur = 0.50; // Hard fallback
+        // Fallback auf letzten bekannten ETH Preis
+        if (!ethEur && lastKnownPrices.ethEur) {
+          ethEur = lastKnownPrices.ethEur;
+        } else if (!ethEur) {
+          ethEur = 3000; // Hard fallback für ETH
         }
         
-        // 2. Hole D.FAITH Preis von OpenOcean
+        // 2. Hole D.FAITH Preis von OpenOcean für Base Chain
         try {
           const params = new URLSearchParams({
-            chain: "polygon",
-            inTokenAddress: "0x0000000000000000000000000000000000001010", // Polygon Native Token (MATIC)
+            chain: "base",
+            inTokenAddress: "0x0000000000000000000000000000000000000000", // Native ETH
             outTokenAddress: DFAITH_TOKEN,
-            amount: "1", // 1 POL
+            amount: "1", // 1 ETH
             gasPrice: "50",
           });
           
-          const response = await fetch(`https://open-api.openocean.finance/v3/polygon/quote?${params}`);
+          const response = await fetch(`https://open-api.openocean.finance/v3/base/quote?${params}`);
           
           if (response.ok) {
             const data = await response.json();
             console.log("OpenOcean Response:", data);
             if (data && data.data && data.data.outAmount && data.data.outAmount !== "0") {
               // outAmount ist in D.FAITH (mit 2 Decimals)
-              price = Number(data.data.outAmount) / Math.pow(10, DFAITH_DECIMALS);
-              // Berechne EUR Preis: (D.FAITH pro POL) * (POL Preis in EUR) = D.FAITH Preis in EUR
-              priceEur = polEur / price; // 1 D.FAITH = POL_EUR / DFAITH_PER_POL
+              const dfaithAmount = Number(data.data.outAmount) / Math.pow(10, DFAITH_DECIMALS);
+              setDfaithPrice(dfaithAmount);
+              // Berechne EUR Preis: (D.FAITH pro ETH) * (ETH Preis in EUR) = D.FAITH Preis in EUR
+              if (ethEur) {
+                dfaithPriceEur = ethEur / dfaithAmount; // 1 D.FAITH = ETH_EUR / DFAITH_PER_ETH
+              }
             } else {
               errorMsg = "OpenOcean: Keine Liquidität verfügbar";
             }
@@ -133,12 +134,12 @@ export default function BuyTab() {
         }
         
         // Fallback auf letzte bekannte D.FAITH Preise
-        if (!price && lastKnownPrices.dfaith) {
-          price = lastKnownPrices.dfaith;
+        if (!dfaithPrice && lastKnownPrices.dfaith) {
+          setDfaithPrice(lastKnownPrices.dfaith);
           errorMsg = "";
         }
-        if (!priceEur && lastKnownPrices.dfaithEur) {
-          priceEur = lastKnownPrices.dfaithEur;
+        if (!dfaithPriceEur && lastKnownPrices.dfaithEur) {
+          dfaithPriceEur = lastKnownPrices.dfaithEur;
           errorMsg = "";
         }
         
@@ -147,26 +148,25 @@ export default function BuyTab() {
         errorMsg = "Preis-API Fehler";
         
         // Verwende letzte bekannte Preise als Fallback
-        if (lastKnownPrices.dfaith) price = lastKnownPrices.dfaith;
-        if (lastKnownPrices.dfaithEur) priceEur = lastKnownPrices.dfaithEur;
-        if (lastKnownPrices.polEur) polEur = lastKnownPrices.polEur;
+        if (lastKnownPrices.dfaith) setDfaithPrice(lastKnownPrices.dfaith);
+        if (lastKnownPrices.dfaithEur) dfaithPriceEur = lastKnownPrices.dfaithEur;
+        if (lastKnownPrices.ethEur) ethEur = lastKnownPrices.ethEur;
         
-        if (price && priceEur && polEur) {
+        if (dfaithPrice && dfaithPriceEur && ethEur) {
           errorMsg = ""; // Kein Fehler anzeigen wenn Fallback verfügbar
         }
       }
       
       // Setze Preise (entweder neue oder Fallback)
-      if (polEur) setPolPriceEur(polEur);
-      if (price) setDfaithPrice(price);
-      if (priceEur) setDfaithPriceEur(priceEur);
+      if (ethEur) setEthPriceEur(ethEur);
+      if (dfaithPriceEur) setDfaithPriceEur(dfaithPriceEur);
       
       // Speichere erfolgreiche Preise
-      if (price && priceEur && polEur) {
+      if (dfaithPrice && dfaithPriceEur && ethEur) {
         const newPrices = {
-          dfaith: price,
-          dfaithEur: priceEur,
-          polEur: polEur,
+          dfaith: dfaithPrice,
+          dfaithEur: dfaithPriceEur,
+          ethEur: ethEur,
           timestamp: Date.now()
         };
         setLastKnownPrices(newPrices);
@@ -187,7 +187,7 @@ export default function BuyTab() {
     // Preis alle 2 Minuten aktualisieren
     const interval = setInterval(fetchDfaithPrice, 120000);
     return () => clearInterval(interval);
-  }, [lastKnownPrices.dfaith, lastKnownPrices.dfaithEur, lastKnownPrices.polEur]);
+  }, [lastKnownPrices.dfaith, lastKnownPrices.dfaithEur, lastKnownPrices.ethEur]);
 
   // D.INVEST kaufen Modal öffnen
   const handleInvestBuy = async () => {
@@ -205,32 +205,32 @@ export default function BuyTab() {
 
   // State für D.FAITH Swap
   const [showDfaithBuyModal, setShowDfaithBuyModal] = useState(false);
-  const [swapAmountPol, setSwapAmountPol] = useState("");
+  const [swapAmountEth, setSwapAmountEth] = useState("");
   const [slippage, setSlippage] = useState("1");
-  const [polBalance, setPolBalance] = useState("0");
+  const [ethBalance, setEthBalance] = useState("0");
   const [isSwapping, setIsSwapping] = useState(false);
   const [swapTxStatus, setSwapTxStatus] = useState<string | null>(null);
 
-  // POL Balance laden (auf 3 Stellen)
+  // ETH Balance laden (auf 3 Stellen)
   useEffect(() => {
-    const fetchPolBalance = async () => {
+    const fetchEthBalance = async () => {
       if (!account?.address) {
         console.log("No account connected");
         return;
       }
       try {
-        console.log("Fetching native POL balance for:", account.address);
+        console.log("Fetching native ETH balance for:", account.address);
         
         const balance = await readContract({
           contract: getContract({
             client,
-            chain: polygon,
+            chain: base,
             address: "0x0000000000000000000000000000000000000000"
           }),
           method: "function balanceOf(address) view returns (uint256)",
           params: [account.address]
         }).catch(async () => {
-          const response = await fetch(polygon.rpc, {
+          const response = await fetch(base.rpc, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -244,22 +244,22 @@ export default function BuyTab() {
           return BigInt(data.result);
         });
         
-        console.log("Native POL Balance raw:", balance.toString());
+        console.log("Native ETH Balance raw:", balance.toString());
         
-        const polFormatted = Number(balance) / Math.pow(10, 18);
-        console.log("Native POL formatted:", polFormatted);
+        const ethFormatted = Number(balance) / Math.pow(10, 18);
+        console.log("Native ETH formatted:", ethFormatted);
         
         // Auf 3 Stellen formatieren
-        setPolBalance(polFormatted.toFixed(3));
+        setEthBalance(ethFormatted.toFixed(3));
         
       } catch (error) {
-        console.error("Fehler beim Laden der POL Balance:", error);
-        setPolBalance("0");
+        console.error("Fehler beim Laden der ETH Balance:", error);
+        setEthBalance("0");
       }
     };
     
-    fetchPolBalance();
-    const interval = setInterval(fetchPolBalance, 10000);
+    fetchEthBalance();
+    const interval = setInterval(fetchEthBalance, 10000);
     return () => clearInterval(interval);
   }, [account?.address]);
 
@@ -267,7 +267,7 @@ export default function BuyTab() {
   const [dfaithBalance, setDfaithBalance] = useState("0.00");
   const [dinvestBalance, setDinvestBalance] = useState("0");
 
-  // Neue Funktion für Balance via Thirdweb Insight API (wie im WalletTab)
+      // Neue Funktion für Balance via Thirdweb Insight API für Base Chain
   const fetchTokenBalanceViaInsightApi = async (
     tokenAddress: string,
     accountAddress: string
@@ -275,7 +275,7 @@ export default function BuyTab() {
     if (!accountAddress) return "0";
     try {
       const params = new URLSearchParams({
-        chain_id: "137",
+        chain_id: "8453", // Base Chain ID
         token_address: tokenAddress,
         owner_address: accountAddress,
         include_native: "true",
@@ -349,7 +349,7 @@ export default function BuyTab() {
     return () => clearInterval(interval);
   }, [account?.address]);
 
-  // D.FAITH Swap Funktion mit mehrstufigem Prozess wie im SellTab
+  // D.FAITH Swap Funktion mit mehrstufigem Prozess angepasst für Base Chain
   const handleGetQuote = async () => {
     setSwapTxStatus("pending");
     setQuoteError(null);
@@ -358,22 +358,22 @@ export default function BuyTab() {
     setNeedsApproval(false);
 
     try {
-      if (!swapAmountPol || parseFloat(swapAmountPol) <= 0 || !account?.address) return;
+      if (!swapAmountEth || parseFloat(swapAmountEth) <= 0 || !account?.address) return;
 
-      console.log("=== OpenOcean Quote Request ===");
-      console.log("POL Amount:", swapAmountPol);
+      console.log("=== OpenOcean Quote Request für Base ===");
+      console.log("ETH Amount:", swapAmountEth);
       
       const quoteParams = new URLSearchParams({
-        chain: "polygon",
-        inTokenAddress: "0x0000000000000000000000000000000000001010", // Native POL
+        chain: "base",
+        inTokenAddress: "0x0000000000000000000000000000000000000000", // Native ETH
         outTokenAddress: DFAITH_TOKEN, // D.FAITH
-        amount: swapAmountPol,
+        amount: swapAmountEth,
         slippage: slippage,
         gasPrice: "50",
         account: account.address,
       });
       
-      const quoteUrl = `https://open-api.openocean.finance/v3/polygon/swap_quote?${quoteParams}`;
+      const quoteUrl = `https://open-api.openocean.finance/v3/base/swap_quote?${quoteParams}`;
       const quoteResponse = await fetch(quoteUrl);
       
       if (!quoteResponse.ok) {
@@ -395,8 +395,7 @@ export default function BuyTab() {
       
       setQuoteTxData(txData);
       
-      // Bei POL-Käufen ist normalerweise kein Approval nötig, da es native Token sind
-      // Aber wir prüfen trotzdem für Konsistenz
+      // Bei ETH-Käufen ist normalerweise kein Approval nötig, da es native Token sind
       setNeedsApproval(false);
       setBuyStep('quoteFetched');
       setSwapTxStatus(null);
@@ -409,14 +408,13 @@ export default function BuyTab() {
     }
   };
 
-  // Approval wird normalerweise nicht benötigt bei POL → D.FAITH da POL native ist
-  // Aber wir implementieren es für Konsistenz
+  // Approval wird normalerweise nicht benötigt bei ETH → D.FAITH da ETH native ist
   const handleApprove = async () => {
     if (!account?.address) return;
     setSwapTxStatus("approving");
     
     try {
-      console.log("Approval für POL (normalerweise nicht nötig)");
+      console.log("Approval für ETH (normalerweise nicht nötig)");
       // Bei Native Token ist kein Approval nötig, also überspringen wir direkt
       setNeedsApproval(false);
       setBuyStep('approved');
@@ -428,25 +426,25 @@ export default function BuyTab() {
     }
   };
 
-  // Verbesserter D.FAITH Swap mit POL-Balance-Verifizierung
+  // Verbesserter D.FAITH Swap mit ETH-Balance-Verifizierung für Base Chain
   const handleBuySwap = async () => {
     if (!quoteTxData || !account?.address) return;
     setIsSwapping(true);
     setSwapTxStatus("swapping");
     
-    // Aktuelle POL-Balance vor dem Swap speichern
-    const initialPolBalance = parseFloat(polBalance);
-    const polAmount = parseFloat(swapAmountPol);
+    // Aktuelle ETH-Balance vor dem Swap speichern
+    const initialEthBalance = parseFloat(ethBalance);
+    const ethAmount = parseFloat(swapAmountEth);
     
     try {
-      console.log("=== D.FAITH Kauf-Swap wird gestartet ===");
+      console.log("=== D.FAITH Kauf-Swap wird gestartet auf Base ===");
       console.log("Verwende Quote-Daten:", quoteTxData);
       
       const { prepareTransaction } = await import("thirdweb");
       
       // Aktuelle Nonce explizit abrufen
       const { getRpcClient } = await import("thirdweb");
-      const rpc = getRpcClient({ client, chain: polygon });
+      const rpc = getRpcClient({ client, chain: base });
       const nonce = await rpc({
         method: "eth_getTransactionCount",
         params: [account.address, "pending"]
@@ -458,7 +456,7 @@ export default function BuyTab() {
         to: quoteTxData.to,
         data: quoteTxData.data,
         value: BigInt(quoteTxData.value || "0"),
-        chain: polygon,
+        chain: base,
         client,
         nonce: parseInt(nonce, 16),
         gas: BigInt(quoteTxData.gasLimit || "300000"),
@@ -473,9 +471,9 @@ export default function BuyTab() {
       console.log("Transaction sent successfully");
       
       setSwapTxStatus("verifying");
-      console.log("Verifiziere POL-Balance-Änderung...");
+      console.log("Verifiziere ETH-Balance-Änderung...");
       
-      // POL-Balance-Verifizierung mit mehreren Versuchen
+      // ETH-Balance-Verifizierung mit mehreren Versuchen
       let balanceVerified = false;
       let attempts = 0;
       const maxAttempts = 30; // Maximal 30 Versuche
@@ -486,7 +484,7 @@ export default function BuyTab() {
       
       while (!balanceVerified && attempts < maxAttempts) {
         attempts++;
-        console.log(`POL-Balance-Verifizierung Versuch ${attempts}/${maxAttempts}`);
+        console.log(`ETH-Balance-Verifizierung Versuch ${attempts}/${maxAttempts}`);
         
         try {
           if (attempts > 1) {
@@ -494,8 +492,8 @@ export default function BuyTab() {
             console.log(`Warte ${waitTime/1000} Sekunden vor nächstem Versuch...`);
             await new Promise(resolve => setTimeout(resolve, waitTime));
           }
-          // POL-Balance neu laden
-          const response = await fetch(polygon.rpc, {
+          // ETH-Balance neu laden
+          const response = await fetch(base.rpc, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -506,24 +504,24 @@ export default function BuyTab() {
             })
           });
           const data = await response.json();
-          const polRaw = data?.result ? BigInt(data.result) : BigInt(0);
-          const currentPolBalance = Number(polRaw) / Math.pow(10, 18);
+          const ethRaw = data?.result ? BigInt(data.result) : BigInt(0);
+          const currentEthBalance = Number(ethRaw) / Math.pow(10, 18);
           
-          console.log(`Initiale POL-Balance: ${initialPolBalance}, Aktuelle POL-Balance: ${currentPolBalance}`);
+          console.log(`Initiale ETH-Balance: ${initialEthBalance}, Aktuelle ETH-Balance: ${currentEthBalance}`);
           
-          // Prüfe ob sich die POL-Balance um mindestens den Kaufbetrag verringert hat (mit 10% Toleranz für Fees)
-          const expectedDecrease = polAmount;
-          const actualDecrease = initialPolBalance - currentPolBalance;
+          // Prüfe ob sich die ETH-Balance um mindestens den Kaufbetrag verringert hat (mit 10% Toleranz für Fees)
+          const expectedDecrease = ethAmount;
+          const actualDecrease = initialEthBalance - currentEthBalance;
           
           console.log(`Erwartete Verringerung: ${expectedDecrease}, Tatsächliche Verringerung: ${actualDecrease}`);
           
           if (actualDecrease >= (expectedDecrease * 0.9)) { // 10% Toleranz
-            console.log("✅ POL-Balance-Änderung verifiziert - Kauf erfolgreich!");
-            setPolBalance(currentPolBalance.toFixed(3));
+            console.log("✅ ETH-Balance-Änderung verifiziert - Kauf erfolgreich!");
+            setEthBalance(currentEthBalance.toFixed(3));
             balanceVerified = true;
             setBuyStep('completed');
             setSwapTxStatus("success");
-            setSwapAmountPol("");
+            setSwapAmountEth("");
             setQuoteTxData(null);
             setSpenderAddress(null);
             // D.FAITH Balance auch aktualisieren
@@ -539,18 +537,18 @@ export default function BuyTab() {
             }, 1000);
             setTimeout(() => setSwapTxStatus(null), 5000);
           } else {
-            console.log(`Versuch ${attempts}: POL-Balance noch nicht ausreichend geändert, weiter warten...`);
+            console.log(`Versuch ${attempts}: ETH-Balance noch nicht ausreichend geändert, weiter warten...`);
           }
         } catch (balanceError) {
-          console.error(`POL-Balance-Verifizierung Versuch ${attempts} fehlgeschlagen:`, balanceError);
+          console.error(`ETH-Balance-Verifizierung Versuch ${attempts} fehlgeschlagen:`, balanceError);
         }
       }
       
       if (!balanceVerified) {
-        console.log("⚠️ POL-Balance-Verifizierung nach mehreren Versuchen nicht erfolgreich");
+        console.log("⚠️ ETH-Balance-Verifizierung nach mehreren Versuchen nicht erfolgreich");
         setSwapTxStatus("success");
         setBuyStep('completed');
-        setSwapAmountPol("");
+        setSwapAmountEth("");
         setTimeout(() => setSwapTxStatus(null), 8000);
       }
       
@@ -564,18 +562,18 @@ export default function BuyTab() {
   };
 
   // Refs für die Modals
-  const polBuyModalRef = useRef<HTMLDivElement>(null);
+  const ethBuyModalRef = useRef<HTMLDivElement>(null);
   const dfaithBuyModalRef = useRef<HTMLDivElement>(null);
   const investBuyModalRef = useRef<HTMLDivElement>(null);
 
   // Scrollen zu den Modals, wenn sie geöffnet werden
   useEffect(() => {
-    if (showPolBuyModal && polBuyModalRef.current) {
+    if (showEthBuyModal && ethBuyModalRef.current) {
       setTimeout(() => {
-        polBuyModalRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+        ethBuyModalRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
       }, 50);
     }
-  }, [showPolBuyModal]);
+  }, [showEthBuyModal]);
 
   useEffect(() => {
     if (showDfaithBuyModal && dfaithBuyModalRef.current) {
@@ -615,8 +613,9 @@ export default function BuyTab() {
                 <p className="text-xs text-zinc-500">Dawid Faith Utility Token</p>
               </div>
             </div>
-            <span className="text-xs text-zinc-400 bg-zinc-700/50 px-2 py-1 rounded">mit POL kaufen</span>
-          </div>            <div className="space-y-4">
+            <span className="text-xs text-zinc-400 bg-zinc-700/50 px-2 py-1 rounded">mit ETH kaufen</span>
+          </div>
+          <div className="space-y-4">
               <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
                 <span className="text-sm text-zinc-400">Aktueller Preis:</span>
                 <span className="text-sm text-amber-400 font-medium">
@@ -640,7 +639,7 @@ export default function BuyTab() {
                 <span className="text-sm text-zinc-300 font-medium">
                   {dfaithPrice ? (
                     <span>
-                      1 POL = {dfaithPrice.toFixed(2)} D.FAITH
+                      1 ETH = {dfaithPrice.toFixed(2)} D.FAITH
                       {priceError && (
                         <span className="text-xs text-yellow-400 ml-1">(cached)</span>
                       )}
@@ -666,7 +665,7 @@ export default function BuyTab() {
                   <button
                     onClick={() => {
                       setShowDfaithBuyModal(false);
-                      setSwapAmountPol("");
+                      setSwapAmountEth("");
                       setSlippage("1");
                       setSwapTxStatus(null);
                       setBuyStep('initial');
@@ -689,35 +688,35 @@ export default function BuyTab() {
                   <div className={` ${buyStep === 'completed' ? 'text-green-400' : 'text-zinc-500'}`}>3. Swap {buyStep === 'completed' ? '✓' : ''}</div>
                 </div>
 
-                {/* Kompakte Inputzeile: POL-Balance als Badge, Input */}
+                {/* Kompakte Inputzeile: ETH-Balance als Badge, Input */}
                 <div className="flex gap-2 items-center mb-3 w-full">
-                  {/* POL-Balance Badge */}
-                  <div className="flex items-center gap-1 bg-purple-900/60 border border-purple-500 rounded-lg px-3 py-2 text-purple-300 font-bold text-sm whitespace-nowrap">
-                    <span className="text-purple-400 text-base">🔷</span>
-                    <span>{polBalance}</span>
-                    <span className="text-xs font-normal ml-1">POL</span>
+                  {/* ETH-Balance Badge */}
+                  <div className="flex items-center gap-1 bg-blue-900/60 border border-blue-500 rounded-lg px-3 py-2 text-blue-300 font-bold text-sm whitespace-nowrap">
+                    <span className="text-blue-400 text-base">⟠</span>
+                    <span>{ethBalance}</span>
+                    <span className="text-xs font-normal ml-1">ETH</span>
                   </div>
-                  {/* POL Input - jetzt mit mehr Platz */}
+                  {/* ETH Input - jetzt mit mehr Platz */}
                   <input
                     type="number"
                     min="0"
                     step="0.001"
                     placeholder="Betrag"
-                    className="flex-grow bg-zinc-800 border border-zinc-600 rounded-lg py-3 px-3 text-base font-bold text-purple-400 focus:border-amber-500 focus:outline-none"
-                    value={swapAmountPol}
-                    onChange={e => setSwapAmountPol(e.target.value)}
+                    className="flex-grow bg-zinc-800 border border-zinc-600 rounded-lg py-3 px-3 text-base font-bold text-blue-400 focus:border-amber-500 focus:outline-none"
+                    value={swapAmountEth}
+                    onChange={e => setSwapAmountEth(e.target.value)}
                     disabled={isSwapping || buyStep !== 'initial'}
                     style={{ minWidth: '120px' }}
                   />
                   <button
-                    className="text-xs px-2 py-2 bg-purple-500/20 text-purple-400 rounded hover:bg-purple-500/30 transition font-bold"
-                    onClick={() => setSwapAmountPol((parseFloat(polBalance) * 0.95).toFixed(3))}
-                    disabled={isSwapping || parseFloat(polBalance) <= 0 || buyStep !== 'initial'}
+                    className="text-xs px-2 py-2 bg-blue-500/20 text-blue-400 rounded hover:bg-blue-500/30 transition font-bold"
+                    onClick={() => setSwapAmountEth((parseFloat(ethBalance) * 0.95).toFixed(3))}
+                    disabled={isSwapping || parseFloat(ethBalance) <= 0 || buyStep !== 'initial'}
                     style={{ minWidth: 'unset' }}
                   >MAX</button>
                 </div>
                 <div className="flex justify-between text-xs text-zinc-500 mb-3">
-                  <span>Verfügbar: <span className="text-purple-400 font-bold">{polBalance} POL</span></span>
+                  <span>Verfügbar: <span className="text-blue-400 font-bold">{ethBalance} ETH</span></span>
                 </div>
 
                 {/* Slippage */}
@@ -762,15 +761,15 @@ export default function BuyTab() {
                 </div>
 
                 {/* Estimated Output */}
-                {swapAmountPol && parseFloat(swapAmountPol) > 0 && dfaithPrice && dfaithPriceEur && (
+                {swapAmountEth && parseFloat(swapAmountEth) > 0 && dfaithPrice && dfaithPriceEur && (
                   <div className="mb-3 p-3 bg-zinc-800/50 rounded text-sm">
                     <div className="flex justify-between mb-1">
                       <span className="text-zinc-400">~D.FAITH:</span>
-                      <span className="text-amber-400 font-bold">{(parseFloat(swapAmountPol) * dfaithPrice).toFixed(2)}</span>
+                      <span className="text-amber-400 font-bold">{(parseFloat(swapAmountEth) * dfaithPrice).toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between mb-1">
                       <span className="text-zinc-400">~Wert:</span>
-                      <span className="text-green-400 font-bold">{(parseFloat(swapAmountPol) * dfaithPrice * dfaithPriceEur).toFixed(2)}€</span>
+                      <span className="text-green-400 font-bold">{(parseFloat(swapAmountEth) * dfaithPrice * dfaithPriceEur).toFixed(2)}€</span>
                     </div>
                   </div>
                 )}
@@ -803,12 +802,12 @@ export default function BuyTab() {
                       className="w-full bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-3 rounded-xl text-base"
                       onClick={handleGetQuote}
                       disabled={
-                        !swapAmountPol || 
-                        parseFloat(swapAmountPol) <= 0 || 
+                        !swapAmountEth || 
+                        parseFloat(swapAmountEth) <= 0 || 
                         isSwapping || 
                         !account?.address || 
-                        parseFloat(polBalance) <= 0 ||
-                        parseFloat(swapAmountPol) > parseFloat(polBalance)
+                        parseFloat(ethBalance) <= 0 ||
+                        parseFloat(swapAmountEth) > parseFloat(ethBalance)
                       }
                     >
                       <FaExchangeAlt className="inline mr-1" />
@@ -822,7 +821,7 @@ export default function BuyTab() {
                       disabled={isSwapping}
                     >
                       <FaExchangeAlt className="inline mr-1" />
-                      {isSwapping ? "Approval läuft..." : "POL freigeben"}
+                      {isSwapping ? "Approval läuft..." : "ETH freigeben"}
                     </Button>
                   )}
                   {((buyStep === 'quoteFetched' && !needsApproval) || buyStep === 'approved') && (
@@ -832,21 +831,20 @@ export default function BuyTab() {
                       disabled={isSwapping}
                     >
                       <FaExchangeAlt className="inline mr-1" />
-                      {isSwapping ? "Kaufe..." : `${swapAmountPol || "0"} POL → D.FAITH`}
+                      {isSwapping ? "Kaufe..." : `${swapAmountEth || "0"} ETH → D.FAITH`}
                     </Button>
                   )}
                   {buyStep === 'completed' && (
                     <Button
                       className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold py-3 rounded-xl text-base"
-                      onClick={() => {
-                        setBuyStep('initial');
-                        setQuoteTxData(null);
-                        setSpenderAddress(null);
-                        setNeedsApproval(false);
-                        setQuoteError(null);
-                        setSwapAmountPol("");
-                        setSwapTxStatus(null);
-                        setSlippage("1");
+                      onClick={() => {                      setBuyStep('initial');
+                      setQuoteTxData(null);
+                      setSpenderAddress(null);
+                      setNeedsApproval(false);
+                      setQuoteError(null);
+                      setSwapAmountEth("");
+                      setSwapTxStatus(null);
+                      setSlippage("1");
                       }}
                       disabled={isSwapping}
                     >
@@ -860,7 +858,7 @@ export default function BuyTab() {
                     className="w-full bg-zinc-600 hover:bg-zinc-700 text-white font-bold py-2 rounded-lg text-xs"
                     onClick={() => {
                       setShowDfaithBuyModal(false);
-                      setSwapAmountPol("");
+                      setSwapAmountEth("");
                       setSlippage("1");
                       setSwapTxStatus(null);
                       setBuyStep('initial');
@@ -876,20 +874,20 @@ export default function BuyTab() {
                 </div>
 
                 {/* Validation kompakt */}
-                {parseFloat(swapAmountPol) > parseFloat(polBalance) && (
+                {parseFloat(swapAmountEth) > parseFloat(ethBalance) && (
                   <div className="mb-3 p-2 bg-red-500/10 border border-red-500/30 rounded text-xs">
                     <div className="flex items-center gap-1">
                       <span className="text-red-400">❌</span>
-                      <span>Nicht genügend POL</span>
+                      <span>Nicht genügend ETH</span>
                     </div>
-                    <div className="text-[10px] text-red-300/70 mt-1">Verfügbar: {polBalance} | Benötigt: {swapAmountPol}</div>
+                    <div className="text-[10px] text-red-300/70 mt-1">Verfügbar: {ethBalance} | Benötigt: {swapAmountEth}</div>
                   </div>
                 )}
-                {parseFloat(swapAmountPol) > 0 && parseFloat(swapAmountPol) < 0.001 && (
+                {parseFloat(swapAmountEth) > 0 && parseFloat(swapAmountEth) < 0.001 && (
                   <div className="mb-3 p-2 bg-yellow-500/10 border border-yellow-500/30 rounded text-xs">
                     <div className="flex items-center gap-1">
                       <span className="text-yellow-400">⚠️</span>
-                      <span>Minimum: 0.001 POL</span>
+                      <span>Minimum: 0.001 ETH</span>
                     </div>
                   </div>
                 )}
@@ -946,16 +944,16 @@ export default function BuyTab() {
           </Button>
         </div>
 
-        {/* POL kaufen */}
+        {/* ETH kaufen */}
         <div className="bg-gradient-to-br from-blue-800/30 to-blue-900/30 rounded-xl p-6 border border-blue-700/50">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-gradient-to-r from-purple-500 to-purple-700 rounded-full">
-                <span className="text-white text-lg font-bold">🔷</span>
+              <div className="p-2 bg-gradient-to-r from-blue-500 to-blue-700 rounded-full">
+                <span className="text-white text-lg font-bold">⟠</span>
               </div>
               <div>
-                <h3 className="font-bold text-purple-400">POL Token</h3>
-                <p className="text-xs text-zinc-500">Polygon Native Token</p>
+                <h3 className="font-bold text-blue-400">ETH Token</h3>
+                <p className="text-xs text-zinc-500">Ethereum Native Token</p>
               </div>
             </div>
             <span className="text-xs text-zinc-400 bg-zinc-700/50 px-2 py-1 rounded">mit EUR kaufen</span>
@@ -964,36 +962,36 @@ export default function BuyTab() {
           <div className="space-y-4">
             <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
               <span className="text-sm text-zinc-400">Aktueller Preis:</span>
-              <span className="text-sm text-purple-400 font-bold">
-                {polPriceEur ? (
+              <span className="text-sm text-blue-400 font-bold">
+                {ethPriceEur ? (
                   <span>
-                    {polPriceEur.toFixed(2)}€ pro POL
+                    {ethPriceEur.toFixed(2)}€ pro ETH
                     {priceError && (
                       <span className="text-xs text-yellow-400 ml-1">(cached)</span>
                     )}
                   </span>
                 ) : (
-                  "~0.50€ pro POL"
+                  "~3000€ pro ETH"
                 )}
               </span>
             </div>
           </div>
           
           <div className="w-full mt-4">
-            {showPolBuyModal ? (
+            {showEthBuyModal ? (
               <div
                 className="fixed inset-0 z-50 flex items-center justify-center min-h-screen bg-black/60 overflow-y-auto"
               >
                 <div
-                  ref={polBuyModalRef}
-                  className="bg-zinc-900 rounded-xl p-4 max-w-full w-full sm:max-w-xs border border-purple-500 text-center flex flex-col items-center justify-center my-4"
+                  ref={ethBuyModalRef}
+                  className="bg-zinc-900 rounded-xl p-4 max-w-full w-full sm:max-w-xs border border-blue-500 text-center flex flex-col items-center justify-center my-4"
                 >
-                  <div className="mb-4 text-purple-400 text-2xl font-bold">POL kaufen</div>
+                  <div className="mb-4 text-blue-400 text-2xl font-bold">ETH kaufen</div>
                   <div className="w-full flex-1 flex items-center justify-center">
                     <BuyWidget
                       client={client}
                       tokenAddress={NATIVE_TOKEN_ADDRESS}
-                      chain={polygon}
+                      chain={base}
                       amount="1"
                       theme="dark"
                       className="w-full"
@@ -1001,7 +999,7 @@ export default function BuyTab() {
                   </div>
                   <Button
                     className="w-full bg-zinc-600 hover:bg-zinc-700 text-white font-bold py-2 rounded-xl mt-4"
-                    onClick={() => setShowPolBuyModal(false)}
+                    onClick={() => setShowEthBuyModal(false)}
                   >
                     Schließen
                   </Button>
@@ -1009,13 +1007,13 @@ export default function BuyTab() {
               </div>
             ) : (
               <Button
-                className="w-full bg-gradient-to-r from-purple-500 to-purple-700 text-white font-bold py-3 rounded-xl hover:opacity-90 transition-opacity"
+                className="w-full bg-gradient-to-r from-blue-500 to-blue-700 text-white font-bold py-3 rounded-xl hover:opacity-90 transition-opacity"
                 onClick={() => {
-                  setShowPolBuyModal(true);
+                  setShowEthBuyModal(true);
                   // Das Scrollen übernimmt jetzt der useEffect
                 }}
               >
-                POL kaufen
+                ETH kaufen
               </Button>
             )}
           </div>
@@ -1030,7 +1028,7 @@ export default function BuyTab() {
           <div>
             <div className="font-medium text-blue-400 mb-1">Hinweis</div>
             <div className="text-sm text-zinc-400">
-              Stellen Sie sicher, dass Sie genügend POL für Transaktionsgebühren in Ihrem Wallet haben.
+              Stellen Sie sicher, dass Sie genügend ETH für Transaktionsgebühren in Ihrem Wallet haben.
             </div>
           </div>
         </div>

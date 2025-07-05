@@ -3,7 +3,7 @@ import { createThirdwebClient, getContract, readContract } from "thirdweb";
 import { useActiveAccount, useActiveWalletConnectionStatus, useSendTransaction } from "thirdweb/react";
 import { ConnectButton } from "thirdweb/react";
 import { inAppWallet, createWallet } from "thirdweb/wallets";
-import { polygon } from "thirdweb/chains";
+import { base } from "thirdweb/chains";
 import { Card, CardContent } from "../../../components/ui/card";
 import { Button } from "../../../components/ui/button";
 import { FaRegCopy, FaCoins, FaArrowDown, FaArrowUp, FaPaperPlane, FaLock, FaHistory, FaTimes, FaSync } from "react-icons/fa";
@@ -78,7 +78,7 @@ export default function WalletTab() {
   const [lastKnownPrices, setLastKnownPrices] = useState<{
     dfaith?: number;
     dfaithEur?: number;
-    polEur?: number;
+    ethEur?: number;
     timestamp?: number;
   }>({});
   const [priceError, setPriceError] = useState<string | null>(null);
@@ -100,31 +100,31 @@ export default function WalletTab() {
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showStakeModal, setShowStakeModal] = useState(false);
   
-  // Konstanten für Token mit echten Contract-Adressen
+  // Konstanten für Token mit BASE-Contract-Adressen
   const DFAITH_TOKEN = {
-    address: "0xD05903dF2E1465e2bDEbB8979104204D1c48698d", // D.FAITH Token-Contract-Adresse
+    address: "0xEE27258975a2DA946CD5025134D70E5E24F6789F", // D.FAITH Token auf Base
     decimals: 2, 
     symbol: "D.FAITH"
   };
 
   const DINVEST_TOKEN = {
-    address: "0x90aCC32F7b0B1CACc3958a260c096c10CCfa0383", // D.INVEST Token-Contract-Adresse
+    address: "0x14d9889892849a1D161c9272a07Fa16Fef79f1AE", // D.INVEST Token auf Base
     decimals: 0, 
     symbol: "D.INVEST"
   };
 
   const STAKING_CONTRACT = {
-    address: "0x89E0ED96e21E73e1F47260cdF72e7E7cb878A2B2", // Aktualisierte D.INVEST Staking Contract-Adresse
+    address: "0xE97b88AbE228310216acd2B9C8Bde7d3dC41a551", // D.INVEST Staking Contract auf Base
     name: "D.INVEST Staking"
   };
 
-  const POL_TOKEN = {
-    address: "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270", // WMATIC
+  const ETH_TOKEN = {
+    address: "0x0000000000000000000000000000000000000000", // Native ETH
     decimals: 18,
-    symbol: "POL"
+    symbol: "ETH"
   };
 
-  // Neue Funktion für Balance via Thirdweb Insight API
+  // Neue Funktion für Balance via Thirdweb Insight API (für Base Chain)
   const fetchTokenBalanceViaInsightApi = async (
     tokenAddress: string,
     accountAddress: string
@@ -132,7 +132,7 @@ export default function WalletTab() {
     if (!accountAddress) return "0";
     try {
       const params = new URLSearchParams({
-        chain_id: "137",
+        chain_id: "8453", // Base Chain ID
         token_address: tokenAddress,
         owner_address: accountAddress,
         include_native: "true",
@@ -182,10 +182,10 @@ export default function WalletTab() {
       // Keine lokale Preis-Lade-Logik hier mehr - wird zentral beim Start gemacht
 
       // Alle Token-Balances via Insight API laden
-      const [dfaithValue, dinvestValue, polValue] = await Promise.all([
+      const [dfaithValue, dinvestValue, ethValue] = await Promise.all([
         fetchTokenBalanceViaInsightApi(DFAITH_TOKEN.address, account.address),
         fetchTokenBalanceViaInsightApi(DINVEST_TOKEN.address, account.address),
-        fetchTokenBalanceViaInsightApi(POL_TOKEN.address, account.address)
+        fetchTokenBalanceViaInsightApi(ETH_TOKEN.address, account.address)
       ]);
       
       if (currentRequestId !== requestIdRef.current) return;
@@ -227,7 +227,7 @@ export default function WalletTab() {
     try {
       const stakingContract = getContract({ 
         client, 
-        chain: polygon, 
+        chain: base, 
         address: STAKING_CONTRACT.address 
       });
 
@@ -320,7 +320,7 @@ export default function WalletTab() {
     };
   }, [account?.address]);
 
-  // D.FAITH EUR-Preis holen mit mehreren Anbietern und Fallback System
+  // D.FAITH EUR-Preis holen mit mehreren Anbietern für ETH/EUR und Fallback System
   const fetchDfaithPrice = async () => {
     // Rate Limiting für alle APIs (max. 1 Request alle 30 Sekunden pro Anbieter)
     const now = Date.now();
@@ -347,7 +347,7 @@ export default function WalletTab() {
             if (parsed.timestamp && (now - parsed.timestamp) < 6 * 60 * 60 * 1000) {
               setLastKnownPrices(parsed);
               if (parsed.dfaithEur) setDfaithPriceEur(parsed.dfaithEur);
-              if (parsed.polEur) setPolPriceEur(parsed.polEur);
+              if (parsed.ethEur) setPolPriceEur(parsed.ethEur); // Rename internal state later
               return true;
             }
           }
@@ -360,12 +360,12 @@ export default function WalletTab() {
       // Verwende gespeicherte Preise falls verfügbar
       const hasStoredPrices = loadStoredPrices();
 
-      let polEur: number | null = null;
+      let ethEur: number | null = null;
       let dfaithPriceEur: number | null = null;
       let errorMsg = "";
 
-      // Mehrere Anbieter für POL/EUR Preis versuchen
-      const polProviders = [
+      // Mehrere Anbieter für ETH/EUR Preis versuchen
+      const ethProviders = [
         {
           name: 'coingecko',
           fetch: async () => {
@@ -375,7 +375,7 @@ export default function WalletTab() {
             }
             localStorage.setItem('last_coingecko_request', now.toString());
             
-            const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=polygon-ecosystem-token&vs_currencies=eur');
+            const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=eur');
             if (!response.ok) {
               if (response.status === 429) {
                 console.log('CoinGecko Rate Limit erreicht (429)');
@@ -383,7 +383,7 @@ export default function WalletTab() {
               throw new Error(`CoinGecko: ${response.status}`);
             }
             const data = await response.json();
-            return data['polygon-ecosystem-token']?.eur;
+            return data['ethereum']?.eur;
           }
         },
         {
@@ -395,7 +395,7 @@ export default function WalletTab() {
             }
             localStorage.setItem('last_cryptocompare_request', now.toString());
             
-            const response = await fetch('https://min-api.cryptocompare.com/data/price?fsym=POL&tsyms=EUR');
+            const response = await fetch('https://min-api.cryptocompare.com/data/price?fsym=ETH&tsyms=EUR');
             if (!response.ok) {
               if (response.status === 429) {
                 console.log('CryptoCompare Rate Limit erreicht (429)');
@@ -415,24 +415,24 @@ export default function WalletTab() {
             }
             localStorage.setItem('last_binance_request', now.toString());
             
-            // Binance API für POL/USDT Preis, dann USDT/EUR
-            const [polUsdtResponse, usdtEurResponse] = await Promise.all([
-              fetch('https://api.binance.com/api/v3/ticker/price?symbol=POLUSDT'),
+            // Binance API für ETH/USDT Preis, dann USDT/EUR
+            const [ethUsdtResponse, usdtEurResponse] = await Promise.all([
+              fetch('https://api.binance.com/api/v3/ticker/price?symbol=ETHUSDT'),
               fetch('https://api.binance.com/api/v3/ticker/price?symbol=EURUSDT')
             ]);
             
-            if (!polUsdtResponse.ok || !usdtEurResponse.ok) {
+            if (!ethUsdtResponse.ok || !usdtEurResponse.ok) {
               throw new Error('Binance API Fehler');
             }
             
-            const polUsdtData = await polUsdtResponse.json();
+            const ethUsdtData = await ethUsdtResponse.json();
             const usdtEurData = await usdtEurResponse.json();
             
-            const polUsdt = parseFloat(polUsdtData.price);
+            const ethUsdt = parseFloat(ethUsdtData.price);
             const eurUsdt = parseFloat(usdtEurData.price);
             
-            if (polUsdt && eurUsdt) {
-              return polUsdt / eurUsdt; // POL in EUR
+            if (ethUsdt && eurUsdt) {
+              return ethUsdt / eurUsdt; // ETH in EUR
             }
             return null;
           }
@@ -440,12 +440,12 @@ export default function WalletTab() {
       ];
 
       // Versuche die Anbieter nacheinander bis einer funktioniert
-      for (const provider of polProviders) {
+      for (const provider of ethProviders) {
         try {
           const price = await provider.fetch();
           if (price && price > 0) {
-            polEur = Math.round(price * 100) / 100;
-            console.log(`POL Preis erfolgreich von ${provider.name} geholt: €${polEur}`);
+            ethEur = Math.round(price * 100) / 100;
+            console.log(`ETH Preis erfolgreich von ${provider.name} geholt: €${ethEur}`);
             break;
           }
         } catch (e) {
@@ -454,35 +454,37 @@ export default function WalletTab() {
         }
       }
 
-      // Fallback auf letzten bekannten POL Preis
-      if (!polEur && lastKnownPrices.polEur) {
-        polEur = lastKnownPrices.polEur;
-        console.log('Verwende gespeicherten POL Preis:', polEur);
-      } else if (!polEur) {
-        polEur = 0.50; // Hard fallback
-        console.log('Verwende Hard-Fallback POL Preis:', polEur);
+      // Fallback auf letzten bekannten ETH Preis
+      if (!ethEur && lastKnownPrices.ethEur) {
+        ethEur = lastKnownPrices.ethEur;
+        console.log('Verwende gespeicherten ETH Preis:', ethEur);
+      } else if (!ethEur) {
+        ethEur = 3000; // Hard fallback für ETH
+        console.log('Verwende Hard-Fallback ETH Preis:', ethEur);
       }
 
       try {
-        // 2. Hole D.FAITH Preis von OpenOcean
+        // 2. Hole D.FAITH Preis von OpenOcean für Base Chain
         const params = new URLSearchParams({
-          chain: "polygon",
-          inTokenAddress: "0x0000000000000000000000000000000000001010", // Polygon Native Token (MATIC)
+          chain: "base",
+          inTokenAddress: "0x0000000000000000000000000000000000000000", // Native ETH
           outTokenAddress: DFAITH_TOKEN.address,
-          amount: "1", // 1 POL
+          amount: "1", // 1 ETH
           gasPrice: "50",
         });
         
-        const response = await fetch(`https://open-api.openocean.finance/v3/polygon/quote?${params}`);
+        const response = await fetch(`https://open-api.openocean.finance/v3/base/quote?${params}`);
         
         if (response.ok) {
           const data = await response.json();
           if (data && data.data && data.data.outAmount && data.data.outAmount !== "0") {
             // outAmount ist in D.FAITH (mit 2 Decimals)
-            const dfaithPerPol = Number(data.data.outAmount) / Math.pow(10, DFAITH_TOKEN.decimals);
-            // Berechne EUR Preis: 1 D.FAITH = POL_EUR / DFAITH_PER_POL
-            dfaithPriceEur = polEur / dfaithPerPol;
-            console.log('D.FAITH Preis erfolgreich von OpenOcean berechnet:', dfaithPriceEur);
+            const dfaithPerEth = Number(data.data.outAmount) / Math.pow(10, DFAITH_TOKEN.decimals);
+            // Berechne EUR Preis: 1 D.FAITH = ETH_EUR / DFAITH_PER_ETH
+            if (ethEur) {
+              dfaithPriceEur = ethEur / dfaithPerEth;
+              console.log('D.FAITH Preis erfolgreich von OpenOcean berechnet:', dfaithPriceEur);
+            }
           } else {
             errorMsg = "OpenOcean: Keine Liquidität verfügbar";
           }
@@ -502,7 +504,7 @@ export default function WalletTab() {
       }
 
       // Setze Preise (entweder neue oder Fallback)
-      if (polEur) setPolPriceEur(polEur);
+      if (ethEur) setPolPriceEur(ethEur); // Keep variable name for now
       if (dfaithPriceEur) {
         setDfaithPriceEur(dfaithPriceEur);
         // EUR-Wert sofort nach Preis-Update neu berechnen
@@ -513,10 +515,10 @@ export default function WalletTab() {
       }
 
       // Speichere erfolgreiche Preise
-      if (dfaithPriceEur && polEur) {
+      if (dfaithPriceEur && ethEur) {
         const newPrices = {
           dfaithEur: dfaithPriceEur,
-          polEur: polEur,
+          ethEur: ethEur,
           timestamp: Date.now()
         };
         setLastKnownPrices(prev => ({ ...prev, ...newPrices }));
@@ -537,8 +539,8 @@ export default function WalletTab() {
       if (lastKnownPrices.dfaithEur) {
         setDfaithPriceEur(lastKnownPrices.dfaithEur);
       }
-      if (lastKnownPrices.polEur) {
-        setPolPriceEur(lastKnownPrices.polEur);
+      if (lastKnownPrices.ethEur) {
+        setPolPriceEur(lastKnownPrices.ethEur);
       }
       // EUR-Wert neu berechnen mit Fallback-Preisen
       if (dfaithBalance?.displayValue) {
@@ -637,8 +639,8 @@ export default function WalletTab() {
             if (parsed.dfaithEur && parsed.dfaithEur > 0) {
               setDfaithPriceEur(parsed.dfaithEur);
             }
-            if (parsed.polEur && parsed.polEur > 0) {
-              setPolPriceEur(parsed.polEur);
+            if (parsed.ethEur && parsed.ethEur > 0) {
+              setPolPriceEur(parsed.ethEur);
             }
             setPricesLoaded(true);
           }
@@ -704,8 +706,8 @@ export default function WalletTab() {
                 }}
                 wallets={wallets}
                 chain={{
-                  id: 137,
-                  rpc: "https://polygon-rpc.com",
+                  id: 8453,
+                  rpc: "https://mainnet.base.org",
                 }}
               />
             </div>
@@ -779,9 +781,9 @@ export default function WalletTab() {
                 connectModal={{ size: "compact" }}
                 wallets={wallets}
                 chain={{
-                  id: 137,
-                  // Verwende einen alternativen, stabileren RPC-Endpunkt
-                  rpc: "https://polygon-rpc.com",
+                  id: 8453,
+                  // Base Chain RPC-Endpunkt
+                  rpc: "https://mainnet.base.org",
                 }}
               />
             </div>
