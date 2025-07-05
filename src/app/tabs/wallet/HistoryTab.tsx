@@ -18,6 +18,11 @@ export default function HistoryTab() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>("");
+  const [stats, setStats] = useState<{
+    transactionCount: number;
+    totalValue: number;
+    avgGas: number;
+  } | null>(null);
   const account = useActiveAccount();
 
   // Demo-Daten für den Fall, dass kein API-Key verfügbar ist
@@ -50,6 +55,32 @@ export default function HistoryTab() {
   // Verwende entweder die verbundene Wallet oder die feste Adresse
   const userAddress = account?.address || targetAddress;
 
+  // Thirdweb Insight API Statistiken abrufen
+  const getTransactionStats = async () => {
+    try {
+      const clientId = process.env.NEXT_PUBLIC_TEMPLATE_CLIENT_ID;
+      if (!clientId) return null;
+
+      const response = await fetch(
+        "https://insight.thirdweb.com/v1/transactions?aggregate=count() AS transaction_count&aggregate=sum(value) AS total_value&aggregate=avg(gas_used) AS avg_gas",
+        {
+          headers: {
+            "x-client-id": clientId,
+          },
+        },
+      );
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log("Transaction Stats:", data);
+        return data;
+      }
+    } catch (error) {
+      console.error("Stats Error:", error);
+    }
+    return null;
+  };
+
   useEffect(() => {
     const fetchTransactions = async () => {
       if (!userAddress) {
@@ -61,174 +92,87 @@ export default function HistoryTab() {
       setError("");
       
       try {
-        // ✅ ETHERSCAN MULTICHAIN API-KEY (V2) - Unterstützt Base Chain nativ!
-        const etherscanMultichainApiKey = process.env.NEXT_PUBLIC_ETHERSCAN_API_KEY;
-        const basescanApiKey = process.env.NEXT_PUBLIC_BASESCAN_API_KEY;
+        // ✅ THIRDWEB INSIGHT API - Zuverlässiger als Etherscan für Base Chain
+        console.log("🚀 Verwende Thirdweb Insight API für Base Chain Transaktionen");
         
-        console.log("🔑 API-Key Konfiguration:");
-        console.log("NEXT_PUBLIC_ETHERSCAN_API_KEY (Multichain V2):", etherscanMultichainApiKey ? "✅ Verfügbar" : "❌ Nicht gefunden");
-        console.log("NEXT_PUBLIC_BASESCAN_API_KEY:", basescanApiKey ? "✅ Verfügbar" : "❌ Nicht gefunden");
-        
-        if (etherscanMultichainApiKey) {
-          console.log("🚀 Etherscan Multichain API Key (V2) erkannt:", etherscanMultichainApiKey?.substring(0, 10) + "...");
-          console.log("✅ Perfekt! Dieser API-Key funktioniert mit Base Chain und allen anderen Chains");
-        } else if (basescanApiKey) {
-          console.log("📍 Basescan API Key erkannt:", basescanApiKey?.substring(0, 10) + "...");
-          console.log("ℹ️ Basescan API-Key ist spezifisch für Base Chain");
-        }
-        
-        // Bevorzuge Etherscan Multichain API-Key (V2) - funktioniert perfekt für Base Chain
-        const apiKey = etherscanMultichainApiKey || basescanApiKey;
-        
-        if (!apiKey) {
-          // Fallback: Demo-Daten anzeigen wenn kein API-Key verfügbar
-          console.warn("⚠️ Kein API-Key verfügbar - verwende Demo-Daten");
+        const clientId = process.env.NEXT_PUBLIC_TEMPLATE_CLIENT_ID;
+        if (!clientId) {
+          console.warn("⚠️ Kein Thirdweb Client ID verfügbar - verwende Demo-Daten");
           setError(`
-            🔑 API-Key Setup erforderlich:
-            
-            Sie haben einen Etherscan Multichain API-Key? Perfekt!
+            🔑 Thirdweb Client ID Setup erforderlich:
             
             1. Öffnen Sie die .env.local Datei im Projekt-Root
-            2. Fügen Sie hinzu: NEXT_PUBLIC_ETHERSCAN_API_KEY=IhrAPIKey
+            2. Stellen Sie sicher, dass NEXT_PUBLIC_TEMPLATE_CLIENT_ID gesetzt ist
             3. Starten Sie die App neu
             
-            Ihr Etherscan Multichain API-Key funktioniert für Base Chain und alle anderen Chains!
-            
-            Alternative: Basescan API-Key für Base Chain only:
-            NEXT_PUBLIC_BASESCAN_API_KEY=IhrBasescanKey
+            Thirdweb Insight API bietet zuverlässige Transaktionsdaten für Base Chain!
           `);
           setTransactions(demoTransactions);
           setIsLoading(false);
           return;
         }
         
-        const finalApiKey = apiKey || "KM73YF9R69Q9DWWZQ5VM5M8QHHX5Z7VPDW";
-        console.log("Using API Key:", finalApiKey ? "✓ Configured" : "✗ Missing");
-        const apiKeySource = etherscanMultichainApiKey ? "Etherscan Multichain V2 ⭐" : basescanApiKey ? "Basescan" : "Fallback";
-        console.log("API Key source:", apiKeySource);
+        console.log("✅ Thirdweb Client ID gefunden:", clientId.substring(0, 10) + "...");
         
-        // ✅ ETHERSCAN V2 MULTICHAIN API für Base Chain
-        if (etherscanMultichainApiKey) {
-          console.log("🚀 Verwende Etherscan V2 Multichain API für Base Chain - Optimal!");
-        } else {
-          console.log("📍 Verwende Basescan API für Base Chain");
+        // API-Parameter für Base Chain (Chain ID: 8453)
+        const params = new URLSearchParams({
+          chain_id: "8453", // Base Chain
+          to_address: userAddress,
+          from_address: userAddress,
+          limit: "50",
+          order: "desc",
+          sort_by: "block_timestamp",
+        });
+        
+        // Thirdweb Insight API für Transaktionen
+        const apiUrl = `https://insight.thirdweb.com/v1/transactions?${params.toString()}`;
+        console.log("API Call:", apiUrl);
+        
+        const response = await fetch(apiUrl, {
+          method: "GET",
+          headers: {
+            "x-client-id": clientId,
+            "Content-Type": "application/json",
+          },
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Thirdweb Insight API Fehler: ${response.status} ${response.statusText}`);
         }
         
-        // API-Endpunkte für Base Network mit Etherscan V2 Multichain API
-        const endpoints = [
-          // Native ETH Transaktionen auf Base (Chain ID: 8453)
-          `https://api.basescan.org/api?module=account&action=txlist&address=${userAddress}&startblock=0&endblock=99999999&sort=desc&apikey=${finalApiKey}`,
-          // ERC20 Token Transaktionen auf Base  
-          `https://api.basescan.org/api?module=account&action=tokentx&address=${userAddress}&startblock=0&endblock=99999999&sort=desc&apikey=${finalApiKey}`,
-          // Interne Transaktionen auf Base
-          `https://api.basescan.org/api?module=account&action=txlistinternal&address=${userAddress}&startblock=0&endblock=99999999&sort=desc&apikey=${finalApiKey}`
-        ];
-
-        // Parallele API-Aufrufe mit verbessertem Error Handling
-        const responses = await Promise.allSettled(
-          endpoints.map(async (url, index) => {
-            console.log(`API Call ${index + 1}:`, url);
-            const response = await fetch(url);
-            const data = await response.json();
-            console.log(`API Response ${index + 1}:`, data);
-            
-            // Verbesserte Fehlerbehandlung für Etherscan V2 Multichain API
-            if (data.status === "0" && data.message) {
-              console.error(`Etherscan V2 API Error ${index + 1}:`, data.message);
-              if (data.message.includes("Invalid API Key")) {
-                console.error("❌ Invalid Etherscan Multichain API Key");
-                console.error("💡 Tipp: Prüfen Sie ob Ihr Etherscan Multichain API-Key korrekt in der .env.local eingetragen ist");
-              } else if (data.message.includes("rate limit")) {
-                console.error("⚠️ Rate limit exceeded - upgrade your plan");
-                console.error("💡 Etherscan Multichain API-Keys haben höhere Limits als Standard-Keys");
-              } else if (data.message.includes("NOTOK")) {
-                console.log("ℹ️ No data found for this address on Base Chain");
-              }
-            } else if (data.status === "1") {
-              console.log(`✅ API Call ${index + 1} successful with Etherscan Multichain API:`, data.result?.length || 0, "transactions");
-            }
-            
-            return data;
-          })
-        );
-
+        const data = await response.json();
+        console.log("Thirdweb Insight API Response:", data);
+        
         let allTransactions: any[] = [];
-
-        // Normale Transaktionen verarbeiten
-        if (responses[0].status === 'fulfilled') {
-          const data = responses[0].value;
-          console.log("Normal Transactions Response:", data);
-          if (data.status === "1" && data.result) {
-            const normalTxs = data.result.map((tx: any) => ({
-              ...tx,
-              _type: "normal",
-              _category: "ETH Transfer"
-            }));
-            allTransactions.push(...normalTxs);
-            console.log(`Added ${normalTxs.length} normal transactions`);
-          } else {
-            console.log("No normal transactions or API error:", data.message);
-          }
+        
+        if (data?.data && Array.isArray(data.data)) {
+          allTransactions = data.data;
+          console.log(`✅ ${allTransactions.length} Transaktionen von Thirdweb Insight API erhalten`);
         } else {
-          console.error("Normal transactions failed:", responses[0].reason);
-        }
-
-        // ERC20 Token Transaktionen verarbeiten
-        if (responses[1].status === 'fulfilled') {
-          const data = responses[1].value;
-          console.log("ERC20 Transactions Response:", data);
-          if (data.status === "1" && data.result) {
-            const erc20Txs = data.result.map((tx: any) => ({
-              ...tx,
-              _type: "erc20",
-              _category: "Token Transfer"
-            }));
-            allTransactions.push(...erc20Txs);
-            console.log(`Added ${erc20Txs.length} ERC20 transactions`);
-          } else {
-            console.log("No ERC20 transactions or API error:", data.message);
-          }
-        } else {
-          console.error("ERC20 transactions failed:", responses[1].reason);
-        }
-
-        // Interne Transaktionen verarbeiten
-        if (responses[2].status === 'fulfilled') {
-          const data = responses[2].value;
-          console.log("Internal Transactions Response:", data);
-          if (data.status === "1" && data.result) {
-            const internalTxs = data.result.map((tx: any) => ({
-              ...tx,
-              _type: "internal",
-              _category: "Contract Call"
-            }));
-            allTransactions.push(...internalTxs);
-            console.log(`Added ${internalTxs.length} internal transactions`);
-          } else {
-            console.log("No internal transactions or API error:", data.message);
-          }
-        } else {
-          console.error("Internal transactions failed:", responses[2].reason);
+          console.log("ℹ️ Keine Transaktionen in der Antwort gefunden");
         }
 
         console.log(`Total transactions found: ${allTransactions.length}`);
 
-        // Wenn keine Transaktionen gefunden wurden, aber API-Aufrufe erfolgreich waren
+        // Wenn keine Transaktionen gefunden wurden
         if (allTransactions.length === 0) {
           console.log("No transactions found for address:", userAddress);
-          // Prüfe ob alle API-Aufrufe erfolgreich waren aber keine Daten zurückgaben
-          const allSuccessful = responses.every(r => r.status === 'fulfilled');
-          if (allSuccessful) {
-            console.log("All API calls successful but no transactions found");
-          }
+          setTransactions([]);
+          setIsLoading(false);
+          return;
         }
 
-        // Nach Zeitstempel sortieren (neueste zuerst)
-        allTransactions.sort((a, b) => Number(b.timeStamp) - Number(a.timeStamp));
+        // Nach Zeitstempel sortieren (neueste zuerst) - Thirdweb Insight Format
+        allTransactions.sort((a, b) => {
+          const timestampA = new Date(a.block_timestamp || a.timestamp || 0).getTime();
+          const timestampB = new Date(b.block_timestamp || b.timestamp || 0).getTime();
+          return timestampB - timestampA;
+        });
 
-        // Auf unser Transaction-Format mappen
+        // Auf unser Transaction-Format mappen - Thirdweb Insight API Format
         const mappedTransactions: Transaction[] = allTransactions.slice(0, 50).map((tx: any) => {
-          const timestamp = Number(tx.timeStamp) * 1000;
+          // Thirdweb Insight API verwendet block_timestamp im ISO-Format
+          const timestamp = new Date(tx.block_timestamp || tx.timestamp || Date.now()).getTime();
           const date = new Date(timestamp);
           const time = date.toLocaleString("de-DE", {
             day: "2-digit",
@@ -239,64 +183,80 @@ export default function HistoryTab() {
           });
 
           let type: "send" | "receive" = "send";
-          let token = "POL";
+          let token = "ETH";
           let amount = "0";
           let address = "";
-          let decimals = 18;
 
-          // Transaktionsrichtung und Details bestimmen
-          if (tx._type === "erc20") {
-            token = tx.tokenSymbol || tx.tokenName || "TOKEN";
-            decimals = Number(tx.tokenDecimal) || 18;
-            
-            const value = Number(tx.value) / Math.pow(10, decimals);
-            const isReceived = tx.to?.toLowerCase() === userAddress.toLowerCase();
-            
-            type = isReceived ? "receive" : "send";
-            amount = (isReceived ? "+" : "-") + value.toFixed(decimals > 6 ? 6 : decimals);
-            address = isReceived ? (tx.from || "") : (tx.to || "");
-            
-          } else if (tx._type === "internal") {
-            token = "POL";
-            const value = Number(tx.value) / Math.pow(10, 18);
-            const isReceived = tx.to?.toLowerCase() === userAddress.toLowerCase();
-            
-            type = isReceived ? "receive" : "send";
-            amount = (isReceived ? "+" : "-") + value.toFixed(6);
-            address = isReceived ? (tx.from || "") : (tx.to || "");
-            
+          // Bestimme Transaktionsrichtung basierend auf from/to
+          const isReceived = tx.to_address?.toLowerCase() === userAddress.toLowerCase();
+          const isFromUser = tx.from_address?.toLowerCase() === userAddress.toLowerCase();
+          
+          if (isReceived && !isFromUser) {
+            type = "receive";
+            address = tx.from_address || "";
           } else {
-            // Normal ETH transaction on Base
-            token = "ETH";
-            const value = Number(tx.value) / Math.pow(10, 18);
-            const isReceived = tx.to?.toLowerCase() === userAddress.toLowerCase();
-            
-            type = isReceived ? "receive" : "send";
-            amount = (isReceived ? "+" : "-") + value.toFixed(6);
-            address = isReceived ? (tx.from || "") : (tx.to || "");
+            type = "send";
+            address = tx.to_address || "";
+          }
+
+          // Wert formatieren - Thirdweb gibt Werte meist in Wei zurück
+          let value = 0;
+          if (tx.value) {
+            if (typeof tx.value === 'string' && tx.value.includes('e')) {
+              // Wissenschaftliche Notation
+              value = parseFloat(tx.value);
+            } else {
+              // Wei zu ETH konvertieren
+              value = Number(tx.value) / Math.pow(10, 18);
+            }
+          }
+          
+          amount = (type === "receive" ? "+" : "-") + value.toFixed(6);
+
+          // Token-Symbol bestimmen
+          if (tx.token_symbol) {
+            token = tx.token_symbol;
+          } else if (tx.token_address && tx.token_address !== "0x0000000000000000000000000000000000000000") {
+            token = "TOKEN"; // Unbekannter Token
+          } else {
+            token = "ETH"; // Native ETH
           }
 
           // Status bestimmen
           let status: "success" | "pending" | "failed" = "success";
-          if (tx.isError === "1" || tx.txreceipt_status === "0") {
+          if (tx.status === "failed" || tx.status === 0 || tx.status === "0") {
             status = "failed";
-          } else if (Number(tx.confirmations || 0) === 0) {
+          } else if (tx.status === "pending" || !tx.block_number) {
             status = "pending";
           }
 
           return {
-            id: tx.hash,
+            id: tx.transaction_hash || tx.hash || Math.random().toString(),
             type,
             token,
             amount,
             address,
-            hash: tx.hash,
+            hash: tx.transaction_hash || tx.hash || "",
             time,
             status,
           };
         });
 
         setTransactions(mappedTransactions);
+        
+        // Statistiken abrufen (optional)
+        try {
+          const statsData = await getTransactionStats();
+          if (statsData?.data?.[0]) {
+            setStats({
+              transactionCount: statsData.data[0].transaction_count || 0,
+              totalValue: statsData.data[0].total_value || 0,
+              avgGas: statsData.data[0].avg_gas || 0,
+            });
+          }
+        } catch (statsError) {
+          console.log("Statistiken konnten nicht geladen werden:", statsError);
+        }
         
       } catch (err) {
         console.error("Fehler beim Laden der Transaktionen:", err);
@@ -350,7 +310,7 @@ export default function HistoryTab() {
         <h2 className="text-2xl font-bold bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 bg-clip-text text-transparent mb-2">
           Transaktionshistorie
         </h2>
-        <p className="text-zinc-400">Live Transaktionsdaten vom Base Network</p>
+        <p className="text-zinc-400">Live Transaktionsdaten vom Base Network via Thirdweb Insight API</p>
         {userAddress && (
           <p className="text-xs text-zinc-500 mt-1">
             Wallet: {formatAddress(userAddress)}
@@ -363,11 +323,14 @@ export default function HistoryTab() {
         <div className="bg-zinc-800/50 rounded-lg p-4 border border-zinc-700 mb-4">
           <h3 className="text-sm font-semibold text-amber-400 mb-2">Debug Info</h3>
           <div className="text-xs text-zinc-400 space-y-1">
-            <div>API Keys: {process.env.NEXT_PUBLIC_ETHERSCAN_API_KEY ? '✓ Etherscan' : '✗ Etherscan'} | {process.env.NEXT_PUBLIC_BASESCAN_API_KEY ? '✓ Basescan' : '✗ Basescan'}</div>
+            <div>Thirdweb Client ID: {process.env.NEXT_PUBLIC_TEMPLATE_CLIENT_ID ? '✓ Konfiguriert' : '✗ Fehlt'}</div>
+            <div>API: Thirdweb Insight API (Base Chain)</div>
+            <div>Chain ID: 8453 (Base)</div>
             <div>Wallet: {userAddress || 'Nicht verbunden'}</div>
             <div>Loading: {isLoading ? 'Ja' : 'Nein'}</div>
             <div>Error: {error || 'Keine'}</div>
             <div>Transactions: {transactions.length}</div>
+            {stats && <div>API Stats: {stats.transactionCount} total, Ø {stats.avgGas.toFixed(0)} gas</div>}
           </div>
         </div>
       )}
@@ -480,14 +443,14 @@ export default function HistoryTab() {
         </div>
       )}
 
-      {/* Summary Stats */}
+      {/* Enhanced Summary Stats mit Thirdweb Insight Daten */}
       {!isLoading && !error && transactions.length > 0 && (
-        <div className="grid grid-cols-3 gap-4 mt-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
           <div className="bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl p-4 border border-zinc-700 text-center">
             <div className="text-2xl font-bold text-amber-400 mb-1">
               {transactions.length}
             </div>
-            <div className="text-xs text-zinc-500">Gesamt</div>
+            <div className="text-xs text-zinc-500">Gezeigt</div>
           </div>
           <div className="bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl p-4 border border-zinc-700 text-center">
             <div className="text-2xl font-bold text-green-400 mb-1">
@@ -501,6 +464,14 @@ export default function HistoryTab() {
             </div>
             <div className="text-xs text-zinc-500">Fehlgeschlagen</div>
           </div>
+          {stats && (
+            <div className="bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl p-4 border border-zinc-700 text-center">
+              <div className="text-2xl font-bold text-blue-400 mb-1">
+                {stats.transactionCount}
+              </div>
+              <div className="text-xs text-zinc-500">Total (API)</div>
+            </div>
+          )}
         </div>
       )}
 
