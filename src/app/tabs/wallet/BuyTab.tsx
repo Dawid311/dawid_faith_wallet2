@@ -156,10 +156,10 @@ export default function BuyTab() {
             if (data && data.data && data.data.outAmount && data.data.outAmount !== "0") {
               // outAmount ist in D.FAITH (mit 2 Decimals)
               const dfaithAmount = Number(data.data.outAmount) / Math.pow(10, DFAITH_DECIMALS);
-              setDfaithPrice(dfaithAmount);
-              // Preis wie im SellTab: 1 D.FAITH = (1 ETH / dfaithAmount) * ethEur
+              setDfaithPrice(dfaithAmount); // Wie viele D.FAITH für 1 ETH
+              // Preis pro D.FAITH in EUR: (1 ETH / dfaithAmount) * ethEur = ethEur / dfaithAmount
               if (ethEur && dfaithAmount > 0) {
-                dfaithPriceEur = (1 / dfaithAmount) * ethEur;
+                dfaithPriceEur = ethEur / dfaithAmount;
               } else {
                 dfaithPriceEur = null;
               }
@@ -625,7 +625,7 @@ export default function BuyTab() {
       balance: dfaithBalance,
       color: "from-amber-400 to-yellow-500",
       description: "Faith Utility Token",
-      price: dfaithPriceEur ? `${dfaithPriceEur.toFixed(3)}€ pro D.FAITH` : (isLoadingPrice ? "Laden..." : (priceError || "Preis nicht verfügbar")),
+      price: dfaithPriceEur ? `${dfaithPriceEur.toFixed(4)}€ pro D.FAITH` : (isLoadingPrice ? "Laden..." : (priceError || "Preis nicht verfügbar")),
       sub: dfaithPrice ? `1 ETH = ${dfaithPrice.toFixed(2)} D.FAITH` : "Wird geladen...",
       icon: <FaCoins className="text-amber-400" />,
     },
@@ -823,8 +823,8 @@ export default function BuyTab() {
                         {dfaithPrice ? `1 ETH = ${dfaithPrice.toFixed(2)} D.FAITH` : "Loading..."}
                       </span>
                       <span className="text-zinc-500">
-                        {swapAmountEth && parseFloat(swapAmountEth) > 0 && dfaithPrice && dfaithPriceEur
-                          ? `≈ €${(parseFloat(swapAmountEth) * dfaithPrice * dfaithPriceEur).toFixed(2)}`
+                        {swapAmountEth && parseFloat(swapAmountEth) > 0 && ethPriceEur
+                          ? `≈ €${(parseFloat(swapAmountEth) * ethPriceEur).toFixed(2)}`
                           : ""
                         }
                       </span>

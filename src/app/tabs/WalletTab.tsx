@@ -363,6 +363,7 @@ export default function WalletTab() {
 
       let ethEur: number | null = null;
       let dfaithPriceEur: number | null = null;
+      let dfaithAmount: number | null = null; // Wie viele D.FAITH für 1 ETH
       let errorMsg = "";
 
       // Mehrere Anbieter für ETH/EUR Preis versuchen
@@ -465,12 +466,13 @@ export default function WalletTab() {
       }
 
       try {
-        // 2. Hole D.FAITH Preis von OpenOcean für Base Chain
+        // 2. Hole D.FAITH Preis von OpenOcean für Base Chain (wie in BuyTab)
+        const amountWei = (1n * 10n ** 18n).toString();
         const params = new URLSearchParams({
           chain: "base",
           inTokenAddress: "0x0000000000000000000000000000000000000000", // Native ETH
           outTokenAddress: DFAITH_TOKEN.address,
-          amount: "1", // 1 ETH
+          amount: amountWei, // 1 ETH in Wei
           gasPrice: "0.001", // Base Chain: 0.001 Gwei
         });
         
@@ -478,13 +480,18 @@ export default function WalletTab() {
         
         if (response.ok) {
           const data = await response.json();
+          console.log("OpenOcean Response (WalletTab):", data);
           if (data && data.data && data.data.outAmount && data.data.outAmount !== "0") {
             // outAmount ist in D.FAITH (mit 2 Decimals)
-            const dfaithPerEth = Number(data.data.outAmount) / Math.pow(10, DFAITH_TOKEN.decimals);
-            // Berechne EUR Preis: 1 D.FAITH = ETH_EUR / DFAITH_PER_ETH
-            if (ethEur) {
-              dfaithPriceEur = ethEur / dfaithPerEth;
-              console.log('D.FAITH Preis erfolgreich von OpenOcean berechnet:', dfaithPriceEur);
+            dfaithAmount = Number(data.data.outAmount) / Math.pow(10, DFAITH_TOKEN.decimals);
+            // Preis pro D.FAITH in EUR: ethEur / dfaithAmount (wie in BuyTab korrigiert)
+            if (ethEur && dfaithAmount > 0) {
+              dfaithPriceEur = ethEur / dfaithAmount;
+              console.log('D.FAITH Preis erfolgreich berechnet (WalletTab):', {
+                ethEur,
+                dfaithAmount,
+                dfaithPriceEur
+              });
             }
           } else {
             errorMsg = "OpenOcean: Keine Liquidität verfügbar";
@@ -515,9 +522,10 @@ export default function WalletTab() {
         }
       }
 
-      // Speichere erfolgreiche Preise
-      if (dfaithPriceEur && ethEur) {
+      // Speichere erfolgreiche Preise (erweitert um dfaithAmount)
+      if (dfaithPriceEur && ethEur && dfaithAmount) {
         const newPrices = {
+          dfaith: dfaithAmount,
           dfaithEur: dfaithPriceEur,
           ethEur: ethEur,
           timestamp: Date.now()
@@ -525,7 +533,7 @@ export default function WalletTab() {
         setLastKnownPrices(prev => ({ ...prev, ...newPrices }));
         try {
           localStorage.setItem('dawid_faith_prices', JSON.stringify(newPrices));
-          console.log('Preise erfolgreich gespeichert:', newPrices);
+          console.log('Preise erfolgreich gespeichert (WalletTab):', newPrices);
         } catch (e) {
           console.log('Fehler beim Speichern der Preise:', e);
         }
@@ -582,13 +590,24 @@ export default function WalletTab() {
     const balanceFloat = parseFloat(balance);
     if (balanceFloat <= 0) return "0.00";
 
-    // Hole aktuelle D.FAITH pro 1 ETH und ETH/EUR Preis
-    let dfaithPerEth = 0;
+    // Verwende den direkt berechneten D.FAITH EUR-Preis
+    if (dfaithPriceEur && dfaithPriceEur > 0) {
+      const eurValue = balanceFloat * dfaithPriceEur;
+      console.log('EUR-Wert berechnet (WalletTab - direkt):', {
+        balance,
+        dfaithPriceEur,
+        eurValue: eurValue.toFixed(2)
+      });
+      return eurValue.toFixed(2);
+    }
+
+    // Fallback: Berechnung über gespeicherte Werte wie in BuyTab/SellTab
+    let dfaithAmount = 0; // Wie viele D.FAITH für 1 ETH
     let ethEur = 0;
 
-    // 1. Aktuelle Werte im State
+    // 1. Aktuelle Werte aus lastKnownPrices
     if (lastKnownPrices && lastKnownPrices.dfaith && lastKnownPrices.ethEur) {
-      dfaithPerEth = lastKnownPrices.dfaith;
+      dfaithAmount = lastKnownPrices.dfaith;
       ethEur = lastKnownPrices.ethEur;
     }
     // 2. Fallback: localStorage
@@ -599,7 +618,7 @@ export default function WalletTab() {
           const parsed = JSON.parse(stored);
           const now = Date.now();
           if (parsed.dfaith && parsed.ethEur && parsed.timestamp && (now - parsed.timestamp) < 24 * 60 * 60 * 1000) {
-            dfaithPerEth = parsed.dfaith;
+            dfaithAmount = parsed.dfaith;
             ethEur = parsed.ethEur;
           }
         }
@@ -609,13 +628,13 @@ export default function WalletTab() {
     }
 
     // Berechne EUR-Wert wie in BuyTab/SellTab
-    if (dfaithPerEth > 0 && ethEur > 0) {
-      // 1 D.FAITH = (1 / dfaithPerEth) * ethEur
-      const dfaithEur = (1 / dfaithPerEth) * ethEur;
+    if (dfaithAmount > 0 && ethEur > 0) {
+      // 1 D.FAITH = (ethEur / dfaithAmount)
+      const dfaithEur = ethEur / dfaithAmount;
       const eurValue = balanceFloat * dfaithEur;
-      console.log('EUR-Wert berechnet (BuyTab/SellTab Methode):', {
+      console.log('EUR-Wert berechnet (WalletTab - Fallback):', {
         balance,
-        dfaithPerEth,
+        dfaithAmount,
         ethEur,
         dfaithEur,
         eurValue: eurValue.toFixed(2)

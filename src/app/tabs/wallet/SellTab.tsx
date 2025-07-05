@@ -721,7 +721,7 @@ const handleSellAllInOne = async () => {
               {/* Professional Sell Widget Header */}
               <div className="text-center pb-3 border-b border-zinc-700">
                 <div className="w-12 h-12 bg-gradient-to-r from-amber-400 to-yellow-500 rounded-full mx-auto mb-2 flex items-center justify-center shadow-lg">
-                  <FaArrowDown className="text-black text-lg" />
+                  <FaCoins className="text-black text-lg" />
                 </div>
                 <p className="text-zinc-400 text-xs">Faith Utility Token auf Base Network</p>
                 {dfaithPrice && ethPriceEur && (
@@ -759,8 +759,8 @@ const handleSellAllInOne = async () => {
 
               {/* Amount Input Section */}
               <div className="space-y-3">
-                <div className="bg-zinc-800/50 rounded-xl p-3 border border-amber-500">
-                  <label className="block text-sm font-medium text-amber-400 mb-2">You Sell</label>
+                <div className="bg-zinc-800/50 rounded-xl p-3 border border-zinc-700">
+                  <label className="block text-sm font-medium text-zinc-300 mb-2">You Sell</label>
                   <div className="flex items-center gap-3 mb-2">
                     <div className="flex items-center gap-2 bg-amber-500/20 rounded-lg px-2 py-1 border border-amber-500/30 flex-shrink-0">
                       <FaCoins className="text-amber-400 text-sm" />
@@ -778,7 +778,7 @@ const handleSellAllInOne = async () => {
                     />
                   </div>
                   <div className="flex justify-between items-center text-xs">
-                    <span className="text-amber-400">Balance: {dfaithBalance} D.FAITH</span>
+                    <span className="text-zinc-500">Balance: {dfaithBalance} D.FAITH</span>
                     <button
                       className="text-amber-400 hover:text-amber-300 font-medium px-2 py-1 rounded"
                       onClick={() => setSellAmount((parseFloat(dfaithBalance) * 0.95).toFixed(2))}
@@ -790,8 +790,8 @@ const handleSellAllInOne = async () => {
                 </div>
 
                 {/* You Receive Section mit Exchange Rate */}
-                <div className="bg-zinc-800/50 rounded-xl p-3 border border-yellow-500">
-                  <label className="block text-sm font-medium text-yellow-400 mb-2">You Receive</label>
+                <div className="bg-zinc-800/50 rounded-xl p-3 border border-zinc-700">
+                  <label className="block text-sm font-medium text-zinc-300 mb-2">You Receive</label>
                   <div className="flex items-center gap-3 mb-2">
                     <div className="flex items-center gap-2 bg-blue-500/20 rounded-lg px-2 py-1 border border-blue-500/30 flex-shrink-0">
                       <span className="text-blue-400 text-sm">⟠</span>
@@ -807,10 +807,10 @@ const handleSellAllInOne = async () => {
                     </div>
                   </div>
                   <div className="flex justify-between items-center text-xs">
-                    <span className="text-yellow-400">
+                    <span className="text-zinc-500">
                       {dfaithPrice ? `1 D.FAITH = ${dfaithPrice.toFixed(6)} ETH` : "Loading..."}
                     </span>
-                    <span className="text-yellow-400">
+                    <span className="text-zinc-500">
                       {sellAmount && parseFloat(sellAmount) > 0 && dfaithPrice && ethPriceEur
                         ? `≈ €${(parseFloat(sellAmount) * dfaithPrice * ethPriceEur).toFixed(2)}`
                         : ""
@@ -831,7 +831,7 @@ const handleSellAllInOne = async () => {
                       min="0.1"
                       max="50"
                       step="0.1"
-                      className="w-16 bg-zinc-700 border border-zinc-600 rounded-lg py-1 px-2 text-sm text-zinc-300 focus:border-red-500 focus:outline-none"
+                      className="w-16 bg-zinc-700 border border-zinc-600 rounded-lg py-1 px-2 text-sm text-zinc-300 focus:border-amber-500 focus:outline-none"
                       value={slippage}
                       onChange={(e) => setSlippage(e.target.value)}
                       disabled={isSwapping || sellStep !== 'initial'}
@@ -844,7 +844,7 @@ const handleSellAllInOne = async () => {
                         key={value}
                         className={`px-2 py-1 rounded text-xs font-medium transition ${
                           slippage === value 
-                            ? "bg-red-500 text-white" 
+                            ? "bg-amber-500 text-black" 
                             : "bg-zinc-700 text-zinc-400 hover:bg-zinc-600"
                         }`}
                         onClick={() => setSlippage(value)}
@@ -913,7 +913,7 @@ const handleSellAllInOne = async () => {
               <div className="space-y-2">
                 {sellStep === 'initial' && (
                   <Button
-                    className="w-full bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-bold py-3 rounded-xl text-base transition-all transform hover:scale-[1.02]"
+                    className="w-full bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-black font-bold py-3 rounded-xl text-base transition-all transform hover:scale-[1.02]"
                     onClick={handleGetQuote}
                     disabled={
                       !sellAmount || 
@@ -971,7 +971,7 @@ const handleSellAllInOne = async () => {
             </div>
 
             <Button
-              className="w-full bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-yellow-500 hover:to-amber-400 text-white font-bold py-2 rounded-lg text-xs mt-2"
+              className="w-full bg-zinc-600 hover:bg-zinc-700 text-white font-bold py-2 rounded-lg text-xs mt-2"
               onClick={() => {
                 setShowSellModal(false);
                 setSelectedToken(null);
