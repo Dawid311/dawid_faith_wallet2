@@ -1,9 +1,9 @@
 import { useEffect, useState, useRef } from "react";
 import { Button } from "../../../../components/ui/button";
 import { FaCoins, FaLock, FaExchangeAlt, FaSync, FaRegCopy } from "react-icons/fa";
-import { useActiveAccount, useSendTransaction, PayEmbed } from "thirdweb/react";
+import { useActiveAccount, useSendTransaction, BuyWidget } from "thirdweb/react";
 import { base } from "thirdweb/chains";
-import { getContract, prepareContractCall, sendAndConfirmTransaction, readContract } from "thirdweb";
+import { NATIVE_TOKEN_ADDRESS, getContract, prepareContractCall, sendAndConfirmTransaction, readContract } from "thirdweb";
 import { client } from "../../client";
 import { balanceOf, approve } from "thirdweb/extensions/erc20";
 
@@ -951,18 +951,13 @@ export default function BuyTab() {
             )}
             {selectedToken === "ETH" && (
               <div className="w-full flex-1 flex items-center justify-center">
-                <PayEmbed
+                <BuyWidget
                   client={client}
-                  payOptions={{
-                    buyWithFiat: {
-                      testMode: false,
-                      preferredProvider: "coinbase",
-                      supportedProviders: ["coinbase", "transak"],
-                      prefillSource: {
-                        currency: "USD",
-                      },
-                    },
-                  }}
+                  tokenAddress={NATIVE_TOKEN_ADDRESS}
+                  chain={base}
+                  amount="0.1"
+                  theme="dark"
+                  className="w-full"
                 />
               </div>
             )}
