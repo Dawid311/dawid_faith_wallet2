@@ -585,7 +585,8 @@ export default function StakeTab() {
                   const amount = parseInt(stakeAmount);
                   const rate = currentRewardRate;
                   if (isNaN(amount) || isNaN(rate)) return "-";
-                  return ((amount * rate) / 100).toFixed(2);
+                  const reward = (amount * rate) / 100;
+                  return reward.toFixed(2);
                 })()} D.FAITH
               </div>
               {/* Nächster Reward verfügbar in ... */}
