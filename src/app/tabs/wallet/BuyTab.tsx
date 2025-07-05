@@ -143,7 +143,7 @@ export default function BuyTab() {
             inTokenAddress: "0x0000000000000000000000000000000000000000", // Native ETH
             outTokenAddress: DFAITH_TOKEN,
             amount: "1", // 1 ETH
-            gasPrice: "50",
+            gasPrice: "0.001", // Base Chain: 0.001 Gwei statt 50 Gwei
           });
           
           const response = await fetch(`https://open-api.openocean.finance/v3/base/quote?${params}`);
@@ -394,7 +394,7 @@ export default function BuyTab() {
         outTokenAddress: DFAITH_TOKEN, // D.FAITH
         amount: swapAmountEth,
         slippage: slippage,
-        gasPrice: "50",
+        gasPrice: "0.001", // Base Chain: 0.001 Gwei
         account: account.address,
       });
       
@@ -490,8 +490,8 @@ export default function BuyTab() {
         chain: base, // Explizit Base Chain
         client,
         nonce: parseInt(nonce, 16),
-        gas: BigInt(quoteTxData.gasLimit || "300000"),
-        gasPrice: BigInt(quoteTxData.gasPrice || "50000000000")
+        gas: BigInt(quoteTxData.gasLimit || "200000"), // Reduziert von 300000
+        gasPrice: BigInt(quoteTxData.gasPrice || "1000000") // 0.001 Gwei statt 50 Gwei
       });
       
       console.log("Prepared Transaction:", transaction);

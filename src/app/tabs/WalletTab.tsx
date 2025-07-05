@@ -470,7 +470,7 @@ export default function WalletTab() {
           inTokenAddress: "0x0000000000000000000000000000000000000000", // Native ETH
           outTokenAddress: DFAITH_TOKEN.address,
           amount: "1", // 1 ETH
-          gasPrice: "50",
+          gasPrice: "0.001", // Base Chain: 0.001 Gwei
         });
         
         const response = await fetch(`https://open-api.openocean.finance/v3/base/quote?${params}`);

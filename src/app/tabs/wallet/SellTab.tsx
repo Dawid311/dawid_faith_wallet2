@@ -133,7 +133,7 @@ export default function SellTab() {
           inTokenAddress: DFAITH_TOKEN,
           outTokenAddress: "0x0000000000000000000000000000000000000000", // Native ETH
           amount: "1",
-          gasPrice: "50",
+          gasPrice: "0.001", // Base Chain: 0.001 Gwei statt 50 Gwei
         });
         const response = await fetch(`https://open-api.openocean.finance/v3/base/quote?${params}`);
         if (response.ok) {
@@ -196,7 +196,7 @@ export default function SellTab() {
         outTokenAddress: "0x0000000000000000000000000000000000000000", // Native ETH
         amount: sellAmount,
         slippage: slippage,
-        gasPrice: "50",
+        gasPrice: "0.001", // Base Chain: 0.001 Gwei
         account: account.address,
       });
       const url = `https://open-api.openocean.finance/v3/base/swap_quote?${params}`;
@@ -358,8 +358,8 @@ export default function SellTab() {
       chain: base,
       client,
       nonce: parseInt(nonce, 16), // Explizite Nonce setzen
-      gas: BigInt(quoteTxData.gasLimit || "300000"), // Gas-Limit aus Quote verwenden
-      gasPrice: BigInt(quoteTxData.gasPrice || "50000000000") // Gas-Preis aus Quote verwenden
+      gas: BigInt(quoteTxData.gasLimit || "200000"), // Reduziert von 300000
+      gasPrice: BigInt(quoteTxData.gasPrice || "1000000") // 0.001 Gwei statt 50 Gwei
     });
     
     console.log("Sending swap transaction mit Nonce:", parseInt(nonce, 16));
