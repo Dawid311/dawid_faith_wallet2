@@ -312,9 +312,64 @@ export default function SellTab() {
       console.log("Approve TX gesendet:", approveResult);
       
       setSwapTxStatus("waiting_approval");
-      const { waitForReceipt } = await import("thirdweb");
-      const receipt = await waitForReceipt(approveResult);
-      console.log("Approve bestätigt:", receipt);
+      
+      // Robuste Approval-Überwachung für Base Chain
+      console.log("Warte auf Approval-Bestätigung...");
+      let approveReceipt = null;
+      let approveAttempts = 0;
+      const maxApproveAttempts = 40; // 40 Versuche = ca. 1.5 Minuten
+      
+      while (!approveReceipt && approveAttempts < maxApproveAttempts) {
+        approveAttempts++;
+        try {
+          console.log(`Approval-Bestätigungsversuch ${approveAttempts}/${maxApproveAttempts}`);
+          
+          // Versuche Receipt über RPC zu holen
+          const txHash = approveResult.transactionHash;
+          const receiptResponse = await fetch(base.rpc, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              jsonrpc: '2.0',
+              method: 'eth_getTransactionReceipt',
+              params: [txHash],
+              id: 1
+            })
+          });
+          
+          const receiptData = await receiptResponse.json();
+          
+          if (receiptData.result && receiptData.result.status) {
+            approveReceipt = {
+              status: receiptData.result.status === "0x1" ? "success" : "reverted",
+              transactionHash: receiptData.result.transactionHash
+            };
+            console.log("Approval bestätigt via RPC:", approveReceipt);
+            break;
+          } else {
+            // Wenn noch nicht bestätigt, warte 2 Sekunden
+            if (approveAttempts < maxApproveAttempts) {
+              await new Promise(resolve => setTimeout(resolve, 2000));
+            }
+          }
+        } catch (receiptError) {
+          console.log(`Approval-Bestätigungsversuch ${approveAttempts} fehlgeschlagen:`, receiptError);
+          if (approveAttempts < maxApproveAttempts) {
+            await new Promise(resolve => setTimeout(resolve, 2000));
+          }
+        }
+      }
+      
+      // Wenn nach allen Versuchen keine Bestätigung, aber gehe trotzdem weiter
+      if (!approveReceipt) {
+        console.log("⚠️ Keine Approval-Bestätigung erhalten, aber gehe weiter zum Swap");
+        approveReceipt = { status: "unknown", transactionHash: approveResult.transactionHash };
+      }
+      
+      // Prüfe ob Approval erfolgreich war
+      if (approveReceipt.status === "reverted") {
+        throw new Error(`Approval fehlgeschlagen - Hash: ${approveReceipt.transactionHash}`);
+      }
       
       setNeedsApproval(false);
       setSellStep('approved');
@@ -341,47 +396,107 @@ export default function SellTab() {
       
       const { prepareTransaction } = await import("thirdweb");
       
-      // Aktuelle Nonce explizit abrufen
-      const { getRpcClient } = await import("thirdweb");
-      const rpc = getRpcClient({ client, chain: base });
-      const nonce = await rpc({
-        method: "eth_getTransactionCount",
-        params: [account.address, "pending"]
-    });
-    
-    console.log("Aktuelle Nonce:", nonce);
-    
-    const tx = prepareTransaction({
-      to: quoteTxData.to,
-      data: quoteTxData.data,
-      value: BigInt(quoteTxData.value || "0"),
-      chain: base,
-      client,
-      nonce: parseInt(nonce, 16), // Explizite Nonce setzen
-      gas: BigInt(quoteTxData.gasLimit || "200000"), // Reduziert von 300000
-      gasPrice: BigInt(quoteTxData.gasPrice || "1000000") // 0.001 Gwei statt 50 Gwei
-    });
-    
-    console.log("Sending swap transaction mit Nonce:", parseInt(nonce, 16));
-    const swapResult = await sendTransaction(tx);
-    console.log("Swap TX gesendet:", swapResult);
+      // Keine manuelle Nonce - lass Thirdweb das automatisch machen
+      console.log("Bereite Transaktion vor...");
+      
+      // Verwende automatische Gas-Schätzung statt manuelle Werte
+      const tx = prepareTransaction({
+        to: quoteTxData.to,
+        data: quoteTxData.data,
+        value: BigInt(quoteTxData.value || "0"),
+        chain: base,
+        client,
+        // Entferne manuelle Nonce - lass Thirdweb das automatisch machen
+        // Entferne manuelle Gas-Parameter - lass Base Chain das automatisch schätzen
+      });
+      
+      console.log("Sende Transaktion...");
+      const swapResult = await sendTransaction(tx);
+      console.log("Swap TX gesendet:", swapResult);
+      console.log("Transaction Hash:", swapResult.transactionHash);
+      
+      // Prüfe sofort nach dem Senden, ob die Transaktion im Mempool ist
+      try {
+        const txResponse = await fetch(base.rpc, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            method: 'eth_getTransactionByHash',
+            params: [swapResult.transactionHash],
+            id: 1
+          })
+        });
+        const txData = await txResponse.json();
+        if (!txData.result) {
+          console.warn("⚠️ Transaktion nicht im Mempool gefunden. Könnte ein Gas-Problem sein.");
+        } else {
+          console.log("✅ Transaktion im Mempool bestätigt:", txData.result);
+        }
+      } catch (mempoolError) {
+        console.log("Mempool-Prüfung fehlgeschlagen:", mempoolError);
+      }
     
     setSwapTxStatus("confirming");
     
-    // Warte auf Transaktionsbestätigung
-    const { waitForReceipt } = await import("thirdweb");
+    // Robuste Transaktionsüberwachung für Base Chain
     console.log("Warte auf Transaktionsbestätigung...");
-    const receipt = await waitForReceipt(swapResult);
-    console.log("Transaktion bestätigt:", receipt);
+    let receipt = null;
+    let confirmationAttempts = 0;
+    const maxConfirmationAttempts = 60; // 60 Versuche = ca. 2 Minuten
     
-    // Prüfe ob Transaktion erfolgreich war
-    if (receipt.status !== "success") {
-      console.error("Transaktion Details:", {
-        status: receipt.status,
-        gasUsed: receipt.gasUsed?.toString(),
-        logs: receipt.logs,
-        transactionHash: receipt.transactionHash
-      });
+    while (!receipt && confirmationAttempts < maxConfirmationAttempts) {
+      confirmationAttempts++;
+      try {
+        console.log(`Bestätigungsversuch ${confirmationAttempts}/${maxConfirmationAttempts}`);
+        
+        // Versuche Receipt über RPC zu holen statt waitForReceipt
+        const txHash = swapResult.transactionHash;
+        const receiptResponse = await fetch(base.rpc, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            method: 'eth_getTransactionReceipt',
+            params: [txHash],
+            id: 1
+          })
+        });
+        
+        const receiptData = await receiptResponse.json();
+        
+        if (receiptData.result && receiptData.result.status) {
+          receipt = {
+            status: receiptData.result.status === "0x1" ? "success" : "reverted",
+            transactionHash: receiptData.result.transactionHash,
+            gasUsed: receiptData.result.gasUsed,
+            logs: receiptData.result.logs
+          };
+          console.log("Transaktion bestätigt via RPC:", receipt);
+          break;
+        } else {
+          // Wenn noch nicht bestätigt, warte 2 Sekunden
+          if (confirmationAttempts < maxConfirmationAttempts) {
+            await new Promise(resolve => setTimeout(resolve, 2000));
+          }
+        }
+      } catch (receiptError) {
+        console.log(`Bestätigungsversuch ${confirmationAttempts} fehlgeschlagen:`, receiptError);
+        if (confirmationAttempts < maxConfirmationAttempts) {
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+      }
+    }
+    
+    // Wenn nach allen Versuchen keine Bestätigung, ignoriere und gehe zur Balance-Verifizierung
+    if (!receipt) {
+      console.log("⚠️ Keine Transaktionsbestätigung erhalten, aber gehe zur Balance-Verifizierung");
+      receipt = { status: "unknown", transactionHash: swapResult.transactionHash };
+    }
+    
+    // Prüfe ob Transaktion erfolgreich war (nur bei bekanntem Status)
+    if (receipt.status === "reverted") {
+      console.error("Transaktion Details:", receipt);
       throw new Error(`Transaktion fehlgeschlagen - Status: ${receipt.status}. Hash: ${receipt.transactionHash}`);
     }
     

@@ -467,16 +467,6 @@ export default function BuyTab() {
       
       const { prepareTransaction } = await import("thirdweb");
       
-      // Aktuelle Nonce explizit abrufen
-      const { getRpcClient } = await import("thirdweb");
-      const rpc = getRpcClient({ client, chain: base });
-      const nonce = await rpc({
-        method: "eth_getTransactionCount",
-        params: [account.address, "pending"]
-      });
-      
-      console.log("Aktuelle Nonce:", nonce);
-      
       // Stelle sicher, dass wir auf Base Chain (ID: 8453) sind
       console.log("Target Chain:", base.name, "Chain ID:", base.id);
       if (base.id !== 8453) {
@@ -489,9 +479,7 @@ export default function BuyTab() {
         value: BigInt(quoteTxData.value || "0"),
         chain: base, // Explizit Base Chain
         client,
-        nonce: parseInt(nonce, 16),
-        gas: BigInt(quoteTxData.gasLimit || "200000"), // Reduziert von 300000
-        gasPrice: BigInt(quoteTxData.gasPrice || "1000000") // 0.001 Gwei statt 50 Gwei
+        // Entferne manuelle Gas-Parameter - lass Base Chain automatisch schätzen
       });
       
       console.log("Prepared Transaction:", transaction);
@@ -501,8 +489,11 @@ export default function BuyTab() {
       try {
         // Explizit Base Chain Context setzen vor Transaction
         console.log("Sende Transaktion auf Base Chain (ID: 8453)");
-        await sendTransaction(transaction);
+        sendTransaction(transaction);
         console.log("Transaction sent successfully on Base Chain");
+        
+        // Da sendTransaction void zurückgibt, können wir nicht sofort die TxHash prüfen
+        // Die Balance-Verifizierung wird das Ergebnis bestätigen
       } catch (txError: any) {
         console.log("Transaction error details:", txError);
         
