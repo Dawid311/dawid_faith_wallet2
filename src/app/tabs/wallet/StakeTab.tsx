@@ -8,10 +8,10 @@ import { base } from "thirdweb/chains";
 import { useSendTransaction } from "thirdweb/react";
 import { balanceOf, approve } from "thirdweb/extensions/erc20";
 
-const STAKING_CONTRACT = "0xdb1f760C528b241AeA93BEADce63f9eeF65426C2"; // Staking Contract auf Base
-const DFAITH_TOKEN = "0xEE27258975a2DA946CD5025134D70E5E24F6789F"; // D.FAITH Token auf Base
+const STAKING_CONTRACT = "0x3A09B55c8B43560ffcc6ced692c5c1d0C56d128A"; // Staking Contract auf Base
+const DFAITH_TOKEN = "0x64E112CAd8FE56B8553cd5025efC29f2F8893792"; // D.FAITH Token auf Base
 const DFAITH_DECIMALS = 2;
-const DINVEST_TOKEN = "0x14d9889892849a1D161c9272a07Fa16Fef79f1AE"; // D.INVEST Token auf Base
+const DINVEST_TOKEN = "0x5983D2b3A4c1cE75b0A158C32CdD64d4BEC45eD1"; // D.INVEST Token auf Base
 const DINVEST_DECIMALS = 0;
 const client = createThirdwebClient({ clientId: process.env.NEXT_PUBLIC_TEMPLATE_CLIENT_ID! });
 
@@ -98,6 +98,7 @@ export default function StakeTab() {
             method: "function getMinClaimAmount() view returns (uint256)",
             params: []
           });
+          // Contract gibt 1 zurück für 0.01 Token (da 2 Decimals)
           setMinClaimAmount((Number(minClaim) / Math.pow(10, 2)).toFixed(2));
         } catch (e) {
           console.error("Fehler beim Abrufen des Min Claim Amount:", e);
@@ -138,8 +139,9 @@ export default function StakeTab() {
             method: "function getStakingStatus() view returns (uint8, uint256, uint256)",
             params: []
           });
+          // Contract gibt Werte zurück: Rate ist in Prozent (z.B. 10 für 0.10%), aber als ganze Zahl
           setCurrentStage(Number(stakingStatus[0]));
-          setCurrentRewardRate(Number(stakingStatus[1]));
+          setCurrentRewardRate(Number(stakingStatus[1])); // Rate direkt verwenden (z.B. 10 für 0.10%)
           setTotalRewardsDistributed((Number(stakingStatus[2]) / Math.pow(10, 2)).toFixed(2));
         } catch (e) {
           console.error("Fehler beim Abrufen des Staking Status:", e);
@@ -406,14 +408,14 @@ export default function StakeTab() {
     }
   };
 
-  // Reward Rate formatieren
+  // Reward Rate formatieren - Contract gibt direkte Werte zurück (10 = 0.10%)
   const formatRewardRate = (rate: number) => {
     return (rate / 100).toFixed(2);
   };
 
   // Hilfsfunktion für den User-Reward pro Woche
   const getUserWeeklyReward = () => {
-    // staked ist ein String, currentRewardRate ist z.B. 150 für 1.5%
+    // staked ist ein String, currentRewardRate ist direkt die Rate (z.B. 10 für 0.10%)
     const stakedNum = parseInt(staked) || 0;
     return ((stakedNum * currentRewardRate) / 100).toFixed(2);
   };

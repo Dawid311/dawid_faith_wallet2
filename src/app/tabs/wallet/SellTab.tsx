@@ -8,9 +8,9 @@ import { getContract, prepareContractCall } from "thirdweb";
 import { client } from "../../client";
 import { balanceOf } from "thirdweb/extensions/erc20";
 
-const DFAITH_TOKEN = "0xEE27258975a2DA946CD5025134D70E5E24F6789F"; // D.FAITH auf Base
+const DFAITH_TOKEN = "0x64E112CAd8FE56B8553cd5025efC29f2F8893792"; // D.FAITH auf Base
 const DFAITH_DECIMALS = 2;
-const DINVEST_TOKEN = "0x14d9889892849a1D161c9272a07Fa16Fef79f1AE"; // D.INVEST auf Base
+const DINVEST_TOKEN = "0x5983D2b3A4c1cE75b0A158C32CdD64d4BEC45eD1"; // D.INVEST auf Base
 const DINVEST_DECIMALS = 0;
 const ETH_TOKEN = "ETH";
 
