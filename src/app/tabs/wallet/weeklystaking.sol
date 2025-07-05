@@ -135,6 +135,37 @@ contract WeeklyTokenStaking is ReentrancyGuard, Pausable {
         emit Unstaked(msg.sender, amountToUnstake);
     }
 
+    // Partielles Unstaking
+    function unstakePartial(uint256 amount) external nonReentrant {
+        StakeInfo storage user = stakers[msg.sender];
+        require(amount > 0, "Amount must be > 0");
+        require(user.amount >= amount, "Not enough tokens staked");
+        require(block.timestamp >= user.stakeTimestamp + WEEK, "Minimum staking period of 7 days not met");
+
+        // Update and claim all rewards first
+        _updateRewards(msg.sender);
+        if (user.accumulatedRewards > 0) {
+            _claimAccumulatedRewards(msg.sender);
+        }
+
+        user.amount -= amount;
+        totalStakedTokens -= amount;
+
+        // Wenn alles unstaked, setze Felder zurück und dekrementiere userCount
+        if (user.amount == 0) {
+            user.lastRewardUpdate = 0;
+            user.stakeTimestamp = 0;
+            user.accumulatedRewards = 0;
+            userCount--;
+        } else {
+            user.lastRewardUpdate = block.timestamp;
+        }
+
+        require(stakingToken.transfer(msg.sender, amount), "Unstake transfer failed");
+
+        emit Unstaked(msg.sender, amount);
+    }
+
     function claimReward() public nonReentrant whenNotPaused {
         StakeInfo storage user = stakers[msg.sender];
         require(user.amount > 0, "Nothing staked");
@@ -280,8 +311,8 @@ contract WeeklyTokenStaking is ReentrancyGuard, Pausable {
         uint256 rewardPerSecond = (_stakedAmount * rewardRate) / (100 * SECONDS_PER_WEEK);
         
         if (rewardPerSecond == 0) return type(uint256).max;
-        
-        return MIN_CLAIM_AMOUNT / rewardPerSecond;
+        // Neue Formel: erst multiplizieren, dann dividieren, um Integer-Division zu vermeiden
+        return (MIN_CLAIM_AMOUNT * 100 * SECONDS_PER_WEEK) / (_stakedAmount * rewardRate);
     }
 
     // Get minimum claim amount (for UI display)

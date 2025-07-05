@@ -322,13 +322,34 @@ export default function SendTab() {
     return () => clearInterval(interval);
   }, [account?.address]);
 
+  // Hilfsfunktion zum Warten auf Balance-Änderung
+  const waitForBalanceChange = async (tokenKey: string, oldBalance: string, address: string, maxTries = 15) => {
+    type Balances = { dfaith: string; dinvest: string; eth: string };
+    const keyMap: Record<string, keyof Balances> = {
+      DFAITH: "dfaith",
+      DINVEST: "dinvest",
+      ETH: "eth",
+    };
+    for (let i = 0; i < maxTries; i++) {
+      await new Promise(res => setTimeout(res, 2000));
+      const balances: Balances = await fetchAllBalances(address);
+      const mappedKey = keyMap[tokenKey] || (tokenKey.toLowerCase() as keyof Balances);
+      let newBalance = balances[mappedKey];
+      if (newBalance !== undefined && newBalance !== oldBalance) {
+        return true;
+      }
+    }
+    return false;
+  };
+
   // Echte Token-Transaktion
   const handleSend = async (amount: string, toAddress: string): Promise<boolean> => {
     if (!amount || !toAddress || !selectedToken || !account?.address) return false;
     try {
       let tx;
+      // Vorherige Balance merken
+      const oldBalance = selectedToken.balance;
       if (selectedToken.key === "ETH") {
-        // Native ETH senden
         tx = {
           to: toAddress,
           value: BigInt(Math.floor(parseFloat(amount) * Math.pow(10, ETH_DECIMALS))),
@@ -337,7 +358,6 @@ export default function SendTab() {
         };
         await sendTransaction(tx);
       } else {
-        // ERC20 senden
         const tokenAddress = selectedToken.key === "DFAITH" ? DFAITH_TOKEN : DINVEST_TOKEN;
         const decimals = selectedToken.key === "DFAITH" ? DFAITH_DECIMALS : DINVEST_DECIMALS;
         const contract = getContract({ client, chain: base, address: tokenAddress });
@@ -348,7 +368,11 @@ export default function SendTab() {
         });
         await sendTransaction(txCall);
       }
-      setShowSuccessModal(true);
+      // Warte auf Balance-Änderung
+      const changed = await waitForBalanceChange(selectedToken.key, oldBalance, account.address);
+      if (changed) {
+        setShowSuccessModal(true);
+      }
       return true;
     } catch (error) {
       console.error("Fehler beim Senden:", error);
