@@ -689,24 +689,13 @@ const handleSellAllInOne = async () => {
 
       {/* Verkaufs-Modal zentral - Mobile Optimiert und zentriert */}
       {showSellModal && selectedToken === "DFAITH" && (
-        <div
-          className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 p-4"
-          style={{ overscrollBehavior: 'contain', paddingTop: 'calc(env(safe-area-inset-top, 0px) + 64px)' }}
-        >
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 overflow-y-auto p-4 pt-8 sm:pt-16">
           <div
-            className="bg-zinc-900 rounded-xl p-4 sm:p-6 max-w-sm w-full border border-amber-500 max-h-[90vh] overflow-y-auto flex flex-col shadow-2xl"
-            style={{
-              boxSizing: 'border-box',
-              marginTop: 0,
-              marginBottom: 'env(safe-area-inset-bottom, 0px)',
-              zIndex: 120,
-            }}
+            className="bg-zinc-900 rounded-xl p-3 sm:p-6 max-w-sm w-full border border-amber-400 max-h-[calc(100vh-8rem)] sm:max-h-[85vh] overflow-y-auto flex flex-col mt-4 sm:mt-0"
+            style={{ boxSizing: 'border-box' }}
           >
             {/* Modal-Header */}
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-base sm:text-xl font-bold text-amber-400">
-                {/* Keine Überschrift mehr */}
-              </h3>
+            <div className="flex items-center justify-end mb-2">
               <button
                 onClick={() => {
                   setShowSellModal(false);
@@ -720,7 +709,7 @@ const handleSellAllInOne = async () => {
                   setNeedsApproval(false);
                   setQuoteError(null);
                 }}
-                className="p-2 text-amber-400 hover:text-amber-300 hover:bg-zinc-800 rounded-lg transition-all flex-shrink-0"
+                className="p-2 text-amber-400 hover:text-yellow-300 hover:bg-zinc-800 rounded-lg transition-all flex-shrink-0"
                 disabled={isSwapping}
               >
                 <span className="text-lg">✕</span>
@@ -732,10 +721,9 @@ const handleSellAllInOne = async () => {
               {/* Professional Sell Widget Header */}
               <div className="text-center pb-3 border-b border-zinc-700">
                 <div className="w-12 h-12 bg-gradient-to-r from-amber-400 to-yellow-500 rounded-full mx-auto mb-2 flex items-center justify-center shadow-lg">
-                  <FaArrowDown className="text-white text-lg" />
+                  <FaArrowDown className="text-black text-lg" />
                 </div>
-                <h4 className="text-lg font-bold text-white mb-1">D.FAITH Token verkaufen</h4>
-                <p className="text-zinc-400 text-xs">Verkaufe D.FAITH für ETH auf Base Network</p>
+                <p className="text-zinc-400 text-xs">Faith Utility Token auf Base Network</p>
                 {dfaithPrice && ethPriceEur && (
                   <div className="mt-2 px-2 py-1 bg-amber-500/10 border border-amber-500/20 rounded-full inline-block">
                     <span className="text-amber-400 text-xs font-semibold">
