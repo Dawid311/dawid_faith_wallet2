@@ -7,35 +7,52 @@ import { getContract, prepareContractCall } from "thirdweb";
 import { client } from "../../client";
 import { fetchAllBalances, TOKEN_ADDRESSES, TOKEN_DECIMALS } from "../../utils/balanceUtils";
 
-// Modal Komponente für Token Transfer
+// Modal Komponente für Token Transfer (mit echter Transaktion und Bestätigung)
 function TokenTransferModal({ 
   open, 
   onClose, 
   token, 
-  onSend 
+  onSend, 
+  showSuccess, 
+  onSuccessClose 
 }: { 
   open: boolean, 
   onClose: () => void, 
   token: any | null,
-  onSend: (amount: string, address: string) => Promise<void>
+  onSend: (amount: string, address: string) => Promise<boolean>,
+  showSuccess: boolean,
+  onSuccessClose: () => void
 }) {
   const [sendAmount, setSendAmount] = useState("");
   const [sendToAddress, setSendToAddress] = useState("");
   const [isSending, setIsSending] = useState(false);
+  const [txError, setTxError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) {
+      setSendAmount("");
+      setSendToAddress("");
+      setTxError(null);
+    }
+  }, [open]);
 
   if (!open || !token) return null;
 
   const handleSend = async () => {
     if (!sendAmount || !sendToAddress) return;
-    
     setIsSending(true);
+    setTxError(null);
     try {
-      await onSend(sendAmount, sendToAddress);
+      const ok = await onSend(sendAmount, sendToAddress);
+      if (!ok) {
+        setTxError("Transaktion fehlgeschlagen");
+        setIsSending(false);
+        return;
+      }
       setSendAmount("");
       setSendToAddress("");
-      onClose();
-    } catch (error) {
-      console.error("Fehler beim Senden:", error);
+    } catch (error: any) {
+      setTxError(error?.message || "Fehler beim Senden");
     } finally {
       setIsSending(false);
     }
@@ -48,6 +65,22 @@ function TokenTransferModal({
   const isAmountValid = sendAmount && 
     parseFloat(sendAmount) > 0 && 
     parseFloat(sendAmount) <= parseFloat(token.balance.replace(",", "."));
+
+  // Success Modal
+  if (showSuccess) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+        <div className="bg-zinc-900 rounded-xl w-full max-w-sm mx-4 p-8 flex flex-col items-center border border-green-500">
+          <div className="text-5xl mb-4">✅</div>
+          <div className="text-green-400 text-xl font-bold mb-2">Token gesendet!</div>
+          <div className="text-zinc-300 text-center mb-4">Deine Transaktion wurde erfolgreich abgeschickt.</div>
+          <Button className="w-full bg-gradient-to-r from-green-400 to-green-600 text-black font-bold py-3 rounded-xl mt-2" onClick={onSuccessClose}>
+            Schließen
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div 
@@ -117,12 +150,17 @@ function TokenTransferModal({
                   </div>
                 </div>
               </div>
-              
               {/* Balance-Validierung */}
               {sendAmount && parseFloat(sendAmount) > parseFloat(token.balance.replace(",", ".")) && (
                 <div className="mt-2 text-sm text-red-400 bg-red-500/20 border border-red-500/30 rounded-lg p-2 flex items-center gap-2">
                   <span>❌</span>
                   <span>Nicht genügend {token.symbol} verfügbar</span>
+                </div>
+              )}
+              {txError && (
+                <div className="mt-2 text-sm text-red-400 bg-red-500/20 border border-red-500/30 rounded-lg p-2 flex items-center gap-2">
+                  <span>❌</span>
+                  <span>{txError}</span>
                 </div>
               )}
             </div>
@@ -239,6 +277,7 @@ const getTokenIcon = (tokenKey: string) => {
 export default function SendTab() {
   const [selectedToken, setSelectedToken] = useState<any | null>(null);
   const [showTransferModal, setShowTransferModal] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
   const account = useActiveAccount();
   const { mutateAsync: sendTransaction } = useSendTransaction();
 
@@ -268,41 +307,59 @@ export default function SendTab() {
       setIsLoadingBalances(true);
       try {
         const balances = await fetchAllBalances(account.address);
-        console.log("SendTab: Geladene Balances:", balances);
-        
-        // Nur die Balances aktualisieren wenn sie erfolgreich geladen wurden
         if (balances.dfaith !== undefined) setDfaithBalance(balances.dfaith);
         if (balances.dinvest !== undefined) setDinvestBalance(balances.dinvest);
         if (balances.eth !== undefined) setEthBalance(balances.eth);
       } catch (error) {
         console.error("Fehler beim Laden der Balances:", error);
-        // Bei Fehlern die alten Werte beibehalten, nicht auf "0" setzen
       } finally {
         setIsLoadingBalances(false);
       }
     };
 
     loadBalances();
-    const interval = setInterval(loadBalances, 10000); // Update alle 10 Sekunden
+    const interval = setInterval(loadBalances, 10000);
     return () => clearInterval(interval);
   }, [account?.address]);
 
-  const handleSend = async (amount: string, toAddress: string) => {
-    if (!amount || !toAddress || !selectedToken) return;
-    
+  // Echte Token-Transaktion
+  const handleSend = async (amount: string, toAddress: string): Promise<boolean> => {
+    if (!amount || !toAddress || !selectedToken || !account?.address) return false;
     try {
-      // Simuliere Transaktion
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      alert(`${amount} ${selectedToken.symbol} würde an ${toAddress} gesendet werden.`);
+      let tx;
+      if (selectedToken.key === "ETH") {
+        // Native ETH senden
+        tx = {
+          to: toAddress,
+          value: BigInt(Math.floor(parseFloat(amount) * Math.pow(10, ETH_DECIMALS))),
+          chain: base,
+          client,
+        };
+        await sendTransaction(tx);
+      } else {
+        // ERC20 senden
+        const tokenAddress = selectedToken.key === "DFAITH" ? DFAITH_TOKEN : DINVEST_TOKEN;
+        const decimals = selectedToken.key === "DFAITH" ? DFAITH_DECIMALS : DINVEST_DECIMALS;
+        const contract = getContract({ client, chain: base, address: tokenAddress });
+        const txCall = prepareContractCall({
+          contract,
+          method: "function transfer(address,uint256) returns (bool)",
+          params: [toAddress, BigInt(Math.floor(parseFloat(amount) * Math.pow(10, decimals)))]
+        });
+        await sendTransaction(txCall);
+      }
+      setShowSuccessModal(true);
+      return true;
     } catch (error) {
       console.error("Fehler beim Senden:", error);
-      throw error;
+      return false;
     }
   };
 
   const handleTokenSelect = (token: any) => {
     setSelectedToken(token);
     setShowTransferModal(true);
+    setShowSuccessModal(false);
   };
 
   const tokenOptions = [
@@ -406,6 +463,12 @@ export default function SendTab() {
         }}
         token={selectedToken}
         onSend={handleSend}
+        showSuccess={showSuccessModal}
+        onSuccessClose={() => {
+          setShowSuccessModal(false);
+          setShowTransferModal(false);
+          setSelectedToken(null);
+        }}
       />
     </div>
   );

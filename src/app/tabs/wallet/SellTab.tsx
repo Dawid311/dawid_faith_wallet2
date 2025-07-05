@@ -651,10 +651,6 @@ const handleSellAllInOne = async () => {
 
       {/* Token-Auswahl Grid */}
       <div className="space-y-3">
-        <label className="text-sm font-semibold text-zinc-300 flex items-center gap-2">
-          <FaExchangeAlt className="text-red-400" />
-          Token auswählen:
-        </label>
         <div className="grid gap-3">
           {tokenOptions.map((token) => (
             <div
@@ -693,10 +689,10 @@ const handleSellAllInOne = async () => {
 
       {/* Verkaufs-Modal zentral - Mobile Optimiert und zentriert */}
       {showSellModal && selectedToken === "DFAITH" && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 overflow-y-auto p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" style={{ overscrollBehavior: 'contain' }}>
           <div
-            className="bg-zinc-900 rounded-xl p-4 sm:p-6 max-w-sm w-full border border-red-500 max-h-[85vh] overflow-y-auto flex flex-col"
-            style={{ boxSizing: 'border-box' }}
+            className="bg-zinc-900 rounded-xl p-4 sm:p-6 max-w-sm w-full border border-red-500 max-h-[90vh] overflow-y-auto flex flex-col"
+            style={{ boxSizing: 'border-box', marginTop: 'env(safe-area-inset-top, 0px)', marginBottom: 'env(safe-area-inset-bottom, 0px)' }}
           >
             {/* Modal-Header */}
             <div className="flex items-center justify-between mb-2">

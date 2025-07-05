@@ -580,6 +580,43 @@ export default function StakeTab() {
             <div className="bg-zinc-800/60 rounded-xl p-4 border border-zinc-700 flex flex-col items-center mt-2">
               <div className="text-xs text-zinc-400 mb-1">Ihr wöchentlicher Reward (Stufe {currentStage}):</div>
               <div className="text-2xl font-bold text-amber-400">{(parseInt(stakeAmount) * (currentRewardRate / 100)).toFixed(2)} D.FAITH</div>
+              {/* Nächster Reward verfügbar in ... */}
+              <div className="text-xs text-zinc-500 mt-2">
+                {(() => {
+                  // Reward pro Sekunde wie im Smart Contract
+                  const rewardPerSecond = (parseInt(stakeAmount) * currentRewardRate) / (100 * 604800);
+                  // Mindest-Claim Amount (z.B. 0.01 D.FAITH)
+                  const minClaim = Number(minClaimAmount);
+                  if (rewardPerSecond > 0) {
+                    const secondsToMinClaim = minClaim / rewardPerSecond;
+                    // Hilfsfunktion für Zeitformatierung (aus dem Code oben)
+                    const formatTime = (seconds: number) => {
+                      if (seconds <= 0) return "Jetzt verfügbar";
+                      if (seconds > 10 * 365 * 24 * 60 * 60) return "Nicht verfügbar";
+                      const days = Math.floor(seconds / (24 * 60 * 60));
+                      const hours = Math.floor((seconds % (24 * 60 * 60)) / (60 * 60));
+                      const minutes = Math.floor((seconds % (60 * 60)) / 60);
+                      if (days > 0) {
+                        if (days >= 7) {
+                          const weeks = Math.floor(days / 7);
+                          const remainingDays = days % 7;
+                          if (remainingDays > 0) {
+                            return `${weeks} Woche${weeks > 1 ? 'n' : ''} ${remainingDays} Tag${remainingDays > 1 ? 'e' : ''}`;
+                          }
+                          return `${weeks} Woche${weeks > 1 ? 'n' : ''}`;
+                        }
+                        return `${days} Tag${days > 1 ? 'e' : ''} ${hours}h`;
+                      }
+                      if (hours > 0) return `${hours}h ${minutes}m`;
+                      if (minutes > 0) return `${minutes} Min`;
+                      return "Weniger als 1 Min";
+                    };
+                    return `Nächster Claim möglich in: ${formatTime(secondsToMinClaim)}`;
+                  } else {
+                    return "Reward aktuell nicht verfügbar";
+                  }
+                })()}
+              </div>
             </div>
           )}
 

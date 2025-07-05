@@ -660,10 +660,6 @@ export default function BuyTab() {
 
       {/* Token-Auswahl Grid */}
       <div className="space-y-3">
-        <label className="text-sm font-semibold text-zinc-300 flex items-center gap-2">
-          <FaCoins className="text-amber-400" />
-          Token auswählen:
-        </label>
         <div className="grid gap-3">
           {tokenOptions.map((token) => (
             <div
@@ -706,12 +702,7 @@ export default function BuyTab() {
             style={{ boxSizing: 'border-box' }}
           >
             {/* Modal-Header */}
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm sm:text-xl font-bold text-amber-400">
-                {selectedToken === "DFAITH" && "D.FAITH kaufen"}
-                {selectedToken === "DINVEST" && "D.INVEST kaufen"}
-                {selectedToken === "ETH" && "ETH kaufen"}
-              </h3>
+            <div className="flex items-center justify-end mb-2">
               <button
                 onClick={() => {
                   setShowBuyModal(false);
@@ -740,7 +731,6 @@ export default function BuyTab() {
                   <div className="w-12 h-12 bg-gradient-to-r from-amber-400 to-yellow-500 rounded-full mx-auto mb-2 flex items-center justify-center shadow-lg">
                     <FaCoins className="text-black text-lg" />
                   </div>
-                  <h4 className="text-lg font-bold text-white mb-1">D.FAITH Token</h4>
                   <p className="text-zinc-400 text-xs">Faith Utility Token auf Base Network</p>
                   {dfaithPriceEur && (
                     <div className="mt-2 px-2 py-1 bg-amber-500/10 border border-amber-500/20 rounded-full inline-block">
