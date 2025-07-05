@@ -250,11 +250,15 @@ export default function SellTab() {
         } catch {
           currentAllowance = BigInt(0);
         }
-        const amountInWei = (parseFloat(sellAmount) * Math.pow(10, DFAITH_DECIMALS)).toFixed(0);
-        const requiredAmount = BigInt(Math.floor(parseFloat(sellAmount)).toString()); // ← Kein * 10^decimals
+        
+        // Korrigiere die Berechnung - sellAmount muss mit den korrekten Decimals multipliziert werden
+        const sellAmountInWei = (parseFloat(sellAmount) * Math.pow(10, DFAITH_DECIMALS)).toFixed(0);
+        const requiredAmount = BigInt(sellAmountInWei); // Jetzt mit korrekten Decimals
 
         console.log("Benötigte Allowance:", requiredAmount.toString());
         console.log("Aktuelle Allowance:", currentAllowance.toString());
+        console.log("Sell Amount:", sellAmount);
+        console.log("Sell Amount in Wei:", sellAmountInWei);
         
         if (currentAllowance < requiredAmount) {
           console.log("Approval nötig");
