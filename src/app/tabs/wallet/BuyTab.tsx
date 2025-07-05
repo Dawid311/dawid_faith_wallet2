@@ -697,17 +697,17 @@ export default function BuyTab() {
         </div>
       </div>
 
-      {/* Kauf-Modal zentral */}
+      {/* Kauf-Modal zentral - Mobile Optimiert */}
       {showBuyModal && selectedToken && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center min-h-screen bg-black/60 overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 overflow-y-auto pt-1 pb-2 px-2">
           <div
             ref={buyModalRef}
-            className="bg-zinc-900 rounded-xl p-4 sm:p-6 max-w-sm w-full mx-2 border border-amber-400 my-4 max-h-[90vh] overflow-y-auto flex flex-col"
+            className="bg-zinc-900 rounded-xl p-3 sm:p-6 max-w-sm w-full border border-amber-400 max-h-[98vh] overflow-y-auto flex flex-col"
             style={{ boxSizing: 'border-box' }}
           >
             {/* Modal-Header */}
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-lg sm:text-2xl font-bold text-amber-400">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-base sm:text-xl font-bold text-amber-400">
                 {selectedToken === "DFAITH" && "D.FAITH kaufen"}
                 {selectedToken === "DINVEST" && "D.INVEST kaufen"}
                 {selectedToken === "ETH" && "ETH kaufen"}
@@ -734,17 +734,17 @@ export default function BuyTab() {
 
             {/* Modal-Inhalt je nach Token */}
             {selectedToken === "DFAITH" && (
-              <div className="w-full space-y-6">
+              <div className="w-full space-y-4">
                 {/* Professional Buy Widget Header */}
-                <div className="text-center pb-4 border-b border-zinc-700">
-                  <div className="w-16 h-16 bg-gradient-to-r from-amber-400 to-yellow-500 rounded-full mx-auto mb-3 flex items-center justify-center shadow-lg">
-                    <FaCoins className="text-black text-2xl" />
+                <div className="text-center pb-3 border-b border-zinc-700">
+                  <div className="w-12 h-12 bg-gradient-to-r from-amber-400 to-yellow-500 rounded-full mx-auto mb-2 flex items-center justify-center shadow-lg">
+                    <FaCoins className="text-black text-lg" />
                   </div>
-                  <h4 className="text-xl font-bold text-white mb-1">D.FAITH Token</h4>
-                  <p className="text-zinc-400 text-sm">Faith Utility Token auf Base Network</p>
+                  <h4 className="text-lg font-bold text-white mb-1">D.FAITH Token</h4>
+                  <p className="text-zinc-400 text-xs">Faith Utility Token auf Base Network</p>
                   {dfaithPriceEur && (
-                    <div className="mt-2 px-3 py-1 bg-amber-500/10 border border-amber-500/20 rounded-full inline-block">
-                      <span className="text-amber-400 text-sm font-semibold">
+                    <div className="mt-2 px-2 py-1 bg-amber-500/10 border border-amber-500/20 rounded-full inline-block">
+                      <span className="text-amber-400 text-xs font-semibold">
                         €{dfaithPriceEur.toFixed(4)} / D.FAITH
                       </span>
                     </div>
@@ -752,23 +752,23 @@ export default function BuyTab() {
                 </div>
 
                 {/* Buy Widget Steps Indicator */}
-                <div className="flex justify-between items-center px-4">
-                  <div className={`flex items-center space-x-2 ${buyStep !== 'initial' ? 'text-green-400' : 'text-zinc-500'}`}>
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${buyStep !== 'initial' ? 'bg-green-500 text-white' : 'bg-zinc-700 text-zinc-400'}`}>
+                <div className="flex justify-between items-center px-2">
+                  <div className={`flex items-center space-x-1 ${buyStep !== 'initial' ? 'text-green-400' : 'text-zinc-500'}`}>
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${buyStep !== 'initial' ? 'bg-green-500 text-white' : 'bg-zinc-700 text-zinc-400'}`}>
                       {buyStep !== 'initial' ? '✓' : '1'}
                     </div>
                     <span className="text-xs font-medium">Quote</span>
                   </div>
-                  <div className={`w-12 h-0.5 ${buyStep === 'approved' || buyStep === 'completed' ? 'bg-green-500' : 'bg-zinc-700'}`}></div>
-                  <div className={`flex items-center space-x-2 ${buyStep === 'approved' || buyStep === 'completed' ? 'text-green-400' : 'text-zinc-500'}`}>
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${buyStep === 'approved' || buyStep === 'completed' ? 'bg-green-500 text-white' : 'bg-zinc-700 text-zinc-400'}`}>
+                  <div className={`w-8 h-0.5 ${buyStep === 'approved' || buyStep === 'completed' ? 'bg-green-500' : 'bg-zinc-700'}`}></div>
+                  <div className={`flex items-center space-x-1 ${buyStep === 'approved' || buyStep === 'completed' ? 'text-green-400' : 'text-zinc-500'}`}>
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${buyStep === 'approved' || buyStep === 'completed' ? 'bg-green-500 text-white' : 'bg-zinc-700 text-zinc-400'}`}>
                       {buyStep === 'approved' || buyStep === 'completed' ? '✓' : '2'}
                     </div>
                     <span className="text-xs font-medium">Approve</span>
                   </div>
-                  <div className={`w-12 h-0.5 ${buyStep === 'completed' ? 'bg-green-500' : 'bg-zinc-700'}`}></div>
-                  <div className={`flex items-center space-x-2 ${buyStep === 'completed' ? 'text-green-400' : 'text-zinc-500'}`}>
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${buyStep === 'completed' ? 'bg-green-500 text-white' : 'bg-zinc-700 text-zinc-400'}`}>
+                  <div className={`w-8 h-0.5 ${buyStep === 'completed' ? 'bg-green-500' : 'bg-zinc-700'}`}></div>
+                  <div className={`flex items-center space-x-1 ${buyStep === 'completed' ? 'text-green-400' : 'text-zinc-500'}`}>
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${buyStep === 'completed' ? 'bg-green-500 text-white' : 'bg-zinc-700 text-zinc-400'}`}>
                       {buyStep === 'completed' ? '✓' : '3'}
                     </div>
                     <span className="text-xs font-medium">Purchase</span>
@@ -776,26 +776,26 @@ export default function BuyTab() {
                 </div>
 
                 {/* Amount Input Section */}
-                <div className="space-y-4">
-                  <div className="bg-zinc-800/50 rounded-xl p-4 border border-zinc-700">
-                    <label className="block text-sm font-medium text-zinc-300 mb-3">You Pay</label>
+                <div className="space-y-3">
+                  <div className="bg-zinc-800/50 rounded-xl p-3 border border-zinc-700">
+                    <label className="block text-sm font-medium text-zinc-300 mb-2">You Pay</label>
                     <div className="flex items-center gap-3">
-                      <div className="flex items-center gap-2 bg-blue-500/20 rounded-lg px-3 py-2 border border-blue-500/30">
-                        <span className="text-blue-400 text-lg">⟠</span>
-                        <span className="text-blue-300 font-semibold text-sm">ETH</span>
+                      <div className="flex items-center gap-2 bg-blue-500/20 rounded-lg px-2 py-1 border border-blue-500/30">
+                        <span className="text-blue-400 text-sm">⟠</span>
+                        <span className="text-blue-300 font-semibold text-xs">ETH</span>
                       </div>
                       <input
                         type="number"
                         min="0"
                         step="0.001"
                         placeholder="0.0"
-                        className="flex-1 bg-transparent text-right text-2xl font-bold text-white focus:outline-none"
+                        className="flex-1 bg-transparent text-right text-xl font-bold text-white focus:outline-none"
                         value={swapAmountEth}
                         onChange={e => setSwapAmountEth(e.target.value)}
                         disabled={isSwapping || buyStep !== 'initial'}
                       />
                     </div>
-                    <div className="flex justify-between items-center mt-2 text-xs">
+                    <div className="flex justify-between items-center mt-1 text-xs">
                       <span className="text-zinc-500">Balance: {ethBalance} ETH</span>
                       <button
                         className="text-blue-400 hover:text-blue-300 font-medium"
@@ -809,21 +809,21 @@ export default function BuyTab() {
 
                   {/* Exchange Arrow */}
                   <div className="flex justify-center">
-                    <div className="w-10 h-10 bg-zinc-800 border border-zinc-600 rounded-full flex items-center justify-center">
-                      <FaExchangeAlt className="text-amber-400" />
+                    <div className="w-8 h-8 bg-zinc-800 border border-zinc-600 rounded-full flex items-center justify-center">
+                      <FaExchangeAlt className="text-amber-400 text-sm" />
                     </div>
                   </div>
 
                   {/* You Receive Section */}
-                  <div className="bg-zinc-800/50 rounded-xl p-4 border border-zinc-700">
-                    <label className="block text-sm font-medium text-zinc-300 mb-3">You Receive</label>
+                  <div className="bg-zinc-800/50 rounded-xl p-3 border border-zinc-700">
+                    <label className="block text-sm font-medium text-zinc-300 mb-2">You Receive</label>
                     <div className="flex items-center gap-3">
-                      <div className="flex items-center gap-2 bg-amber-500/20 rounded-lg px-3 py-2 border border-amber-500/30">
-                        <FaCoins className="text-amber-400" />
-                        <span className="text-amber-300 font-semibold text-sm">D.FAITH</span>
+                      <div className="flex items-center gap-2 bg-amber-500/20 rounded-lg px-2 py-1 border border-amber-500/30">
+                        <FaCoins className="text-amber-400 text-sm" />
+                        <span className="text-amber-300 font-semibold text-xs">D.FAITH</span>
                       </div>
                       <div className="flex-1 text-right">
-                        <div className="text-2xl font-bold text-amber-400">
+                        <div className="text-xl font-bold text-amber-400">
                           {swapAmountEth && parseFloat(swapAmountEth) > 0 && dfaithPrice 
                             ? (parseFloat(swapAmountEth) * dfaithPrice).toFixed(2)
                             : "0.00"
@@ -831,7 +831,7 @@ export default function BuyTab() {
                         </div>
                       </div>
                     </div>
-                    <div className="text-right mt-2">
+                    <div className="text-right mt-1">
                       <span className="text-zinc-500 text-xs">
                         {swapAmountEth && parseFloat(swapAmountEth) > 0 && dfaithPrice && dfaithPriceEur
                           ? `≈ €${(parseFloat(swapAmountEth) * dfaithPrice * dfaithPriceEur).toFixed(2)}`
@@ -843,8 +843,8 @@ export default function BuyTab() {
                 </div>
 
                 {/* Advanced Settings */}
-                <div className="bg-zinc-800/30 rounded-xl p-4 border border-zinc-700">
-                  <div className="flex justify-between items-center mb-3">
+                <div className="bg-zinc-800/30 rounded-xl p-3 border border-zinc-700">
+                  <div className="flex justify-between items-center mb-2">
                     <span className="text-sm font-medium text-zinc-300">Slippage Tolerance</span>
                     <div className="flex gap-1">
                       {["0.5", "1", "3"].map((value) => (
@@ -878,19 +878,19 @@ export default function BuyTab() {
 
                 {/* Status Display */}
                 {swapTxStatus && (
-                  <div className={`rounded-xl p-4 border text-center ${
+                  <div className={`rounded-xl p-3 border text-center ${
                     swapTxStatus === "success" ? "bg-green-500/10 border-green-500/30 text-green-400" :
                     swapTxStatus === "error" ? "bg-red-500/10 border-red-500/30 text-red-400" :
                     "bg-blue-500/10 border-blue-500/30 text-blue-400"
                   }`}>
-                    <div className="flex items-center justify-center gap-2 mb-2">
-                      {swapTxStatus === "success" && <span className="text-2xl">🎉</span>}
-                      {swapTxStatus === "error" && <span className="text-2xl">❌</span>}
-                      {swapTxStatus === "pending" && <span className="text-2xl">📝</span>}
-                      {swapTxStatus === "confirming" && <span className="text-2xl">⏳</span>}
-                      {swapTxStatus === "verifying" && <span className="text-2xl">🔎</span>}
-                      {swapTxStatus === "swapping" && <span className="text-2xl">🔄</span>}
-                      <span className="font-semibold">
+                    <div className="flex items-center justify-center gap-2 mb-1">
+                      {swapTxStatus === "success" && <span className="text-xl">🎉</span>}
+                      {swapTxStatus === "error" && <span className="text-xl">❌</span>}
+                      {swapTxStatus === "pending" && <span className="text-xl">📝</span>}
+                      {swapTxStatus === "confirming" && <span className="text-xl">⏳</span>}
+                      {swapTxStatus === "verifying" && <span className="text-xl">🔎</span>}
+                      {swapTxStatus === "swapping" && <span className="text-xl">🔄</span>}
+                      <span className="font-semibold text-sm">
                         {swapTxStatus === "success" && "Purchase Successful!"}
                         {swapTxStatus === "error" && "Purchase Failed"}
                         {swapTxStatus === "pending" && "Getting Quote..."}
@@ -907,7 +907,7 @@ export default function BuyTab() {
 
                 {/* Validation Warnings */}
                 {parseFloat(swapAmountEth) > parseFloat(ethBalance) && (
-                  <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 text-red-400 text-sm">
+                  <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-2 text-red-400 text-sm">
                     <div className="flex items-center gap-2">
                       <span>⚠️</span>
                       <span>Insufficient ETH balance</span>
@@ -916,7 +916,7 @@ export default function BuyTab() {
                 )}
 
                 {parseFloat(swapAmountEth) > 0 && parseFloat(swapAmountEth) < 0.001 && (
-                  <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-3 text-yellow-400 text-sm">
+                  <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-2 text-yellow-400 text-sm">
                     <div className="flex items-center gap-2">
                       <span>💡</span>
                       <span>Minimum purchase: 0.001 ETH</span>
@@ -925,10 +925,10 @@ export default function BuyTab() {
                 )}
 
                 {/* Action Buttons */}
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {buyStep === 'initial' && (
                     <Button
-                      className="w-full bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-black font-bold py-4 rounded-xl text-lg transition-all transform hover:scale-[1.02]"
+                      className="w-full bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-black font-bold py-3 rounded-xl text-base transition-all transform hover:scale-[1.02]"
                       onClick={handleGetQuote}
                       disabled={
                         !swapAmountEth || 
@@ -946,7 +946,7 @@ export default function BuyTab() {
 
                   {buyStep === 'quoteFetched' && needsApproval && (
                     <Button
-                      className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-4 rounded-xl text-lg transition-all"
+                      className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 rounded-xl text-base transition-all"
                       onClick={handleApprove}
                       disabled={isSwapping}
                     >
@@ -956,7 +956,7 @@ export default function BuyTab() {
 
                   {((buyStep === 'quoteFetched' && !needsApproval) || buyStep === 'approved') && (
                     <Button
-                      className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-bold py-4 rounded-xl text-lg transition-all transform hover:scale-[1.02]"
+                      className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-bold py-3 rounded-xl text-base transition-all transform hover:scale-[1.02]"
                       onClick={handleBuySwap}
                       disabled={isSwapping}
                     >
@@ -966,7 +966,7 @@ export default function BuyTab() {
 
                   {buyStep === 'completed' && (
                     <Button
-                      className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-bold py-4 rounded-xl text-lg transition-all"
+                      className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-bold py-3 rounded-xl text-base transition-all"
                       onClick={() => {
                         setBuyStep('initial');
                         setQuoteTxData(null);
@@ -985,8 +985,8 @@ export default function BuyTab() {
                 </div>
 
                 {/* Market Info */}
-                <div className="bg-zinc-800/30 rounded-xl p-4 border border-zinc-700">
-                  <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="bg-zinc-800/30 rounded-xl p-3 border border-zinc-700">
+                  <div className="grid grid-cols-2 gap-3 text-sm">
                     <div>
                       <span className="text-zinc-500">Your D.FAITH Balance</span>
                       <div className="text-amber-400 font-semibold">{dfaithBalance}</div>
@@ -1003,17 +1003,17 @@ export default function BuyTab() {
             )}
             {selectedToken === "DINVEST" && (
               <>
-                <div className="mb-4 text-zinc-300 text-sm">
+                <div className="mb-3 text-zinc-300 text-sm">
                   <b>Preis:</b> 5€ pro D.INVEST<br />
                   <b>Minimum:</b> 5 EUR
                 </div>
-                <div className="mb-4 text-zinc-300 text-sm">
+                <div className="mb-3 text-zinc-300 text-sm">
                   {copied
                     ? "Deine Wallet-Adresse wurde kopiert. Bitte füge sie beim Stripe-Kauf als Verwendungszweck ein, damit wir dir die Token zuweisen können."
                     : "Bitte stelle sicher, dass du eine Wallet verbunden hast."}
                 </div>
                 <Button
-                  className="w-full bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-2 rounded-xl mt-2"
+                  className="w-full bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-2 rounded-xl mt-1"
                   onClick={async () => {
                     if (account?.address) {
                       await navigator.clipboard.writeText(account.address);
@@ -1040,7 +1040,7 @@ export default function BuyTab() {
               </div>
             )}
             <Button
-              className="w-full bg-zinc-600 hover:bg-zinc-700 text-white font-bold py-2 rounded-lg text-xs mt-4"
+              className="w-full bg-zinc-600 hover:bg-zinc-700 text-white font-bold py-2 rounded-lg text-xs mt-2"
               onClick={() => {
                 setShowBuyModal(false);
                 setSelectedToken(null);
