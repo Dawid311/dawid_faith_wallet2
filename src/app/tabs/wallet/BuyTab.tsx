@@ -624,7 +624,7 @@ export default function BuyTab() {
       color: "from-amber-400 to-yellow-500",
       description: "Faith Utility Token",
       price: dfaithPriceEur ? `${dfaithPriceEur.toFixed(4)}€ pro D.FAITH` : (isLoadingPrice ? "Laden..." : (priceError || "Preis nicht verfügbar")),
-      sub: dfaithPrice && ethPriceEur ? `1 D.FAITH = ${(dfaithPrice * ethPriceEur).toFixed(4)}€` : "Wird geladen...",
+      sub: dfaithPrice ? `1 ETH = ${(1 / dfaithPrice).toFixed(2)} D.FAITH` : "Wird geladen...",
       icon: <FaCoins className="text-amber-400" />,
     },
     {

@@ -466,13 +466,12 @@ export default function WalletTab() {
       }
 
       try {
-        // 2. Hole D.FAITH Preis von OpenOcean für Base Chain (wie in BuyTab)
-        const amountWei = (1n * 10n ** 18n).toString();
+        // 2. Hole D.FAITH Preis von OpenOcean für Base Chain (gleiche Richtung wie SellTab)
         const params = new URLSearchParams({
           chain: "base",
-          inTokenAddress: "0x0000000000000000000000000000000000000000", // Native ETH
-          outTokenAddress: DFAITH_TOKEN.address,
-          amount: amountWei, // 1 ETH in Wei
+          inTokenAddress: DFAITH_TOKEN.address,
+          outTokenAddress: "0x0000000000000000000000000000000000000000", // Native ETH
+          amount: "1", // 1 D.FAITH
           gasPrice: "0.001", // Base Chain: 0.001 Gwei
         });
         
@@ -482,14 +481,15 @@ export default function WalletTab() {
           const data = await response.json();
           console.log("OpenOcean Response (WalletTab):", data);
           if (data && data.data && data.data.outAmount && data.data.outAmount !== "0") {
-            // outAmount ist in D.FAITH (mit 2 Decimals)
-            dfaithAmount = Number(data.data.outAmount) / Math.pow(10, DFAITH_TOKEN.decimals);
-            // Preis pro D.FAITH in EUR: ethEur / dfaithAmount (wie in BuyTab korrigiert)
-            if (ethEur && dfaithAmount > 0) {
-              dfaithPriceEur = ethEur / dfaithAmount;
+            // outAmount ist in ETH (mit 18 Decimals)
+            const ethPerDfaith = Number(data.data.outAmount) / Math.pow(10, 18);
+            // Preis pro D.FAITH in EUR: ethPerDfaith * ethEur
+            if (ethEur && ethPerDfaith > 0) {
+              dfaithPriceEur = ethPerDfaith * ethEur;
+              dfaithAmount = ethPerDfaith; // Speichere ETH pro D.FAITH für Konsistenz
               console.log('D.FAITH Preis erfolgreich berechnet (WalletTab):', {
                 ethEur,
-                dfaithAmount,
+                ethPerDfaith,
                 dfaithPriceEur
               });
             }
@@ -522,10 +522,10 @@ export default function WalletTab() {
         }
       }
 
-      // Speichere erfolgreiche Preise (erweitert um dfaithAmount)
+      // Speichere erfolgreiche Preise (erweitert um ethPerDfaith)
       if (dfaithPriceEur && ethEur && dfaithAmount) {
         const newPrices = {
-          dfaith: dfaithAmount,
+          dfaith: dfaithAmount, // Jetzt ETH pro D.FAITH (konsistent mit SellTab)
           dfaithEur: dfaithPriceEur,
           ethEur: ethEur,
           timestamp: Date.now()
@@ -601,13 +601,13 @@ export default function WalletTab() {
       return eurValue.toFixed(2);
     }
 
-    // Fallback: Berechnung über gespeicherte Werte wie in BuyTab/SellTab
-    let dfaithAmount = 0; // Wie viele D.FAITH für 1 ETH
+    // Fallback: Berechnung über gespeicherte Werte wie in SellTab
+    let ethPerDfaith = 0; // Wie viel ETH für 1 D.FAITH
     let ethEur = 0;
 
     // 1. Aktuelle Werte aus lastKnownPrices
     if (lastKnownPrices && lastKnownPrices.dfaith && lastKnownPrices.ethEur) {
-      dfaithAmount = lastKnownPrices.dfaith;
+      ethPerDfaith = lastKnownPrices.dfaith; // Jetzt ETH pro D.FAITH
       ethEur = lastKnownPrices.ethEur;
     }
     // 2. Fallback: localStorage
@@ -618,7 +618,7 @@ export default function WalletTab() {
           const parsed = JSON.parse(stored);
           const now = Date.now();
           if (parsed.dfaith && parsed.ethEur && parsed.timestamp && (now - parsed.timestamp) < 24 * 60 * 60 * 1000) {
-            dfaithAmount = parsed.dfaith;
+            ethPerDfaith = parsed.dfaith; // Jetzt ETH pro D.FAITH
             ethEur = parsed.ethEur;
           }
         }
@@ -627,14 +627,14 @@ export default function WalletTab() {
       }
     }
 
-    // Berechne EUR-Wert wie in BuyTab/SellTab
-    if (dfaithAmount > 0 && ethEur > 0) {
-      // 1 D.FAITH = (ethEur / dfaithAmount)
-      const dfaithEur = ethEur / dfaithAmount;
+    // Berechne EUR-Wert wie in SellTab
+    if (ethPerDfaith > 0 && ethEur > 0) {
+      // 1 D.FAITH = ethPerDfaith * ethEur
+      const dfaithEur = ethPerDfaith * ethEur;
       const eurValue = balanceFloat * dfaithEur;
       console.log('EUR-Wert berechnet (WalletTab - Fallback):', {
         balance,
-        dfaithAmount,
+        ethPerDfaith,
         ethEur,
         dfaithEur,
         eurValue: eurValue.toFixed(2)
