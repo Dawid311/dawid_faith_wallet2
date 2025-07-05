@@ -428,9 +428,21 @@ export default function StakeTab() {
     const hours = Math.floor((seconds % (24 * 60 * 60)) / (60 * 60));
     const minutes = Math.floor((seconds % (60 * 60)) / 60);
     
-    if (days > 0) return `${days}d ${hours}h ${minutes}m`;
+    // Zeige nur die relevantesten Zeiteinheiten
+    if (days > 0) {
+      if (days >= 7) {
+        const weeks = Math.floor(days / 7);
+        const remainingDays = days % 7;
+        if (remainingDays > 0) {
+          return `${weeks} Woche${weeks > 1 ? 'n' : ''} ${remainingDays} Tag${remainingDays > 1 ? 'e' : ''}`;
+        }
+        return `${weeks} Woche${weeks > 1 ? 'n' : ''}`;
+      }
+      return `${days} Tag${days > 1 ? 'e' : ''} ${hours}h`;
+    }
     if (hours > 0) return `${hours}h ${minutes}m`;
-    return `${minutes}m`;
+    if (minutes > 0) return `${minutes} Min`;
+    return "Weniger als 1 Min";
   };
 
   return (

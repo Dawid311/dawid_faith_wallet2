@@ -708,9 +708,9 @@ export default function BuyTab() {
             {/* Modal-Header */}
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-base sm:text-xl font-bold text-amber-400">
-                {selectedToken === "DFAITH" && "D.FAITH kaufen"}
+                {selectedToken === "DFAITH" && ""}
                 {selectedToken === "DINVEST" && "D.INVEST kaufen"}
-                {selectedToken === "ETH" && "ETH kaufen"}
+                {selectedToken === "ETH" && ""}
               </h3>
               <button
                 onClick={() => {
@@ -981,16 +981,6 @@ export default function BuyTab() {
                       Make Another Purchase
                     </Button>
                   )}
-                </div>
-
-                {/* Market Info - Kompakt */}
-                <div className="bg-zinc-800/30 rounded-xl p-3 border border-zinc-700">
-                  <div className="text-sm">
-                    <div>
-                      <span className="text-zinc-500">Your D.FAITH Balance: </span>
-                      <span className="text-amber-400 font-semibold">{dfaithBalance}</span>
-                    </div>
-                  </div>
                 </div>
               </div>
             )}
