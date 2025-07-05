@@ -261,24 +261,20 @@ export default function SellTab() {
         console.log("Sell Amount:", sellAmount);
         console.log("Sell Amount in Wei:", sellAmountRaw);
         
+        // Prüfe Allowance für Logging-Zwecke
         if (currentAllowance < requiredAmount) {
-          console.log("Approval nötig");
-          setNeedsApproval(true);
+          console.log("Approval nötig - Allowance zu niedrig");
         } else {
-          console.log("Approval bereits vorhanden");
-          setNeedsApproval(false);
+          console.log("Allowance bereits ausreichend vorhanden");
         }
       } else {
-        console.log("Fehler beim Abrufen der Allowance - setze Approval als nötig");
-        setNeedsApproval(true);
+        console.log("Fehler beim Abrufen der Allowance");
       }
       
-      // Zusätzliche Sicherheitsmaßnahme: Immer Approval anfordern bei ersten Verkäufen
+      // IMMER Approval anfordern für maximale Sicherheit und Konsistenz
       // Dies gewährleistet, dass der Approve-Button immer angezeigt wird
-      if (currentAllowance === BigInt(0)) {
-        console.log("Keine vorherige Allowance gefunden - Approval erforderlich");
-        setNeedsApproval(true);
-      }
+      console.log("Setze Approval als erforderlich (Sicherheitsmaßnahme)");
+      setNeedsApproval(true);
       
       setSellStep('quoteFetched');
       setSwapTxStatus(null);
