@@ -26,9 +26,9 @@ export default function BuyTab() {
     timestamp?: number;
   }>({});
   const account = useActiveAccount();
-  const [showInvestModal, setShowInvestModal] = useState(false);
+  // Modal- und Token-Auswahl-States für neues Design
+  const [selectedToken, setSelectedToken] = useState<null | "DFAITH" | "DINVEST" | "ETH">(null);
   const [showBuyModal, setShowBuyModal] = useState(false);
-  const [showEthBuyModal, setShowEthBuyModal] = useState(false);
   const [copied, setCopied] = useState(false);
   const [priceError, setPriceError] = useState<string | null>(null);
   const [swapAmount, setSwapAmount] = useState("");
@@ -189,22 +189,10 @@ export default function BuyTab() {
     return () => clearInterval(interval);
   }, [lastKnownPrices.dfaith, lastKnownPrices.dfaithEur, lastKnownPrices.ethEur]);
 
-  // D.INVEST kaufen Modal öffnen
-  const handleInvestBuy = async () => {
-    if (account?.address) {
-      await navigator.clipboard.writeText(account.address);
-      setCopied(true);
-    }
-    setShowInvestModal(true);
-  };
 
-  const handleInvestContinue = () => {
-    setShowInvestModal(false);
-    window.open('https://dein-stripe-link.de', '_blank');
-  };
+  // Entfernt: handleInvestBuy, handleInvestContinue, setShowInvestModal, investBuyModalRef, showInvestModal
 
-  // State für D.FAITH Swap
-  const [showDfaithBuyModal, setShowDfaithBuyModal] = useState(false);
+  // State für D.FAITH Swap (Modal wird jetzt zentral gesteuert)
   const [swapAmountEth, setSwapAmountEth] = useState("");
   const [slippage, setSlippage] = useState("1");
   const [ethBalance, setEthBalance] = useState("0");
@@ -561,142 +549,162 @@ export default function BuyTab() {
     }
   };
 
-  // Refs für die Modals
-  const ethBuyModalRef = useRef<HTMLDivElement>(null);
-  const dfaithBuyModalRef = useRef<HTMLDivElement>(null);
-  const investBuyModalRef = useRef<HTMLDivElement>(null);
 
-  // Scrollen zu den Modals, wenn sie geöffnet werden
+  // Modal-Ref für Scroll
+  const buyModalRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (showEthBuyModal && ethBuyModalRef.current) {
+    if (showBuyModal && buyModalRef.current) {
       setTimeout(() => {
-        ethBuyModalRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+        buyModalRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
       }, 50);
     }
-  }, [showEthBuyModal]);
+  }, [showBuyModal]);
 
-  useEffect(() => {
-    if (showDfaithBuyModal && dfaithBuyModalRef.current) {
-      setTimeout(() => {
-        dfaithBuyModalRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-      }, 50);
-    }
-  }, [showDfaithBuyModal]);
-
-  useEffect(() => {
-    if (showInvestModal && investBuyModalRef.current) {
-      setTimeout(() => {
-        investBuyModalRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-      }, 50);
-    }
-  }, [showInvestModal]);
+  // Token-Auswahl wie im SendTab
+  const tokenOptions = [
+    {
+      key: "DFAITH",
+      label: "D.FAITH",
+      symbol: "DFAITH",
+      balance: dfaithBalance,
+      color: "from-amber-400 to-yellow-500",
+      description: "Faith Utility Token",
+      price: dfaithPriceEur ? `${dfaithPriceEur.toFixed(3)}€ pro D.FAITH` : (isLoadingPrice ? "Laden..." : (priceError || "Preis nicht verfügbar")),
+      sub: dfaithPrice ? `1 ETH = ${dfaithPrice.toFixed(2)} D.FAITH` : "Wird geladen...",
+      icon: <FaCoins className="text-amber-400" />,
+    },
+    {
+      key: "DINVEST",
+      label: "D.INVEST",
+      symbol: "DINVEST",
+      balance: dinvestBalance,
+      color: "from-blue-400 to-blue-600",
+      description: "Investment & Staking Token",
+      price: "5€ pro D.INVEST",
+      sub: "Minimum: 5 EUR",
+      icon: <FaLock className="text-blue-400" />,
+    },
+    {
+      key: "ETH",
+      label: "ETH",
+      symbol: "ETH",
+      balance: ethBalance,
+      color: "from-blue-500 to-blue-700",
+      description: "Ethereum Native Token",
+      price: ethPriceEur ? `${ethPriceEur.toFixed(2)}€ pro ETH` : "~3000€ pro ETH",
+      sub: "mit EUR kaufen",
+      icon: <span className="text-white text-lg font-bold">⟠</span>,
+    },
+  ];
 
   return (
-    <div className="flex flex-col gap-6 p-6">
+    <div className="flex flex-col gap-6 p-6 max-w-lg mx-auto">
       <div className="text-center mb-6">
         <h2 className="text-2xl font-bold bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 bg-clip-text text-transparent mb-2">
           Token kaufen
         </h2>
-        <p className="text-zinc-400">Wählen Sie den Token, den Sie kaufen möchten</p>
+        <p className="text-zinc-400">Wähle einen Token und kaufe ihn direkt</p>
       </div>
 
-      <div className="flex flex-col gap-4">
-        {/* DFAITH kaufen */}
-        <div className="bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl p-6 border border-zinc-700">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-gradient-to-r from-yellow-400 to-amber-600 rounded-full">
-                <FaCoins className="text-black text-lg" />
-              </div>
-              <div>
-                <h3 className="font-bold text-amber-400">D.FAITH Token</h3>
-                <p className="text-xs text-zinc-500">Dawid Faith Utility Token</p>
-              </div>
-            </div>
-            <span className="text-xs text-zinc-400 bg-zinc-700/50 px-2 py-1 rounded">mit ETH kaufen</span>
-          </div>
-          <div className="space-y-4">
-              <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
-                <span className="text-sm text-zinc-400">Aktueller Preis:</span>
-                <span className="text-sm text-amber-400 font-medium">
-                  {isLoadingPrice && !dfaithPriceEur ? (
-                    <span className="animate-pulse">Laden...</span>
-                  ) : dfaithPriceEur ? (
-                    <span>
-                      {dfaithPriceEur.toFixed(3)}€ pro D.FAITH
-                      {priceError && (
-                        <span className="text-xs text-yellow-400 ml-1">(cached)</span>
-                      )}
-                    </span>
-                  ) : (
-                    <span className="text-red-400 text-xs">{priceError || "Preis nicht verfügbar"}</span>
-                  )}
-                </span>
-              </div>
-              
-              <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
-                <span className="text-sm text-zinc-400">Wechselkurs:</span>
-                <span className="text-sm text-zinc-300 font-medium">
-                  {dfaithPrice ? (
-                    <span>
-                      1 ETH = {dfaithPrice.toFixed(2)} D.FAITH
-                      {priceError && (
-                        <span className="text-xs text-yellow-400 ml-1">(cached)</span>
-                      )}
-                    </span>
-                  ) : (
-                    "Wird geladen..."
-                  )}
-                </span>
-              </div>
-            </div>
-          
-          {/* D.FAITH kaufen Modal */}
-          {showDfaithBuyModal ? (
-            <div className="fixed inset-0 z-50 flex items-center justify-center min-h-screen bg-black/60 overflow-y-auto">
-              <div
-                ref={dfaithBuyModalRef}
-                className="bg-zinc-900 rounded-xl p-4 sm:p-6 max-w-sm w-full mx-2 border border-amber-400 my-4 max-h-[90vh] overflow-y-auto flex flex-col"
-                style={{ boxSizing: 'border-box' }}
-              >
-                {/* Header mit Close Button */}
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-lg sm:text-2xl font-bold text-amber-400">D.FAITH kaufen</h3>
-                  <button
-                    onClick={() => {
-                      setShowDfaithBuyModal(false);
-                      setSwapAmountEth("");
-                      setSlippage("1");
-                      setSwapTxStatus(null);
-                      setBuyStep('initial');
-                      setQuoteTxData(null);
-                      setSpenderAddress(null);
-                      setNeedsApproval(false);
-                      setQuoteError(null);
-                    }}
-                    className="p-2 text-amber-400 hover:text-yellow-300 hover:bg-zinc-800 rounded-lg transition-all flex-shrink-0"
-                    disabled={isSwapping}
-                  >
-                    <span className="text-lg">✕</span>
-                  </button>
+      {/* Token-Auswahl Grid */}
+      <div className="space-y-3">
+        <label className="text-sm font-semibold text-zinc-300 flex items-center gap-2">
+          <FaCoins className="text-amber-400" />
+          Token auswählen:
+        </label>
+        <div className="grid gap-3">
+          {tokenOptions.map((token) => (
+            <div
+              key={token.key}
+              onClick={() => {
+                if (account?.address) {
+                  setSelectedToken(token.key as "DFAITH" | "DINVEST" | "ETH");
+                  setShowBuyModal(true);
+                  setCopied(false);
+                } else {
+                  alert('Bitte Wallet verbinden!');
+                }
+              }}
+              className="relative cursor-pointer rounded-xl p-4 border-2 transition-all duration-200 bg-zinc-800/50 border-zinc-700 hover:border-zinc-600 hover:bg-zinc-800/70 hover:scale-[1.02]"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={`w-12 h-12 rounded-full bg-gradient-to-r ${token.color} flex items-center justify-center text-white font-bold text-lg shadow-lg`}>
+                    {token.icon}
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-white text-lg">{token.label}</h3>
+                    <p className="text-zinc-400 text-xs">{token.description}</p>
+                  </div>
                 </div>
-                
+                <div className="text-right">
+                  <div className="font-bold text-amber-400 text-lg flex items-center gap-1">
+                    {token.balance}
+                  </div>
+                  <div className="text-zinc-500 text-xs font-medium">{token.symbol}</div>
+                </div>
+              </div>
+              <div className="flex justify-between mt-2 text-xs">
+                <span className="text-zinc-400">{token.price}</span>
+                <span className="text-zinc-400">{token.sub}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Kauf-Modal zentral */}
+      {showBuyModal && selectedToken && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center min-h-screen bg-black/60 overflow-y-auto">
+          <div
+            ref={buyModalRef}
+            className="bg-zinc-900 rounded-xl p-4 sm:p-6 max-w-sm w-full mx-2 border border-amber-400 my-4 max-h-[90vh] overflow-y-auto flex flex-col"
+            style={{ boxSizing: 'border-box' }}
+          >
+            {/* Modal-Header */}
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg sm:text-2xl font-bold text-amber-400">
+                {selectedToken === "DFAITH" && "D.FAITH kaufen"}
+                {selectedToken === "DINVEST" && "D.INVEST kaufen"}
+                {selectedToken === "ETH" && "ETH kaufen"}
+              </h3>
+              <button
+                onClick={() => {
+                  setShowBuyModal(false);
+                  setSelectedToken(null);
+                  setSwapAmountEth("");
+                  setSlippage("1");
+                  setSwapTxStatus(null);
+                  setBuyStep('initial');
+                  setQuoteTxData(null);
+                  setSpenderAddress(null);
+                  setNeedsApproval(false);
+                  setQuoteError(null);
+                }}
+                className="p-2 text-amber-400 hover:text-yellow-300 hover:bg-zinc-800 rounded-lg transition-all flex-shrink-0"
+                disabled={isSwapping}
+              >
+                <span className="text-lg">✕</span>
+              </button>
+            </div>
+
+            {/* Modal-Inhalt je nach Token */}
+            {selectedToken === "DFAITH" && (
+              // ... D.FAITH Swap UI wie bisher (aus Modal übernehmen) ...
+              <>
                 {/* Prozessschritte anzeigen */}
                 <div className="mb-3 flex justify-between text-xs">
                   <div className={` ${buyStep !== 'initial' ? 'text-green-400' : 'text-zinc-500'}`}>1. Quote {buyStep !== 'initial' ? '✓' : ''}</div>
                   <div className={` ${buyStep === 'approved' || buyStep === 'completed' ? 'text-green-400' : 'text-zinc-500'}`}>2. Approve {buyStep === 'approved' || buyStep === 'completed' ? '✓' : needsApproval ? '' : '(nötig)'}</div>
                   <div className={` ${buyStep === 'completed' ? 'text-green-400' : 'text-zinc-500'}`}>3. Swap {buyStep === 'completed' ? '✓' : ''}</div>
                 </div>
-
                 {/* Kompakte Inputzeile: ETH-Balance als Badge, Input */}
                 <div className="flex gap-2 items-center mb-3 w-full">
-                  {/* ETH-Balance Badge */}
                   <div className="flex items-center gap-1 bg-blue-900/60 border border-blue-500 rounded-lg px-3 py-2 text-blue-300 font-bold text-sm whitespace-nowrap">
                     <span className="text-blue-400 text-base">⟠</span>
                     <span>{ethBalance}</span>
                     <span className="text-xs font-normal ml-1">ETH</span>
                   </div>
-                  {/* ETH Input - jetzt mit mehr Platz */}
                   <input
                     type="number"
                     min="0"
@@ -718,7 +726,6 @@ export default function BuyTab() {
                 <div className="flex justify-between text-xs text-zinc-500 mb-3">
                   <span>Verfügbar: <span className="text-blue-400 font-bold">{ethBalance} ETH</span></span>
                 </div>
-
                 {/* Slippage */}
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-zinc-300 mb-2">Slippage Toleranz (%)</label>
@@ -759,7 +766,6 @@ export default function BuyTab() {
                     </div>
                   </div>
                 </div>
-
                 {/* Estimated Output */}
                 {swapAmountEth && parseFloat(swapAmountEth) > 0 && dfaithPrice && dfaithPriceEur && (
                   <div className="mb-3 p-3 bg-zinc-800/50 rounded text-sm">
@@ -773,7 +779,6 @@ export default function BuyTab() {
                     </div>
                   </div>
                 )}
-
                 {/* Status/Fehler kompakt */}
                 {swapTxStatus && (
                   <div className={`mb-3 p-2 rounded text-center text-xs ${
@@ -794,7 +799,6 @@ export default function BuyTab() {
                     {swapTxStatus === "pending" && <div><b>📝 Quote wird geholt...</b></div>}
                   </div>
                 )}
-
                 {/* Swap Buttons */}
                 <div className="space-y-2">
                   {buyStep === 'initial' && (
@@ -854,25 +858,7 @@ export default function BuyTab() {
                   {quoteError && (
                     <div className="text-red-400 text-xs text-center">{quoteError}</div>
                   )}
-                  <Button
-                    className="w-full bg-zinc-600 hover:bg-zinc-700 text-white font-bold py-2 rounded-lg text-xs"
-                    onClick={() => {
-                      setShowDfaithBuyModal(false);
-                      setSwapAmountEth("");
-                      setSlippage("1");
-                      setSwapTxStatus(null);
-                      setBuyStep('initial');
-                      setQuoteTxData(null);
-                      setSpenderAddress(null);
-                      setNeedsApproval(false);
-                      setQuoteError(null);
-                    }}
-                    disabled={isSwapping}
-                  >
-                    Schließen
-                  </Button>
                 </div>
-
                 {/* Validation kompakt */}
                 {parseFloat(swapAmountEth) > parseFloat(ethBalance) && (
                   <div className="mb-3 p-2 bg-red-500/10 border border-red-500/30 rounded text-xs">
@@ -891,135 +877,71 @@ export default function BuyTab() {
                     </div>
                   </div>
                 )}
-              </div>
-            </div>
-          ) : (
-            <Button
-              className="w-full mt-4 bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-3 rounded-xl hover:opacity-90 transition-opacity"
-              onClick={() => {
-                if (account?.address) {
-                  setShowDfaithBuyModal(true);
-                } else {
-                  alert('Bitte Wallet verbinden!');
-                }
-              }}
-              disabled={!account?.address}
-            >
-              D.FAITH kaufen
-            </Button>
-          )}
-        </div>
-
-        {/* D.INVEST kaufen */}
-        <div className="bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl p-6 border border-zinc-700">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-gradient-to-r from-yellow-400 to-amber-600 rounded-full">
-                <FaLock className="text-black text-lg" />
-              </div>
-              <div>
-                <h3 className="font-bold text-amber-400">D.INVEST Token</h3>
-                <p className="text-xs text-zinc-500">Investment & Staking Token</p>
-              </div>
-            </div>
-            <span className="text-xs text-zinc-400 bg-zinc-700/50 px-2 py-1 rounded">mit EUR kaufen</span>
-          </div>
-          
-          <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
-              <span className="text-sm text-zinc-400">Aktueller Preis:</span>
-              <span className="text-sm text-amber-400 font-medium">5€ pro D.INVEST</span>
-            </div>
-            <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
-              <span className="text-sm text-zinc-400">Minimum:</span>
-              <span className="text-sm text-zinc-300 font-medium">5 EUR</span>
-            </div>
-          </div>
-          
-          <Button
-            className="w-full mt-4 bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-3 rounded-xl hover:opacity-90 transition-opacity"
-            onClick={handleInvestBuy}
-          >
-            D.INVEST kaufen
-          </Button>
-        </div>
-
-        {/* ETH kaufen */}
-        <div className="bg-gradient-to-br from-blue-800/30 to-blue-900/30 rounded-xl p-6 border border-blue-700/50">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-gradient-to-r from-blue-500 to-blue-700 rounded-full">
-                <span className="text-white text-lg font-bold">⟠</span>
-              </div>
-              <div>
-                <h3 className="font-bold text-blue-400">ETH Token</h3>
-                <p className="text-xs text-zinc-500">Ethereum Native Token</p>
-              </div>
-            </div>
-            <span className="text-xs text-zinc-400 bg-zinc-700/50 px-2 py-1 rounded">mit EUR kaufen</span>
-          </div>
-          
-          <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
-              <span className="text-sm text-zinc-400">Aktueller Preis:</span>
-              <span className="text-sm text-blue-400 font-bold">
-                {ethPriceEur ? (
-                  <span>
-                    {ethPriceEur.toFixed(2)}€ pro ETH
-                    {priceError && (
-                      <span className="text-xs text-yellow-400 ml-1">(cached)</span>
-                    )}
-                  </span>
-                ) : (
-                  "~3000€ pro ETH"
-                )}
-              </span>
-            </div>
-          </div>
-          
-          <div className="w-full mt-4">
-            {showEthBuyModal ? (
-              <div
-                className="fixed inset-0 z-50 flex items-center justify-center min-h-screen bg-black/60 overflow-y-auto"
-              >
-                <div
-                  ref={ethBuyModalRef}
-                  className="bg-zinc-900 rounded-xl p-4 max-w-full w-full sm:max-w-xs border border-blue-500 text-center flex flex-col items-center justify-center my-4"
-                >
-                  <div className="mb-4 text-blue-400 text-2xl font-bold">ETH kaufen</div>
-                  <div className="w-full flex-1 flex items-center justify-center">
-                    <BuyWidget
-                      client={client}
-                      tokenAddress={NATIVE_TOKEN_ADDRESS}
-                      chain={base}
-                      amount="1"
-                      theme="dark"
-                      className="w-full"
-                    />
-                  </div>
-                  <Button
-                    className="w-full bg-zinc-600 hover:bg-zinc-700 text-white font-bold py-2 rounded-xl mt-4"
-                    onClick={() => setShowEthBuyModal(false)}
-                  >
-                    Schließen
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <Button
-                className="w-full bg-gradient-to-r from-blue-500 to-blue-700 text-white font-bold py-3 rounded-xl hover:opacity-90 transition-opacity"
-                onClick={() => {
-                  setShowEthBuyModal(true);
-                  // Das Scrollen übernimmt jetzt der useEffect
-                }}
-              >
-                ETH kaufen
-              </Button>
+              </>
             )}
+            {selectedToken === "DINVEST" && (
+              <>
+                <div className="mb-4 text-zinc-300 text-sm">
+                  <b>Preis:</b> 5€ pro D.INVEST<br />
+                  <b>Minimum:</b> 5 EUR
+                </div>
+                <div className="mb-4 text-zinc-300 text-sm">
+                  {copied
+                    ? "Deine Wallet-Adresse wurde kopiert. Bitte füge sie beim Stripe-Kauf als Verwendungszweck ein, damit wir dir die Token zuweisen können."
+                    : "Bitte stelle sicher, dass du eine Wallet verbunden hast."}
+                </div>
+                <Button
+                  className="w-full bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-2 rounded-xl mt-2"
+                  onClick={async () => {
+                    if (account?.address) {
+                      await navigator.clipboard.writeText(account.address);
+                      setCopied(true);
+                    }
+                    window.open('https://dein-stripe-link.de', '_blank');
+                  }}
+                  autoFocus
+                >
+                  Weiter zu Stripe
+                </Button>
+              </>
+            )}
+            {selectedToken === "ETH" && (
+              <>
+                <div className="mb-4 text-blue-400 text-2xl font-bold">ETH kaufen</div>
+                <div className="w-full flex-1 flex items-center justify-center">
+                  <BuyWidget
+                    client={client}
+                    tokenAddress={NATIVE_TOKEN_ADDRESS}
+                    chain={base}
+                    amount="1"
+                    theme="dark"
+                    className="w-full"
+                  />
+                </div>
+              </>
+            )}
+            <Button
+              className="w-full bg-zinc-600 hover:bg-zinc-700 text-white font-bold py-2 rounded-lg text-xs mt-4"
+              onClick={() => {
+                setShowBuyModal(false);
+                setSelectedToken(null);
+                setSwapAmountEth("");
+                setSlippage("1");
+                setSwapTxStatus(null);
+                setBuyStep('initial');
+                setQuoteTxData(null);
+                setSpenderAddress(null);
+                setNeedsApproval(false);
+                setQuoteError(null);
+              }}
+              disabled={isSwapping}
+            >
+              Schließen
+            </Button>
           </div>
         </div>
-      </div>
-
+      )}
+      {/* Hinweis nur einmal anzeigen */}
       <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4 mt-6">
         <div className="flex items-start gap-3">
           <div className="w-5 h-5 rounded-full bg-blue-500/20 flex items-center justify-center mt-0.5">
@@ -1033,34 +955,6 @@ export default function BuyTab() {
           </div>
         </div>
       </div>
-
-      {/* Info Modal für D.INVEST */}
-      {showInvestModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center min-h-screen bg-black/60 overflow-y-auto">
-          <div
-            ref={investBuyModalRef}
-            className="bg-zinc-900 rounded-xl p-8 w-full max-w-xs border border-amber-400 text-center flex flex-col items-center justify-center my-8"
-          >
-            <div className="mb-4 text-amber-400 text-2xl font-bold">Wichtiger Hinweis</div>
-            <div className="mb-4 text-zinc-300 text-sm">
-              {copied
-                ? "Deine Wallet-Adresse wurde kopiert. Bitte füge sie beim Stripe-Kauf als Verwendungszweck ein, damit wir dir die Token zuweisen können."
-                : "Bitte stelle sicher, dass du eine Wallet verbunden hast."}
-            </div>
-            <Button
-              className="w-full bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-2 rounded-xl mt-2"
-              onClick={handleInvestContinue}
-              autoFocus
-            >
-              Weiter zu Stripe
-            </Button>
-            <button
-              className="w-full mt-2 text-zinc-400 text-xs underline"
-              onClick={() => setShowInvestModal(false)}
-            >Abbrechen</button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
