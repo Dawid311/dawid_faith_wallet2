@@ -37,15 +37,20 @@ export default function HistoryTab() {
       setError("");
       
       try {
-        const apiKey = process.env.NEXT_PUBLIC_BASESCAN_API_KEY;
+        // Versuche zuerst Basescan API Key, dann Etherscan API Key
+        const basescanApiKey = process.env.NEXT_PUBLIC_BASESCAN_API_KEY;
+        const etherscanApiKey = process.env.NEXT_PUBLIC_ETHERSCAN_API_KEY;
+        
+        const apiKey = basescanApiKey || etherscanApiKey;
         
         if (!apiKey) {
-          throw new Error("Basescan API-Key nicht konfiguriert");
+          throw new Error("Weder Basescan noch Etherscan API-Key konfiguriert");
         }
         
-        console.log("Using Basescan API Key:", apiKey ? "✓ Configured" : "✗ Missing");
+        console.log("Using API Key:", apiKey ? "✓ Configured" : "✗ Missing");
+        console.log("API Key source:", basescanApiKey ? "Basescan" : "Etherscan");
         
-        // API-Endpunkte für Basescan (Base Network)
+        // API-Endpunkte für Base Network (funktioniert mit beiden API Keys)
         const endpoints = [
           // Native ETH Transaktionen auf Base
           `https://api.basescan.org/api?module=account&action=txlist&address=${userAddress}&startblock=0&endblock=99999999&sort=desc&apikey=${apiKey}`,
@@ -55,41 +60,86 @@ export default function HistoryTab() {
           `https://api.basescan.org/api?module=account&action=txlistinternal&address=${userAddress}&startblock=0&endblock=99999999&sort=desc&apikey=${apiKey}`
         ];
 
-        // Parallele API-Aufrufe
+        // Parallele API-Aufrufe mit verbessertem Error Handling
         const responses = await Promise.allSettled(
-          endpoints.map(url => fetch(url).then(res => res.json()))
+          endpoints.map(async (url, index) => {
+            console.log(`API Call ${index + 1}:`, url);
+            const response = await fetch(url);
+            const data = await response.json();
+            console.log(`API Response ${index + 1}:`, data);
+            return data;
+          })
         );
 
         let allTransactions: any[] = [];
 
         // Normale Transaktionen verarbeiten
-        if (responses[0].status === 'fulfilled' && responses[0].value.status === "1") {
-          const normalTxs = responses[0].value.result.map((tx: any) => ({
-            ...tx,
-            _type: "normal",
-            _category: "POL Transfer"
-          }));
-          allTransactions.push(...normalTxs);
+        if (responses[0].status === 'fulfilled') {
+          const data = responses[0].value;
+          console.log("Normal Transactions Response:", data);
+          if (data.status === "1" && data.result) {
+            const normalTxs = data.result.map((tx: any) => ({
+              ...tx,
+              _type: "normal",
+              _category: "ETH Transfer"
+            }));
+            allTransactions.push(...normalTxs);
+            console.log(`Added ${normalTxs.length} normal transactions`);
+          } else {
+            console.log("No normal transactions or API error:", data.message);
+          }
+        } else {
+          console.error("Normal transactions failed:", responses[0].reason);
         }
 
         // ERC20 Token Transaktionen verarbeiten
-        if (responses[1].status === 'fulfilled' && responses[1].value.status === "1") {
-          const erc20Txs = responses[1].value.result.map((tx: any) => ({
-            ...tx,
-            _type: "erc20",
-            _category: "Token Transfer"
-          }));
-          allTransactions.push(...erc20Txs);
+        if (responses[1].status === 'fulfilled') {
+          const data = responses[1].value;
+          console.log("ERC20 Transactions Response:", data);
+          if (data.status === "1" && data.result) {
+            const erc20Txs = data.result.map((tx: any) => ({
+              ...tx,
+              _type: "erc20",
+              _category: "Token Transfer"
+            }));
+            allTransactions.push(...erc20Txs);
+            console.log(`Added ${erc20Txs.length} ERC20 transactions`);
+          } else {
+            console.log("No ERC20 transactions or API error:", data.message);
+          }
+        } else {
+          console.error("ERC20 transactions failed:", responses[1].reason);
         }
 
         // Interne Transaktionen verarbeiten
-        if (responses[2].status === 'fulfilled' && responses[2].value.status === "1") {
-          const internalTxs = responses[2].value.result.map((tx: any) => ({
-            ...tx,
-            _type: "internal",
-            _category: "Contract Call"
-          }));
-          allTransactions.push(...internalTxs);
+        if (responses[2].status === 'fulfilled') {
+          const data = responses[2].value;
+          console.log("Internal Transactions Response:", data);
+          if (data.status === "1" && data.result) {
+            const internalTxs = data.result.map((tx: any) => ({
+              ...tx,
+              _type: "internal",
+              _category: "Contract Call"
+            }));
+            allTransactions.push(...internalTxs);
+            console.log(`Added ${internalTxs.length} internal transactions`);
+          } else {
+            console.log("No internal transactions or API error:", data.message);
+          }
+        } else {
+          console.error("Internal transactions failed:", responses[2].reason);
+        }
+
+        console.log(`Total transactions found: ${allTransactions.length}`);
+
+        // Wenn keine Transaktionen gefunden wurden, aber API-Aufrufe erfolgreich waren
+        if (allTransactions.length === 0) {
+          console.log("No transactions found for address:", userAddress);
+          // Prüfe ob alle API-Aufrufe erfolgreich waren aber keine Daten zurückgaben
+          const allSuccessful = responses.every(r => r.status === 'fulfilled');
+          if (allSuccessful) {
+            console.log("All API calls successful but no transactions found");
+          }
         }
 
         // Nach Zeitstempel sortieren (neueste zuerst)
@@ -219,8 +269,27 @@ export default function HistoryTab() {
         <h2 className="text-2xl font-bold bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 bg-clip-text text-transparent mb-2">
           Transaktionshistorie
         </h2>
-        <p className="text-zinc-400">Basescan API Integration - Live Daten</p>
+        <p className="text-zinc-400">Live Transaktionsdaten vom Base Network</p>
+        {userAddress && (
+          <p className="text-xs text-zinc-500 mt-1">
+            Wallet: {formatAddress(userAddress)}
+          </p>
+        )}
       </div>
+
+      {/* Debug Info - nur in Development */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="bg-zinc-800/50 rounded-lg p-4 border border-zinc-700 mb-4">
+          <h3 className="text-sm font-semibold text-amber-400 mb-2">Debug Info</h3>
+          <div className="text-xs text-zinc-400 space-y-1">
+            <div>API Keys: {process.env.NEXT_PUBLIC_ETHERSCAN_API_KEY ? '✓ Etherscan' : '✗ Etherscan'} | {process.env.NEXT_PUBLIC_BASESCAN_API_KEY ? '✓ Basescan' : '✗ Basescan'}</div>
+            <div>Wallet: {userAddress || 'Nicht verbunden'}</div>
+            <div>Loading: {isLoading ? 'Ja' : 'Nein'}</div>
+            <div>Error: {error || 'Keine'}</div>
+            <div>Transactions: {transactions.length}</div>
+          </div>
+        </div>
+      )}
 
       {/* Loading State */}
       {isLoading && (
