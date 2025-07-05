@@ -157,9 +157,8 @@ export default function BuyTab() {
               // outAmount ist in D.FAITH (mit 2 Decimals)
               const dfaithAmount = Number(data.data.outAmount) / Math.pow(10, DFAITH_DECIMALS);
               setDfaithPrice(dfaithAmount);
-              // Berechne EUR Preis wie im SellTab: 1 D.FAITH = (1 / D.FAITH pro 1 ETH) * ETH_EUR
+              // Preis wie im SellTab: 1 D.FAITH = (1 ETH / dfaithAmount) * ethEur
               if (ethEur && dfaithAmount > 0) {
-                // Korrekte Formel: 1 D.FAITH = (1 / dfaithAmount) * ethEur
                 dfaithPriceEur = (1 / dfaithAmount) * ethEur;
               } else {
                 dfaithPriceEur = null;
@@ -1055,3 +1054,4 @@ export default function BuyTab() {
     </div>
   );
 }
+
