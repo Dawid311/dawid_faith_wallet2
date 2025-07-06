@@ -915,7 +915,7 @@ const handleSellAllInOne = async () => {
               <div className="space-y-2">
                 {sellStep === 'initial' && (
                   <Button
-                    className="w-full bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-bold py-3 rounded-xl text-base transition-all transform hover:scale-[1.02]"
+                    className="w-full bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-black font-bold py-3 rounded-xl text-base transition-all transform hover:scale-[1.02]"
                     onClick={handleGetQuote}
                     disabled={
                       !sellAmount || 
