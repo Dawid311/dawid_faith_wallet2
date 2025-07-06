@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { createThirdwebClient, getContract, readContract } from "thirdweb";
 import { useActiveAccount, useActiveWalletConnectionStatus, useSendTransaction } from "thirdweb/react";
 import { ConnectButton } from "thirdweb/react";
@@ -115,7 +115,7 @@ export default function WalletTab() {
   };
 
   const STAKING_CONTRACT = {
-    address: "0xeB6f60E08AaAd7951896BdefC65cB789633BbeAd", // D.INVEST Staking Contract NEU
+    address: "0x6Ea0f270FfE448D85cCf68F90B5405F30b1bA479", // Korrekte Staking Contract Adresse
     name: "D.INVEST Staking"
   };
 
@@ -123,6 +123,20 @@ export default function WalletTab() {
     address: "0x0000000000000000000000000000000000000000", // Native ETH
     decimals: 18,
     symbol: "ETH"
+  };
+
+  // Token-Icon-Funktion
+  const getTokenIcon = (tokenSymbol: string, size: string = "w-6 h-6") => {
+    switch (tokenSymbol) {
+      case 'D.FAITH':
+        return <img src="/token-icons/dfaith.png" alt="D.FAITH" className={`${size} object-contain`} />;
+      case 'D.INVEST':
+        return <img src="/token-icons/dinvest.png" alt="D.INVEST" className={`${size} object-contain`} />;
+      case 'ETH':
+        return <img src="/token-icons/eth.png" alt="ETH" className={`${size} object-contain`} />;
+      default:
+        return <FaCoins className={`text-amber-400 ${size}`} />;
+    }
   };
 
   // Neue Funktion für Balance via Thirdweb Insight API (für Base Chain)
@@ -226,22 +240,45 @@ export default function WalletTab() {
     }
 
     try {
+      // Korrekte Staking Contract Adresse verwenden
       const stakingContract = getContract({ 
         client, 
         chain: base, 
-        address: STAKING_CONTRACT.address 
+        address: "0x6Ea0f270FfE448D85cCf68F90B5405F30b1bA479" // Korrekte Staking Contract Adresse
       });
 
-      const stakeInfo = await readContract({
+      // Verwende die korrekte Funktion wie in StakeTab
+      const stakedAmount = await readContract({
         contract: stakingContract,
-        method: "function stakers(address) view returns (uint256, uint256)",
+        method: "function stakes(address) view returns (uint256)",
         params: [account.address]
       });
-      // stakeInfo[0] ist die gestakte Menge
-      setStakedBalance(stakeInfo[0].toString());
+      
+      console.log("Gestakte Balance abgerufen:", stakedAmount.toString());
+      setStakedBalance(stakedAmount.toString());
     } catch (error) {
       console.error("Fehler beim Abrufen der gestakten Balance:", error);
-      setStakedBalance("0");
+      // Fallback: Versuche getUserStakeInfo wie in StakeTab
+      try {
+        const stakingContract = getContract({ 
+          client, 
+          chain: base, 
+          address: "0x6Ea0f270FfE448D85cCf68F90B5405F30b1bA479"
+        });
+        
+        const userInfo = await readContract({
+          contract: stakingContract,
+          method: "function getUserStakeInfo(address) view returns (uint256, uint256, uint256, uint256, bool, uint256, bool)",
+          params: [account.address]
+        });
+        
+        // userInfo[0] ist die gestakte Menge
+        console.log("Gestakte Balance via getUserStakeInfo:", userInfo[0].toString());
+        setStakedBalance(userInfo[0].toString());
+      } catch (fallbackError) {
+        console.error("Auch Fallback für gestakte Balance fehlgeschlagen:", fallbackError);
+        setStakedBalance("0");
+      }
     }
   };
 
@@ -319,7 +356,7 @@ export default function WalletTab() {
         console.log("🛑 Preis-Aktualisierung gestoppt");
       }
     };
-  }, [account?.address]);
+  }, [account?.address]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // D.FAITH EUR-Preis holen mit mehreren Anbietern für ETH/EUR und Fallback System
   const fetchDfaithPrice = async () => {
@@ -586,7 +623,7 @@ export default function WalletTab() {
   const formatAddress = (address: string) => `${address.slice(0, 6)}...${address.slice(-4)}`;
 
   // Zentrale Funktion zur EUR-Wert-Berechnung (wie BuyTab/SellTab)
-  const calculateEurValue = (balance: string): string => {
+  const calculateEurValue = useCallback((balance: string): string => {
     const balanceFloat = parseFloat(balance);
     if (balanceFloat <= 0) return "0.00";
 
@@ -643,7 +680,7 @@ export default function WalletTab() {
     }
 
     return "0.00";
-  };
+  }, [dfaithPriceEur, lastKnownPrices]);
 
   // Lade gespeicherte Preise beim Start
   useEffect(() => {
@@ -684,7 +721,7 @@ export default function WalletTab() {
     } else if (!dfaithBalance?.displayValue) {
       setDfaithEurValue("0.00");
     }
-  }, [dfaithPriceEur, dfaithBalance?.displayValue, lastKnownPrices.dfaithEur, pricesLoaded]);
+  }, [dfaithPriceEur, dfaithBalance?.displayValue, lastKnownPrices.dfaithEur, pricesLoaded, calculateEurValue]);
 
   // Entferne fetchTokenBalanceViaContract komplett (nicht mehr benötigt)
 
@@ -742,7 +779,10 @@ export default function WalletTab() {
   const renderDinvestSection = () => {
     return (
       <div className="flex flex-col items-center p-4 bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl border border-zinc-700 w-full">
-        <div className="uppercase text-xs tracking-widest text-amber-500/80 mb-2">D.INVEST</div>
+        <div className="flex items-center gap-2 mb-2">
+          {getTokenIcon('D.INVEST', 'w-5 h-5')}
+          <div className="uppercase text-xs tracking-widest text-amber-500/80">D.INVEST</div>
+        </div>
         <div className="text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 mb-2 flex items-center">
           {dinvestBalance?.displayValue || "0"}
           {(isLoadingBalances || isRefreshing) && (
@@ -841,9 +881,12 @@ export default function WalletTab() {
               </div>
             </div>
 
-            {/* DFAITH Token-Karte - jetzt mit D.FAITH */}
+            {/* DFAITH Token-Karte - jetzt mit D.FAITH und Icon */}
             <div className="flex flex-col items-center p-4 bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl border border-zinc-700 w-full mb-6">
-              <span className="uppercase text-xs tracking-widest text-amber-500/80 mb-2">D.FAITH</span>
+              <div className="flex items-center gap-2 mb-2">
+                {getTokenIcon('D.FAITH', 'w-5 h-5')}
+                <span className="uppercase text-xs tracking-widest text-amber-500/80">D.FAITH</span>
+              </div>
               <div className="text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 drop-shadow-sm">
                 {dfaithBalance ? dfaithBalance.displayValue : "0.00"}
                 {(isLoadingBalances || isRefreshing) && (
@@ -923,7 +966,7 @@ export default function WalletTab() {
             {/* Staking Modal mit verbesserter Integration */}
             <Modal open={showStakeModal} onClose={() => setShowStakeModal(false)} title="Staking">
               <div className="min-h-[400px]">
-                <StakeTab />
+                <StakeTab onStakeChanged={fetchStakedBalance} />
               </div>
             </Modal>
 

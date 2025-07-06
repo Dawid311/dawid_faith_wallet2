@@ -14,6 +14,20 @@ const DINVEST_DECIMALS = 0; // D.INVEST hat keine Dezimalstellen
 const ETH_TOKEN = "0x0000000000000000000000000000000000000000"; // Native ETH
 const ETH_DECIMALS = 18;
 
+// Token-Icon-Funktion
+const getTokenIcon = (tokenSymbol: string, size: string = "w-6 h-6") => {
+  switch (tokenSymbol) {
+    case 'D.FAITH':
+      return <img src="/token-icons/dfaith.png" alt="D.FAITH" className={`${size} object-contain`} />;
+    case 'D.INVEST':
+      return <img src="/token-icons/dinvest.png" alt="D.INVEST" className={`${size} object-contain`} />;
+    case 'ETH':
+      return <img src="/token-icons/eth.png" alt="ETH" className={`${size} object-contain`} />;
+    default:
+      return <FaCoins className={`text-amber-400 ${size}`} />;
+  }
+};
+
 export default function BuyTab() {
   // Globale Fehlerbehandlung für Thirdweb Analytics
   useEffect(() => {
@@ -226,7 +240,7 @@ export default function BuyTab() {
     // Preis alle 2 Minuten aktualisieren
     const interval = setInterval(fetchDfaithPrice, 120000);
     return () => clearInterval(interval);
-  }, [lastKnownPrices.dfaith, lastKnownPrices.dfaithEur, lastKnownPrices.ethEur]);
+  }, [lastKnownPrices.dfaith, lastKnownPrices.dfaithEur, lastKnownPrices.ethEur, dfaithPrice]);
 
 
   // Entfernt: handleInvestBuy, handleInvestContinue, setShowInvestModal, investBuyModalRef, showInvestModal
@@ -622,10 +636,10 @@ export default function BuyTab() {
       symbol: "DFAITH",
       balance: dfaithBalance,
       color: "from-amber-400 to-yellow-500",
-      description: "Faith Utility Token",
+      description: "Dawid Faith Token",
       price: dfaithPriceEur ? `${dfaithPriceEur.toFixed(4)}€ pro D.FAITH` : (isLoadingPrice ? "Laden..." : (priceError || "Preis nicht verfügbar")),
       sub: dfaithPrice ? `1 ETH = ${(1 / dfaithPrice).toFixed(2)} D.FAITH` : "Wird geladen...",
-      icon: <FaCoins className="text-amber-400" />,
+      icon: getTokenIcon('D.FAITH', 'w-8 h-8'),
     },
     {
       key: "DINVEST",
@@ -636,7 +650,7 @@ export default function BuyTab() {
       description: "Investment & Staking Token",
       price: "5€ pro D.INVEST",
       sub: "Minimum: 5 EUR",
-      icon: <FaLock className="text-blue-400" />,
+      icon: getTokenIcon('D.INVEST', 'w-8 h-8'),
     },
     {
       key: "ETH",
@@ -647,7 +661,7 @@ export default function BuyTab() {
       description: "Ethereum Native Token",
       price: ethPriceEur ? `${ethPriceEur.toFixed(2)}€ pro ETH` : "~3000€ pro ETH",
       sub: "mit EUR kaufen",
-      icon: <span className="text-white text-lg font-bold">⟠</span>,
+      icon: getTokenIcon('ETH', 'w-8 h-8'),
     },
   ];
 
@@ -697,10 +711,10 @@ export default function BuyTab() {
 
       {/* Kauf-Modal zentral - Mobile Optimiert und zentriert */}
       {showBuyModal && selectedToken && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 overflow-y-auto p-4">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 overflow-y-auto p-4 pt-20">
           <div
             ref={buyModalRef}
-            className="bg-zinc-900 rounded-xl p-3 sm:p-6 max-w-sm w-full border border-amber-400 max-h-[90vh] overflow-y-auto my-4"
+            className="bg-zinc-900 rounded-xl p-3 sm:p-6 max-w-sm w-full border border-amber-400 max-h-[85vh] overflow-y-auto my-4 relative"
             style={{ boxSizing: 'border-box' }}
           >
             {/* Modal-Header */}
@@ -729,11 +743,12 @@ export default function BuyTab() {
             {selectedToken === "DFAITH" && (
               <div className="w-full space-y-4">
                 {/* Professional Buy Widget Header */}
-                <div className="text-center pb-3 border-b border-zinc-700">
+                <div className="text-center pb-3 border-b border-zinc-700 mb-4">
                   <div className="w-12 h-12 bg-gradient-to-r from-amber-400 to-yellow-500 rounded-full mx-auto mb-2 flex items-center justify-center shadow-lg">
-                    <FaCoins className="text-black text-lg" />
+                    {getTokenIcon('D.FAITH', 'w-6 h-6')}
                   </div>
-                  <p className="text-zinc-400 text-xs">Faith Utility Token auf Base Network</p>
+                  <h3 className="text-xl font-bold text-white mb-1">D.FAITH kaufen</h3>
+                  <p className="text-zinc-400 text-xs">Dawid Faith Token auf Base</p>
                   {dfaithPriceEur && (
                     <div className="mt-2 px-2 py-1 bg-amber-500/10 border border-amber-500/20 rounded-full inline-block">
                       <span className="text-amber-400 text-xs font-semibold">
@@ -773,7 +788,7 @@ export default function BuyTab() {
                     <label className="block text-sm font-medium text-zinc-300 mb-2">You Pay</label>
                     <div className="flex items-center gap-3 mb-2">
                       <div className="flex items-center gap-2 bg-blue-500/20 rounded-lg px-2 py-1 border border-blue-500/30 flex-shrink-0">
-                        <span className="text-blue-400 text-sm">⟠</span>
+                        {getTokenIcon('ETH', 'w-4 h-4')}
                         <span className="text-blue-300 font-semibold text-xs">ETH</span>
                       </div>
                       <input
@@ -804,7 +819,7 @@ export default function BuyTab() {
                     <label className="block text-sm font-medium text-zinc-300 mb-2">You Receive</label>
                     <div className="flex items-center gap-3 mb-2">
                       <div className="flex items-center gap-2 bg-amber-500/20 rounded-lg px-2 py-1 border border-amber-500/30 flex-shrink-0">
-                        <FaCoins className="text-amber-400 text-sm" />
+                        {getTokenIcon('D.FAITH', 'w-4 h-4')}
                         <span className="text-amber-300 font-semibold text-xs">D.FAITH</span>
                       </div>
                       <div className="flex-1 min-w-0">
@@ -906,14 +921,7 @@ export default function BuyTab() {
                   </div>
                 )}
 
-                {parseFloat(swapAmountEth) > 0 && parseFloat(swapAmountEth) < 0.001 && (
-                  <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-2 text-yellow-400 text-sm">
-                    <div className="flex items-center gap-2">
-                      <span>💡</span>
-                      <span>Minimum purchase: 0.001 ETH</span>
-                    </div>
-                  </div>
-                )}
+
 
                 {/* Action Buttons */}
                 <div className="space-y-2">
@@ -927,8 +935,7 @@ export default function BuyTab() {
                         isSwapping || 
                         !account?.address || 
                         parseFloat(ethBalance) <= 0 ||
-                        parseFloat(swapAmountEth) > parseFloat(ethBalance) ||
-                        parseFloat(swapAmountEth) < 0.001
+                        parseFloat(swapAmountEth) > parseFloat(ethBalance)
                       }
                     >
                       {isSwapping ? "Processing..." : "Get Quote"}
@@ -978,6 +985,13 @@ export default function BuyTab() {
             )}
             {selectedToken === "DINVEST" && (
               <>
+                <div className="text-center pb-3 border-b border-zinc-700 mb-4">
+                  <div className="w-12 h-12 bg-gradient-to-r from-blue-400 to-blue-600 rounded-full mx-auto mb-2 flex items-center justify-center shadow-lg">
+                    {getTokenIcon('D.INVEST', 'w-6 h-6')}
+                  </div>
+                  <h3 className="text-xl font-bold text-white mb-1">D.INVEST kaufen</h3>
+                  <p className="text-zinc-400 text-xs">Investment & Staking Token</p>
+                </div>
                 <div className="mb-3 text-zinc-300 text-sm">
                   <b>Preis:</b> 5€ pro D.INVEST<br />
                   <b>Minimum:</b> 5 EUR
@@ -1000,6 +1014,24 @@ export default function BuyTab() {
                 >
                   Weiter zu Stripe
                 </Button>
+                <Button
+                  className="w-full bg-zinc-600 hover:bg-zinc-700 text-white font-bold py-2 rounded-lg text-xs mt-2"
+                  onClick={() => {
+                    setShowBuyModal(false);
+                    setSelectedToken(null);
+                    setSwapAmountEth("");
+                    setSlippage("1");
+                    setSwapTxStatus(null);
+                    setBuyStep('initial');
+                    setQuoteTxData(null);
+                    setSpenderAddress(null);
+                    setNeedsApproval(false);
+                    setQuoteError(null);
+                  }}
+                  disabled={isSwapping}
+                >
+                  Schließen
+                </Button>
               </>
             )}
             {selectedToken === "ETH" && (
@@ -1014,41 +1046,9 @@ export default function BuyTab() {
                 />
               </div>
             )}
-            <Button
-              className="w-full bg-zinc-600 hover:bg-zinc-700 text-white font-bold py-2 rounded-lg text-xs mt-2"
-              onClick={() => {
-                setShowBuyModal(false);
-                setSelectedToken(null);
-                setSwapAmountEth("");
-                setSlippage("1");
-                setSwapTxStatus(null);
-                setBuyStep('initial');
-                setQuoteTxData(null);
-                setSpenderAddress(null);
-                setNeedsApproval(false);
-                setQuoteError(null);
-              }}
-              disabled={isSwapping}
-            >
-              Schließen
-            </Button>
           </div>
         </div>
       )}
-      {/* Hinweis nur einmal anzeigen */}
-      <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4 mt-6">
-        <div className="flex items-start gap-3">
-          <div className="w-5 h-5 rounded-full bg-blue-500/20 flex items-center justify-center mt-0.5">
-            <span className="text-blue-400 text-xs">ℹ</span>
-          </div>
-          <div>
-            <div className="font-medium text-blue-400 mb-1">Hinweis</div>
-            <div className="text-sm text-zinc-400">
-              Stellen Sie sicher, dass Sie genügend ETH für Transaktionsgebühren in Ihrem Wallet haben.
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

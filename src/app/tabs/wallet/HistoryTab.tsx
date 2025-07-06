@@ -1,7 +1,24 @@
+import { useCallback } from "react";
 import { useState, useEffect } from "react";
 import { Button } from "../../../../components/ui/button";
 import { FaPaperPlane, FaArrowDown, FaExchangeAlt, FaCoins, FaLock } from "react-icons/fa";
 import { useActiveAccount } from "thirdweb/react";
+
+// Token-Icon-Funktion
+const getTokenIcon = (tokenSymbol: string, size: string = "w-6 h-6") => {
+  switch (tokenSymbol) {
+    case 'D.FAITH':
+    case 'DFAITH':
+      return <img src="/token-icons/dfaith.png" alt="D.FAITH" className={`${size} object-contain`} />;
+    case 'D.INVEST':
+    case 'DINVEST':
+      return <img src="/token-icons/dinvest.png" alt="D.INVEST" className={`${size} object-contain`} />;
+    case 'ETH':
+      return <img src="/token-icons/eth.png" alt="ETH" className={`${size} object-contain`} />;
+    default:
+      return <FaCoins className={`text-amber-400 ${size}`} />;
+  }
+};
 
 type Transaction = {
   id: string;
@@ -55,65 +72,112 @@ export default function HistoryTab() {
   // Verwende entweder die verbundene Wallet oder die feste Adresse
   const userAddress = account?.address || targetAddress;
 
-  // GetBlock API Access Token
-  const GETBLOCK_ACCESS_TOKEN = "203fd782785743ce8139c33e6e78d73b";
-  const BASE_RPC_URL = `https://go.getblock.io/${GETBLOCK_ACCESS_TOKEN}`;
+  // Alchemy API Key für Base Chain
+  const ALCHEMY_API_KEY = "7zoUrdSYTUNPJ9rNEiOM8";
+  const ALCHEMY_BASE_URL = `https://base-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`;
 
-  // Base Chain Transaktionen über GetBlock API abrufen
-  const getTransactionsFromGetBlock = async (address: string) => {
+  // Alchemy API für Base Chain Transaktionen
+  const getTransactionsFromAlchemy = async (address: string) => {
     try {
-      console.log("🚀 Verwende GetBlock API für Base Chain Transaktionen");
+      console.log("🚀 Verwende Alchemy API für Base Chain Transaktionen");
+      console.log("📍 Wallet Adresse:", address);
       
-      // Verwende Base Chain RPC über GetBlock
-      const response = await fetch(BASE_RPC_URL, {
+      // Hole ausgehende Transaktionen
+      console.log("🔄 Lade ausgehende Transaktionen...");
+      const response = await fetch(ALCHEMY_BASE_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           jsonrpc: '2.0',
-          method: 'eth_getBalance',
-          params: [address, 'latest'],
+          method: 'alchemy_getAssetTransfers',
+          params: [
+            {
+              fromBlock: "0x0",
+              toBlock: "latest",
+              fromAddress: address,
+              category: ["external", "erc20", "erc721", "erc1155"], // "internal" entfernt für Base Chain
+              withMetadata: true, // Aktiviert für bessere Zeitstempel
+              excludeZeroValue: true,
+              maxCount: "0x32" // 50 Transaktionen
+            }
+          ],
           id: 1
         })
       });
 
       if (!response.ok) {
-        throw new Error(`GetBlock API Fehler: ${response.status}`);
+        throw new Error(`Alchemy API Fehler: ${response.status} ${response.statusText}`);
       }
 
       const data = await response.json();
-      console.log("GetBlock API Response:", data);
-      return data;
+      
+      // Prüfe auf API-Fehler
+      if (data.error) {
+        console.error("❌ Alchemy API Error (Outgoing):", data.error);
+        throw new Error(`Alchemy API Error: ${data.error.message}`);
+      }
+      
+      console.log("✅ Alchemy API Response (FROM):", data);
+      
+      // Hole eingehende Transaktionen
+      console.log("🔄 Lade eingehende Transaktionen...");
+      const responseIncoming = await fetch(ALCHEMY_BASE_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          method: 'alchemy_getAssetTransfers',
+          params: [
+            {
+              fromBlock: "0x0",
+              toBlock: "latest",
+              toAddress: address,
+              category: ["external", "erc20", "erc721", "erc1155"], // "internal" entfernt für Base Chain
+              withMetadata: true, // Aktiviert für bessere Zeitstempel
+              excludeZeroValue: true,
+              maxCount: "0x32" // 50 Transaktionen
+            }
+          ],
+          id: 2
+        })
+      });
+
+      if (!responseIncoming.ok) {
+        throw new Error(`Alchemy API Fehler (Incoming): ${responseIncoming.status} ${responseIncoming.statusText}`);
+      }
+
+      const dataIncoming = await responseIncoming.json();
+      
+      // Prüfe auf API-Fehler
+      if (dataIncoming.error) {
+        console.error("❌ Alchemy API Error (Incoming):", dataIncoming.error);
+        throw new Error(`Alchemy API Error (Incoming): ${dataIncoming.error.message}`);
+      }
+
+      console.log("✅ Alchemy API Response (TO):", dataIncoming);
+      
+      // Kombiniere ausgehende und eingehende Transaktionen
+      const outgoingTransfers = data.result?.transfers || [];
+      const incomingTransfers = dataIncoming.result?.transfers || [];
+      const allTransfers = [...outgoingTransfers, ...incomingTransfers];
+      
+      console.log(`📊 Transaktionen gefunden: ${outgoingTransfers.length} ausgehend, ${incomingTransfers.length} eingehend, ${allTransfers.length} total`);
+      
+      return allTransfers;
     } catch (error) {
-      console.error("GetBlock API Error:", error);
+      console.error("❌ Alchemy API Error:", error);
       throw error;
     }
   };
 
-  // Transaktionshistorie über Basescan API (als Fallback zu GetBlock)
-  const getTransactionHistory = async (address: string) => {
-    try {
-      // Verwende Basescan API für detaillierte Transaktionshistorie
-      const basescanResponse = await fetch(
-        `https://api.basescan.org/api?module=account&action=txlist&address=${address}&startblock=0&endblock=99999999&sort=desc&apikey=YourApiKeyToken`
-      );
-      
-      if (basescanResponse.ok) {
-        const data = await basescanResponse.json();
-        return data.result || [];
-      } else {
-        console.log("Basescan API nicht verfügbar, verwende Demo-Daten");
-        return [];
-      }
-    } catch (error) {
-      console.error("Basescan API Error:", error);
-      return [];
-    }
-  };
+
 
   // Funktion zum Neuladen der Transaktionen
-  const refreshTransactions = async () => {
+  const refreshTransactions = useCallback(async () => {
     if (!userAddress) {
       setTransactions([]);
       return;
@@ -123,79 +187,103 @@ export default function HistoryTab() {
     setError("");
     
     try {
-      console.log("� Lade Transaktionen neu mit GetBlock API...");
+      console.log("🔄 Lade Transaktionen neu mit Alchemy API...");
       
-      // Erst Balance über GetBlock API prüfen
-      const balanceData = await getTransactionsFromGetBlock(userAddress);
-      console.log("Balance Data:", balanceData);
+      // Hole Transaktionen über Alchemy API
+      const alchemyTransfers = await getTransactionsFromAlchemy(userAddress);
+      console.log("Alchemy Transfers:", alchemyTransfers);
       
-      // Dann Transaktionshistorie über Basescan API
-      const transactionHistory = await getTransactionHistory(userAddress);
-      console.log("Transaction History:", transactionHistory);
-      
-      if (transactionHistory.length === 0) {
+      if (alchemyTransfers.length === 0) {
         console.log("Keine Transaktionen gefunden, verwende Demo-Daten");
         setTransactions(demoTransactions);
         setIsLoading(false);
         return;
       }
 
-      // Transaktionen verarbeiten
-      const mappedTransactions: Transaction[] = transactionHistory.slice(0, 50).map((tx: any) => {
-        const timestamp = parseInt(tx.timeStamp) * 1000;
-        const date = new Date(timestamp);
-        const time = date.toLocaleString("de-DE", {
-          day: "2-digit",
-          month: "2-digit", 
-          year: "numeric",
-          hour: "2-digit",
-          minute: "2-digit"
-        });
+      // Transaktionen verarbeiten und sortieren
+      const mappedTransactions: Transaction[] = alchemyTransfers
+        .map((transfer: any) => {
+          // Verbesserte Zeitstempel-Verarbeitung
+          let timestamp: Date;
+          if (transfer.metadata?.blockTimestamp) {
+            timestamp = new Date(transfer.metadata.blockTimestamp);
+          } else if (transfer.blockNum) {
+            // Fallback: Schätze Zeit basierend auf Block-Nummer (ungefähr)
+            const currentTime = Date.now();
+            const estimatedTime = currentTime - (transfer.blockNum * 2000); // Ungefähr 2s pro Block
+            timestamp = new Date(estimatedTime);
+          } else {
+            timestamp = new Date();
+          }
+          
+          const time = timestamp.toLocaleString("de-DE", {
+            day: "2-digit",
+            month: "2-digit", 
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit"
+          });
 
-        let type: "send" | "receive" = "send";
-        let token = "ETH";
-        let amount = "0";
-        let address = "";
+          let type: "send" | "receive" = "send";
+          let token = transfer.asset || "ETH";
+          let amount = "0";
+          let address = "";
 
-        // Bestimme Transaktionsrichtung
-        const isReceived = tx.to?.toLowerCase() === userAddress.toLowerCase();
-        const isFromUser = tx.from?.toLowerCase() === userAddress.toLowerCase();
-        
-        if (isReceived && !isFromUser) {
-          type = "receive";
-          address = tx.from || "";
-        } else {
-          type = "send";
-          address = tx.to || "";
-        }
+          // Bestimme Transaktionsrichtung
+          const isReceived = transfer.to?.toLowerCase() === userAddress.toLowerCase();
+          const isFromUser = transfer.from?.toLowerCase() === userAddress.toLowerCase();
+          
+          if (isReceived && !isFromUser) {
+            type = "receive";
+            address = transfer.from || "";
+            amount = "+" + (transfer.value || "0");
+          } else if (isFromUser) {
+            type = "send";
+            address = transfer.to || "";
+            amount = "-" + (transfer.value || "0");
+          }
 
-        // Wert von Wei zu ETH konvertieren
-        const value = Number(tx.value) / Math.pow(10, 18);
-        amount = (type === "receive" ? "+" : "-") + value.toFixed(6);
+          // Token-Symbol und Dezimalstellen richtig verarbeiten
+          if (transfer.category === "erc20") {
+            token = transfer.asset || "TOKEN";
+            // Formatiere den Betrag basierend auf Dezimalstellen
+            if (transfer.rawContract?.decimals && transfer.rawContract.value) {
+              const decimals = parseInt(transfer.rawContract.decimals);
+              const rawValue = transfer.rawContract.value;
+              const formattedValue = (parseInt(rawValue) / Math.pow(10, decimals)).toFixed(decimals > 6 ? 6 : decimals);
+              amount = type === "receive" ? "+" + formattedValue : "-" + formattedValue;
+            }
+          } else if (transfer.category === "external") {
+            token = "ETH";
+            // ETH hat 18 Dezimalstellen
+            if (transfer.value) {
+              const ethValue = parseFloat(transfer.value).toFixed(6);
+              amount = type === "receive" ? "+" + ethValue : "-" + ethValue;
+            }
+          }
 
-        // Status bestimmen
-        let status: "success" | "pending" | "failed" = "success";
-        if (tx.isError === "1") {
-          status = "failed";
-        } else if (tx.confirmations === "0") {
-          status = "pending";
-        }
+          return {
+            id: transfer.uniqueId || transfer.hash || Math.random().toString(),
+            type,
+            token,
+            amount,
+            address,
+            hash: transfer.hash || "",
+            time,
+            status: "success" as const, // Alchemy gibt nur bestätigte Transaktionen zurück
+          };
+        })
+        .filter((tx: Transaction) => tx.hash && tx.address) // Nur vollständige Transaktionen
+        .sort((a: Transaction, b: Transaction) => {
+          // Sortiere nach Zeit (neueste zuerst)
+          return new Date(b.time).getTime() - new Date(a.time).getTime();
+        })
+        .slice(0, 50); // Limitiere auf 50 Transaktionen
 
-        return {
-          id: tx.hash || Math.random().toString(),
-          type,
-          token,
-          amount,
-          address,
-          hash: tx.hash || "",
-          time,
-          status,
-        };
-      });
-
+      console.log(`📋 Verarbeitete Transaktionen: ${mappedTransactions.length}`);
       setTransactions(mappedTransactions);
       
-      // Einfache Statistiken basierend auf geladenen Transaktionen
+      // Statistiken basierend auf geladenen Transaktionen
       setStats({
         transactionCount: mappedTransactions.length,
         totalValue: mappedTransactions.reduce((sum, tx) => {
@@ -207,16 +295,16 @@ export default function HistoryTab() {
       
     } catch (err) {
       console.error("Fehler beim Laden der Transaktionen:", err);
-      setError("Fehler beim Laden der Transaktionsdaten. Verwende Demo-Daten.");
+      setError("Fehler beim Laden der Transaktionsdaten von Alchemy. Verwende Demo-Daten.");
       setTransactions(demoTransactions);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [userAddress]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     refreshTransactions();
-  }, [userAddress]);
+  }, [userAddress, refreshTransactions]);
 
   // Hilfsfunktionen für Anzeige
   const getTransactionIcon = (type: string) => {
@@ -258,7 +346,7 @@ export default function HistoryTab() {
         <h2 className="text-2xl font-bold bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 bg-clip-text text-transparent mb-2">
           Transaktionshistorie
         </h2>
-        <p className="text-zinc-400">Live Transaktionsdaten vom Base Network via GetBlock API</p>
+        <p className="text-zinc-400">Live Transaktionsdaten vom Base Network via Alchemy API</p>
         {userAddress && (
           <p className="text-xs text-zinc-500 mt-1">
             Wallet: {formatAddress(userAddress)}
@@ -271,13 +359,15 @@ export default function HistoryTab() {
         <div className="bg-zinc-800/50 rounded-lg p-4 border border-zinc-700 mb-4">
           <h3 className="text-sm font-semibold text-amber-400 mb-2">Debug Info</h3>
           <div className="text-xs text-zinc-400 space-y-1">
-            <div>GetBlock Access Token: {GETBLOCK_ACCESS_TOKEN ? '✓ Konfiguriert' : '✗ Fehlt'}</div>
-            <div>API: GetBlock RPC API (Base Chain)</div>
+            <div>Alchemy API Key: {ALCHEMY_API_KEY ? '✓ Konfiguriert' : '✗ Fehlt'}</div>
+            <div>API: Alchemy Enhanced API (Base Chain - ohne &apos;internal&apos; Kategorie)</div>
+            <div>Base URL: {ALCHEMY_BASE_URL.substring(0, 50)}...</div>
             <div>Chain ID: 8453 (Base)</div>
             <div>Wallet: {userAddress || 'Nicht verbunden'}</div>
             <div>Loading: {isLoading ? 'Ja' : 'Nein'}</div>
             <div>Error: {error || 'Keine'}</div>
             <div>Transactions: {transactions.length}</div>
+            <div>Kategorien: external, erc20, erc721, erc1155 (internal entfernt)</div>
             {stats && <div>Stats: {stats.transactionCount} total, {stats.totalValue.toFixed(6)} ETH, Ø {stats.avgGas.toFixed(6)} gas</div>}
           </div>
         </div>
@@ -302,8 +392,8 @@ export default function HistoryTab() {
       {!isLoading && !error && userAddress && transactions.length === 0 && (
         <div className="text-center py-8">
           <div className="bg-zinc-800/50 rounded-lg p-6 border border-zinc-700">
-            <FaCoins className="text-4xl text-zinc-500 mx-auto mb-4" />
-            <p className="text-zinc-400 text-lg mb-2">Keine Transaktionen gefunden</p>
+            {getTokenIcon('D.FAITH', 'w-16 h-16')}
+            <p className="text-zinc-400 text-lg mb-2 mt-4">Keine Transaktionen gefunden</p>
             <p className="text-zinc-500 text-sm">
               Diese Wallet-Adresse hat noch keine aufgezeichneten Transaktionen auf Base Network.
             </p>
@@ -330,8 +420,11 @@ export default function HistoryTab() {
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className={`font-bold text-lg ${getAmountColor(tx.amount)}`}>
-                    {tx.amount}
+                  <div className="flex items-center justify-end gap-2 mb-1">
+                    {getTokenIcon(tx.token, 'w-4 h-4')}
+                    <div className={`font-bold text-lg ${getAmountColor(tx.amount)}`}>
+                      {tx.amount}
+                    </div>
                   </div>
                   <div className="text-sm font-semibold text-zinc-400">{tx.token}</div>
                 </div>
