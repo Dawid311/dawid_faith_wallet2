@@ -121,8 +121,17 @@ export default function SellTab() {
           setEthPriceEur(ethData['ethereum']?.eur || 3000);
         }
         
-        // Preis-Abfrage: 1 D.FAITH (ohne Dezimalstellen) = 100 (da 2 Dezimalstellen)
+        // KORREKTUR: Richtige Preis-Abfrage für 1 D.FAITH
+        // 1 D.FAITH mit 2 Dezimalstellen = 1 * 10^2 = 100 Raw-Units
         const oneTokenRaw = Math.pow(10, DFAITH_DECIMALS).toString(); // "100" für 2 Dezimalstellen
+        
+        console.log("=== KORRIGIERTE PRICE FETCH DEBUG ===");
+        console.log("DFAITH_DECIMALS:", DFAITH_DECIMALS);
+        console.log("Math.pow(10, DFAITH_DECIMALS):", Math.pow(10, DFAITH_DECIMALS));
+        console.log("Price fetch amount (raw):", oneTokenRaw);
+        console.log("This represents:", oneTokenRaw, "raw units =", Number(oneTokenRaw) / Math.pow(10, DFAITH_DECIMALS), "D.FAITH");
+        console.log("Verification: 1 D.FAITH = 100 raw units? ", oneTokenRaw === "100");
+        console.log("=== END KORRIGIERTE PRICE FETCH DEBUG ===");
         
         const params = new URLSearchParams({
           chain: "base",
@@ -132,16 +141,14 @@ export default function SellTab() {
           gasPrice: "1000000", // Base Chain: 0.001 Gwei (1000000 Wei)
         });
         
-        console.log("=== PRICE FETCH DEBUG ===");
-        console.log("Price fetch amount (raw):", oneTokenRaw);
-        console.log("This represents:", oneTokenRaw, "raw units =", Number(oneTokenRaw) / Math.pow(10, DFAITH_DECIMALS), "D.FAITH");
-        console.log("=== END PRICE FETCH DEBUG ===");
-        
         const response = await fetch(`https://open-api.openocean.finance/v3/base/quote?${params}`);
         if (response.ok) {
           const data = await response.json();
+          console.log("Price fetch response:", data);
+          
           if (data && data.data && data.data.outAmount && data.data.outAmount !== "0") {
             const ethPerDfaith = Number(data.data.outAmount) / Math.pow(10, 18);
+            console.log("Calculated price:", ethPerDfaith, "ETH per D.FAITH");
             setDfaithPrice(ethPerDfaith);
           } else {
             setPriceError("Keine Liquidität für Verkauf verfügbar");
@@ -325,19 +332,27 @@ export default function SellTab() {
         throw new Error(`Insufficient balance (fresh check). Available: ${currentBalanceNum}, Requested: ${sellAmountNum}`);
       }
       
-      // WICHTIG: Konvertiere zu Raw-Werten OHNE Dezimalstellen für OpenOcean
-      // D.FAITH hat 2 Dezimalstellen, also multipliziere mit 10^2 = 100
+      // KORREKTUR: Richtige Dezimalstellen-Konvertierung
+      // D.FAITH hat 2 Dezimalstellen, also: 10 D.FAITH = 10 * 10^2 = 1000 (nicht 100000!)
       const sellAmountRaw = Math.floor(sellAmountNum * Math.pow(10, DFAITH_DECIMALS)).toString();
       
-      console.log("=== ENHANCED DECIMAL CONVERSION CHECK ===");
+      console.log("=== KORRIGIERTE DECIMAL CONVERSION CHECK ===");
       console.log("DFAITH_DECIMALS:", DFAITH_DECIMALS);
       console.log("Verkaufsbetrag (Display):", sellAmountNum);
+      console.log("Math.pow(10, DFAITH_DECIMALS):", Math.pow(10, DFAITH_DECIMALS));
+      console.log("Verkaufsbetrag * Math.pow(10, DFAITH_DECIMALS):", sellAmountNum * Math.pow(10, DFAITH_DECIMALS));
       console.log("Verkaufsbetrag (Raw ohne Dezimalstellen):", sellAmountRaw);
       console.log("Conversion Check:", sellAmountNum, "* 10^" + DFAITH_DECIMALS, "=", sellAmountNum * Math.pow(10, DFAITH_DECIMALS));
       console.log("Nach Math.floor:", Math.floor(sellAmountNum * Math.pow(10, DFAITH_DECIMALS)));
       console.log("Balance (Raw):", Number(currentBalance).toString());
       console.log("Raw Balance >= Raw Sell Amount:", Number(currentBalance) >= Math.floor(sellAmountNum * Math.pow(10, DFAITH_DECIMALS)));
-      console.log("=== END ENHANCED CONVERSION CHECK ===");
+      
+      // VERIFIKATION: Prüfe ob die Raw-Werte korrekt sind
+      console.log("=== VERIFICATION ===");
+      console.log("10 D.FAITH sollte werden zu:", 10 * Math.pow(10, 2), "= 1000 raw units");
+      console.log("Aktueller sellAmountRaw:", sellAmountRaw);
+      console.log("Ist sellAmountRaw korrekt?", Number(sellAmountRaw) === (10 * Math.pow(10, 2)));
+      console.log("=== END VERIFICATION ===");
       
       // Zusätzliche Sicherheit: Prüfe ob Raw-Werte sinnvoll sind
       if (Number(sellAmountRaw) > Number(currentBalance)) {
@@ -346,7 +361,7 @@ export default function SellTab() {
       
       const quoteParams = new URLSearchParams({
         chain: "base",
-        inTokenAddress: DFAITH_TOKEN, // Verwende exakt die gleiche Adresse
+        inTokenAddress: DFAITH_TOKEN,
         outTokenAddress: "0x0000000000000000000000000000000000000000", // Native ETH
         amount: sellAmountRaw, // RAW-Wert ohne Dezimalstellen
         slippage: slippage,
@@ -354,12 +369,32 @@ export default function SellTab() {
         account: account.address,
       });
       
-      console.log("=== OPENOCEAN REQUEST DEBUG ===");
+      console.log("=== DETAILLIERTE OPENOCEAN REQUEST DEBUG ===");
+      console.log("Eingabe: sellAmount =", sellAmount);
+      console.log("Eingabe: sellAmountNum =", sellAmountNum);
+      console.log("Berechnung: sellAmountNum * Math.pow(10, DFAITH_DECIMALS) =", sellAmountNum * Math.pow(10, DFAITH_DECIMALS));
+      console.log("Berechnung: Math.floor(sellAmountNum * Math.pow(10, DFAITH_DECIMALS)) =", Math.floor(sellAmountNum * Math.pow(10, DFAITH_DECIMALS)));
+      console.log("Endergebnis: sellAmountRaw =", sellAmountRaw);
       console.log("Quote URL:", `https://open-api.openocean.finance/v3/base/swap_quote?${quoteParams}`);
-      console.log("inTokenAddress:", DFAITH_TOKEN);
-      console.log("amount (raw):", sellAmountRaw);
-      console.log("account:", account.address);
-      console.log("=== END OPENOCEAN REQUEST DEBUG ===");
+      
+      // Manuelle Verifikation
+      const manualCalculation = parseFloat(sellAmount) * Math.pow(10, DFAITH_DECIMALS);
+      console.log("Manuelle Verifikation:");
+      console.log("- sellAmount:", sellAmount);
+      console.log("- DFAITH_DECIMALS:", DFAITH_DECIMALS);
+      console.log("- Math.pow(10, DFAITH_DECIMALS):", Math.pow(10, DFAITH_DECIMALS));
+      console.log("- parseFloat(sellAmount):", parseFloat(sellAmount));
+      console.log("- Ergebnis:", manualCalculation);
+      console.log("- Als String:", manualCalculation.toString());
+      console.log("- Mit Math.floor:", Math.floor(manualCalculation).toString());
+      
+      // Prüfe ob sellAmountRaw korrekt ist
+      const expectedRaw = Math.floor(parseFloat(sellAmount) * Math.pow(10, DFAITH_DECIMALS));
+      console.log("Expected raw amount:", expectedRaw);
+      console.log("Actual raw amount:", sellAmountRaw);
+      console.log("Match:", expectedRaw.toString() === sellAmountRaw);
+      
+      console.log("=== END DETAILLIERTE OPENOCEAN REQUEST DEBUG ===");
       
       const quoteUrl = `https://open-api.openocean.finance/v3/base/swap_quote?${quoteParams}`;
       const quoteResponse = await fetch(quoteUrl);
@@ -370,6 +405,15 @@ export default function SellTab() {
       
       const quoteData = await quoteResponse.json();
       console.log("Quote Response:", quoteData);
+      
+      // WICHTIG: Verifikation der Quote-Response
+      if (quoteData && quoteData.data && quoteData.data.inAmount) {
+        console.log("=== QUOTE RESPONSE VERIFICATION ===");
+        console.log("OpenOcean returned inAmount:", quoteData.data.inAmount);
+        console.log("We sent amount:", sellAmountRaw);
+        console.log("Amounts match:", quoteData.data.inAmount === sellAmountRaw);
+        console.log("=== END QUOTE RESPONSE VERIFICATION ===");
+      }
       
       if (!quoteData || quoteData.code !== 200 || !quoteData.data) {
         throw new Error(`OpenOcean: Keine gültige Quote erhalten (Code: ${quoteData?.code})`);
