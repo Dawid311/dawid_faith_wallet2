@@ -136,15 +136,13 @@ export default function BuyTab() {
           ethEur = 3000; // Hard fallback für ETH
         }
         
-        // 2. Hole D.FAITH Preis von OpenOcean für Base Chain
+        // 2. Hole D.FAITH Preis von OpenOcean für Base Chain (gleiche Richtung wie SellTab)
         try {
-          // amount in Wei (1 ETH = 1e18)
-          const amountWei = (1n * 10n ** 18n).toString();
           const params = new URLSearchParams({
             chain: "base",
-            inTokenAddress: "0x0000000000000000000000000000000000000000", // Native ETH
-            outTokenAddress: DFAITH_TOKEN,
-            amount: amountWei, // 1 ETH in Wei
+            inTokenAddress: DFAITH_TOKEN,
+            outTokenAddress: "0x0000000000000000000000000000000000000000", // Native ETH
+            amount: "1", // 1 D.FAITH
             gasPrice: "0.001", // Base Chain: 0.001 Gwei statt 50 Gwei
           });
           
@@ -154,12 +152,12 @@ export default function BuyTab() {
             const data = await response.json();
             console.log("OpenOcean Response:", data);
             if (data && data.data && data.data.outAmount && data.data.outAmount !== "0") {
-              // outAmount ist in D.FAITH (mit 2 Decimals)
-              const dfaithAmount = Number(data.data.outAmount) / Math.pow(10, DFAITH_DECIMALS);
-              setDfaithPrice(dfaithAmount);
-              // Preis wie im SellTab: 1 D.FAITH = (1 ETH / dfaithAmount) * ethEur
-              if (ethEur && dfaithAmount > 0) {
-                dfaithPriceEur = (1 / dfaithAmount) * ethEur;
+              // outAmount ist in ETH (mit 18 Decimals)
+              const ethPerDfaith = Number(data.data.outAmount) / Math.pow(10, 18);
+              setDfaithPrice(ethPerDfaith); // Wie viele ETH für 1 D.FAITH
+              // Preis pro D.FAITH in EUR: ethPerDfaith * ethEur
+              if (ethEur && ethPerDfaith > 0) {
+                dfaithPriceEur = ethPerDfaith * ethEur;
               } else {
                 dfaithPriceEur = null;
               }
@@ -396,7 +394,7 @@ export default function BuyTab() {
         chain: "base",
         inTokenAddress: "0x0000000000000000000000000000000000000000", // Native ETH
         outTokenAddress: DFAITH_TOKEN, // D.FAITH
-        amount: swapAmountEth,
+        amount: (parseFloat(swapAmountEth) * Math.pow(10, 18)).toString(), // ETH in Wei
         slippage: slippage,
         gasPrice: "0.001", // Base Chain: 0.001 Gwei
         account: account.address,
@@ -625,8 +623,8 @@ export default function BuyTab() {
       balance: dfaithBalance,
       color: "from-amber-400 to-yellow-500",
       description: "Faith Utility Token",
-      price: dfaithPriceEur ? `${dfaithPriceEur.toFixed(3)}€ pro D.FAITH` : (isLoadingPrice ? "Laden..." : (priceError || "Preis nicht verfügbar")),
-      sub: dfaithPrice ? `1 ETH = ${dfaithPrice.toFixed(2)} D.FAITH` : "Wird geladen...",
+      price: dfaithPriceEur ? `${dfaithPriceEur.toFixed(4)}€ pro D.FAITH` : (isLoadingPrice ? "Laden..." : (priceError || "Preis nicht verfügbar")),
+      sub: dfaithPrice ? `1 ETH = ${(1 / dfaithPrice).toFixed(2)} D.FAITH` : "Wird geladen...",
       icon: <FaCoins className="text-amber-400" />,
     },
     {
@@ -699,10 +697,10 @@ export default function BuyTab() {
 
       {/* Kauf-Modal zentral - Mobile Optimiert und zentriert */}
       {showBuyModal && selectedToken && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 overflow-y-auto p-4 pt-8 sm:pt-16">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 overflow-y-auto p-4">
           <div
             ref={buyModalRef}
-            className="bg-zinc-900 rounded-xl p-3 sm:p-6 max-w-sm w-full border border-amber-400 max-h-[calc(100vh-8rem)] sm:max-h-[85vh] overflow-y-auto flex flex-col mt-4 sm:mt-0"
+            className="bg-zinc-900 rounded-xl p-3 sm:p-6 max-w-sm w-full border border-amber-400 max-h-[90vh] overflow-y-auto my-4"
             style={{ boxSizing: 'border-box' }}
           >
             {/* Modal-Header */}
@@ -812,7 +810,7 @@ export default function BuyTab() {
                       <div className="flex-1 min-w-0">
                         <div className="text-lg sm:text-xl font-bold text-amber-400">
                           {swapAmountEth && parseFloat(swapAmountEth) > 0 && dfaithPrice 
-                            ? (parseFloat(swapAmountEth) * dfaithPrice).toFixed(2)
+                            ? (parseFloat(swapAmountEth) / dfaithPrice).toFixed(2)
                             : "0.00"
                           }
                         </div>
@@ -820,11 +818,11 @@ export default function BuyTab() {
                     </div>
                     <div className="flex justify-between items-center text-xs">
                       <span className="text-zinc-500">
-                        {dfaithPrice ? `1 ETH = ${dfaithPrice.toFixed(2)} D.FAITH` : "Loading..."}
+                        {dfaithPrice ? `1 D.FAITH = ${dfaithPrice.toFixed(6)} ETH` : "Loading..."}
                       </span>
                       <span className="text-zinc-500">
-                        {swapAmountEth && parseFloat(swapAmountEth) > 0 && dfaithPrice && dfaithPriceEur
-                          ? `≈ €${(parseFloat(swapAmountEth) * dfaithPrice * dfaithPriceEur).toFixed(2)}`
+                        {swapAmountEth && parseFloat(swapAmountEth) > 0 && ethPriceEur
+                          ? `≈ €${(parseFloat(swapAmountEth) * ethPriceEur).toFixed(2)}`
                           : ""
                         }
                       </span>

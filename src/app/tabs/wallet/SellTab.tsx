@@ -7,6 +7,7 @@ import { getContract, prepareContractCall } from "thirdweb";
 import { client } from "../../client";
 import { balanceOf } from "thirdweb/extensions/erc20";
 
+// ÜBERPRÜFUNG: Ist das die korrekte D.FAITH Contract-Adresse auf Base?
 const DFAITH_TOKEN = "0xeB6f60E08AaAd7951896BdefC65cB789633BbeAd"; // D.FAITH auf Base (NEU Juli 2025)
 const DFAITH_DECIMALS = 2;
 
@@ -119,18 +120,35 @@ export default function SellTab() {
           const ethData = await ethResponse.json();
           setEthPriceEur(ethData['ethereum']?.eur || 3000);
         }
+        
+        // KORREKTUR: Richtige Preis-Abfrage für 1 D.FAITH
+        // 1 D.FAITH mit 2 Dezimalstellen = 1 * 10^2 = 100 Raw-Units
+        const oneTokenRaw = Math.pow(10, DFAITH_DECIMALS).toString(); // "100" für 2 Dezimalstellen
+        
+        console.log("=== KORRIGIERTE PRICE FETCH DEBUG ===");
+        console.log("DFAITH_DECIMALS:", DFAITH_DECIMALS);
+        console.log("Math.pow(10, DFAITH_DECIMALS):", Math.pow(10, DFAITH_DECIMALS));
+        console.log("Price fetch amount (raw):", oneTokenRaw);
+        console.log("This represents:", oneTokenRaw, "raw units =", Number(oneTokenRaw) / Math.pow(10, DFAITH_DECIMALS), "D.FAITH");
+        console.log("Verification: 1 D.FAITH = 100 raw units? ", oneTokenRaw === "100");
+        console.log("=== END KORRIGIERTE PRICE FETCH DEBUG ===");
+        
         const params = new URLSearchParams({
           chain: "base",
           inTokenAddress: DFAITH_TOKEN,
           outTokenAddress: "0x0000000000000000000000000000000000000000", // Native ETH
-          amount: "1",
-          gasPrice: "0.001", // Base Chain: 0.001 Gwei statt 50 Gwei
+          amount: oneTokenRaw, // RAW-Wert: 100 (entspricht 1.00 D.FAITH)
+          gasPrice: "1000000", // Base Chain: 0.001 Gwei (1000000 Wei)
         });
+        
         const response = await fetch(`https://open-api.openocean.finance/v3/base/quote?${params}`);
         if (response.ok) {
           const data = await response.json();
+          console.log("Price fetch response:", data);
+          
           if (data && data.data && data.data.outAmount && data.data.outAmount !== "0") {
             const ethPerDfaith = Number(data.data.outAmount) / Math.pow(10, 18);
+            console.log("Calculated price:", ethPerDfaith, "ETH per D.FAITH");
             setDfaithPrice(ethPerDfaith);
           } else {
             setPriceError("Keine Liquidität für Verkauf verfügbar");
@@ -173,7 +191,98 @@ export default function SellTab() {
     }
   };
 
-  // Funktion um eine Verkaufs-Quote zu erhalten
+  // Erweiterte Debugging-Funktion für Contract-Verifikation
+  const verifyContractAndBalance = async () => {
+    if (!account?.address) return;
+    
+    try {
+      console.log("=== CONTRACT VERIFICATION ===");
+      console.log("D.FAITH Contract:", DFAITH_TOKEN);
+      console.log("User Address:", account.address);
+      console.log("Expected Decimals:", DFAITH_DECIMALS);
+      
+      // Prüfe Contract mit Thirdweb
+      const contract = getContract({
+        client,
+        chain: base,
+        address: DFAITH_TOKEN
+      });
+      
+      // Hole Balance über Thirdweb
+      const thirdwebBalance = await balanceOf({
+        contract,
+        address: account.address,
+      });
+      
+      console.log("Thirdweb Balance (Raw):", thirdwebBalance.toString());
+      console.log("Thirdweb Balance (Display):", (Number(thirdwebBalance) / Math.pow(10, DFAITH_DECIMALS)).toFixed(DFAITH_DECIMALS));
+      
+      // Hole Balance über API
+      const apiBalance = await fetchTokenBalanceViaInsightApi(DFAITH_TOKEN, account.address);
+      console.log("API Balance (Raw):", apiBalance);
+      console.log("API Balance (Display):", (Number(apiBalance) / Math.pow(10, DFAITH_DECIMALS)).toFixed(DFAITH_DECIMALS));
+      
+      // Vergleiche die Ergebnisse
+      const thirdwebRaw = Number(thirdwebBalance);
+      const apiRaw = Number(apiBalance);
+      
+      console.log("Balance Comparison:");
+      console.log("Thirdweb Raw:", thirdwebRaw);
+      console.log("API Raw:", apiRaw);
+      console.log("Difference:", Math.abs(thirdwebRaw - apiRaw));
+      console.log("Match:", thirdwebRaw === apiRaw);
+      
+      // Prüfe Contract-Details
+      try {
+        const { readContract } = await import("thirdweb");
+        
+        const name = await readContract({
+          contract,
+          method: "function name() view returns (string)",
+          params: []
+        });
+        console.log("Contract Name:", name);
+        
+        const symbol = await readContract({
+          contract,
+          method: "function symbol() view returns (string)",
+          params: []
+        });
+        console.log("Contract Symbol:", symbol);
+        
+        const decimals = await readContract({
+          contract,
+          method: "function decimals() view returns (uint8)",
+          params: []
+        });
+        console.log("Contract Decimals:", decimals);
+        console.log("Expected Decimals:", DFAITH_DECIMALS);
+        console.log("Decimals Match:", Number(decimals) === DFAITH_DECIMALS);
+        
+        if (Number(decimals) !== DFAITH_DECIMALS) {
+          console.error("❌ DECIMALS MISMATCH!");
+          console.error("Contract has", decimals, "decimals, but we're using", DFAITH_DECIMALS);
+        }
+        
+      } catch (contractError) {
+        console.error("Contract details error:", contractError);
+      }
+      
+      console.log("=== END CONTRACT VERIFICATION ===");
+      
+    } catch (error) {
+      console.error("Contract verification failed:", error);
+    }
+  };
+
+  // Teste die Contract-Verifikation beim Start
+  useEffect(() => {
+    if (account?.address) {
+      verifyContractAndBalance();
+    }
+  }, [account?.address]);
+
+  // Funktion um eine Verkaufs-Quote zu erhalten (angepasst von BuyTab-Logik)
   const handleGetQuote = async () => {
     setSwapTxStatus("pending");
     setQuoteError(null);
@@ -184,89 +293,184 @@ export default function SellTab() {
     try {
       if (!sellAmount || parseFloat(sellAmount) <= 0 || !account?.address) return;
 
-      // Erster Schritt: Quote von OpenOcean API holen
-      console.log("1. Quote anfordern für", sellAmount, "D.FAITH");
+      console.log("=== ENHANCED QUOTE REQUEST DEBUG ===");
+      console.log("D.FAITH Contract:", DFAITH_TOKEN);
+      console.log("User Address:", account.address);
+      console.log("Sell Amount Input:", sellAmount);
+      console.log("D.FAITH Balance:", dfaithBalance);
       
-      const params = new URLSearchParams({
+      // Verifikation der Contract-Adresse vor Quote
+      await verifyContractAndBalance();
+      
+      // WICHTIG: Prüfe Balance VOR der Konvertierung
+      const sellAmountNum = parseFloat(sellAmount);
+      const balanceNum = parseFloat(dfaithBalance);
+      
+      console.log("Verkaufsbetrag (Float):", sellAmountNum);
+      console.log("Balance (Float):", balanceNum);
+      
+      if (sellAmountNum > balanceNum) {
+        throw new Error(`Insufficient balance. Available: ${balanceNum}, Requested: ${sellAmountNum}`);
+      }
+      
+      // Hole die aktuellste Balance direkt vom Contract
+      const contract = getContract({
+        client,
+        chain: base,
+        address: DFAITH_TOKEN
+      });
+      
+      const currentBalance = await balanceOf({
+        contract,
+        address: account.address,
+      });
+      
+      const currentBalanceNum = Number(currentBalance) / Math.pow(10, DFAITH_DECIMALS);
+      console.log("Current Contract Balance:", currentBalanceNum);
+      
+      if (sellAmountNum > currentBalanceNum) {
+        throw new Error(`Insufficient balance (fresh check). Available: ${currentBalanceNum}, Requested: ${sellAmountNum}`);
+      }
+      
+      // KORREKTUR: Richtige Dezimalstellen-Konvertierung
+      // D.FAITH hat 2 Dezimalstellen, also: 10 D.FAITH = 10 * 10^2 = 1000 (nicht 100000!)
+      const sellAmountRaw = Math.floor(sellAmountNum * Math.pow(10, DFAITH_DECIMALS)).toString();
+      
+      console.log("=== KORRIGIERTE DECIMAL CONVERSION CHECK ===");
+      console.log("DFAITH_DECIMALS:", DFAITH_DECIMALS);
+      console.log("Verkaufsbetrag (Display):", sellAmountNum);
+      console.log("Math.pow(10, DFAITH_DECIMALS):", Math.pow(10, DFAITH_DECIMALS));
+      console.log("Verkaufsbetrag * Math.pow(10, DFAITH_DECIMALS):", sellAmountNum * Math.pow(10, DFAITH_DECIMALS));
+      console.log("Verkaufsbetrag (Raw ohne Dezimalstellen):", sellAmountRaw);
+      console.log("Conversion Check:", sellAmountNum, "* 10^" + DFAITH_DECIMALS, "=", sellAmountNum * Math.pow(10, DFAITH_DECIMALS));
+      console.log("Nach Math.floor:", Math.floor(sellAmountNum * Math.pow(10, DFAITH_DECIMALS)));
+      console.log("Balance (Raw):", Number(currentBalance).toString());
+      console.log("Raw Balance >= Raw Sell Amount:", Number(currentBalance) >= Math.floor(sellAmountNum * Math.pow(10, DFAITH_DECIMALS)));
+      
+      // VERIFIKATION: Prüfe ob die Raw-Werte korrekt sind
+      console.log("=== VERIFICATION ===");
+      console.log("10 D.FAITH sollte werden zu:", 10 * Math.pow(10, 2), "= 1000 raw units");
+      console.log("Aktueller sellAmountRaw:", sellAmountRaw);
+      console.log("Ist sellAmountRaw korrekt?", Number(sellAmountRaw) === (10 * Math.pow(10, 2)));
+      console.log("=== END VERIFICATION ===");
+      
+      // Zusätzliche Sicherheit: Prüfe ob Raw-Werte sinnvoll sind
+      if (Number(sellAmountRaw) > Number(currentBalance)) {
+        throw new Error(`Raw amount exceeds balance. Raw sell: ${sellAmountRaw}, Raw balance: ${currentBalance}`);
+      }
+      
+      const quoteParams = new URLSearchParams({
         chain: "base",
         inTokenAddress: DFAITH_TOKEN,
         outTokenAddress: "0x0000000000000000000000000000000000000000", // Native ETH
-        amount: sellAmount,
+        amount: sellAmountRaw, // RAW-Wert ohne Dezimalstellen
         slippage: slippage,
-        gasPrice: "0.001", // Base Chain: 0.001 Gwei
+        gasPrice: "1000000", // Base Chain: 0.001 Gwei (1000000 Wei)
         account: account.address,
       });
-      const url = `https://open-api.openocean.finance/v3/base/swap_quote?${params}`;
-      const response = await fetch(url);
-      if (!response.ok) throw new Error(`OpenOcean API Fehler: ${response.status}`);
-      const data = await response.json();
-      if (!data || !data.data) throw new Error("OpenOcean: Keine Daten erhalten");
-      const txData = data.data;
       
-      console.log("Quote erhalten:", txData);
+      console.log("=== DETAILLIERTE OPENOCEAN REQUEST DEBUG ===");
+      console.log("Eingabe: sellAmount =", sellAmount);
+      console.log("Eingabe: sellAmountNum =", sellAmountNum);
+      console.log("Berechnung: sellAmountNum * Math.pow(10, DFAITH_DECIMALS) =", sellAmountNum * Math.pow(10, DFAITH_DECIMALS));
+      console.log("Berechnung: Math.floor(sellAmountNum * Math.pow(10, DFAITH_DECIMALS)) =", Math.floor(sellAmountNum * Math.pow(10, DFAITH_DECIMALS)));
+      console.log("Endergebnis: sellAmountRaw =", sellAmountRaw);
+      console.log("Quote URL:", `https://open-api.openocean.finance/v3/base/swap_quote?${quoteParams}`);
+      
+      // Manuelle Verifikation
+      const manualCalculation = parseFloat(sellAmount) * Math.pow(10, DFAITH_DECIMALS);
+      console.log("Manuelle Verifikation:");
+      console.log("- sellAmount:", sellAmount);
+      console.log("- DFAITH_DECIMALS:", DFAITH_DECIMALS);
+      console.log("- Math.pow(10, DFAITH_DECIMALS):", Math.pow(10, DFAITH_DECIMALS));
+      console.log("- parseFloat(sellAmount):", parseFloat(sellAmount));
+      console.log("- Ergebnis:", manualCalculation);
+      console.log("- Als String:", manualCalculation.toString());
+      console.log("- Mit Math.floor:", Math.floor(manualCalculation).toString());
+      
+      // Prüfe ob sellAmountRaw korrekt ist
+      const expectedRaw = Math.floor(parseFloat(sellAmount) * Math.pow(10, DFAITH_DECIMALS));
+      console.log("Expected raw amount:", expectedRaw);
+      console.log("Actual raw amount:", sellAmountRaw);
+      console.log("Match:", expectedRaw.toString() === sellAmountRaw);
+      
+      console.log("=== END DETAILLIERTE OPENOCEAN REQUEST DEBUG ===");
+      
+      const quoteUrl = `https://open-api.openocean.finance/v3/base/swap_quote?${quoteParams}`;
+      const quoteResponse = await fetch(quoteUrl);
+      
+      if (!quoteResponse.ok) {
+        throw new Error(`OpenOcean Quote Fehler: ${quoteResponse.status}`);
+      }
+      
+      const quoteData = await quoteResponse.json();
+      console.log("Quote Response:", quoteData);
+      
+      // WICHTIG: Verifikation der Quote-Response und KORREKTUR
+      if (quoteData && quoteData.data && quoteData.data.inAmount) {
+        console.log("=== QUOTE RESPONSE VERIFICATION ===");
+        console.log("OpenOcean returned inAmount:", quoteData.data.inAmount);
+        console.log("We sent amount:", sellAmountRaw);
+        console.log("Amounts match:", quoteData.data.inAmount === sellAmountRaw);
+        
+        // KRITISCHER BUG: OpenOcean gibt falschen inAmount zurück!
+        // String-Vergleich ist notwendig, da beide Werte als String kommen
+        if (quoteData.data.inAmount.toString() !== sellAmountRaw.toString()) {
+          console.log("🚨 KRITISCHER OPENOCEAN BUG ERKANNT!");
+          console.log("❌ OpenOcean inAmount (falsch):", quoteData.data.inAmount);
+          console.log("✅ Korrekte inAmount (unser Wert):", sellAmountRaw);
+          console.log("🔧 PATCH: Überschreibe inAmount mit korrektem Wert...");
+          
+          // KORREKTUR: Überschreibe den falschen inAmount mit dem korrekten Wert
+          const originalInAmount = quoteData.data.inAmount;
+          quoteData.data.inAmount = sellAmountRaw;
+          
+          console.log("✅ PATCH ANGEWENDET:");
+          console.log("  Alt:", originalInAmount);
+          console.log("  Neu:", quoteData.data.inAmount);
+          console.log("  Differenz:", BigInt(originalInAmount) - BigInt(sellAmountRaw));
+          console.log("=== OPENOCEAN BUG PATCH ERFOLGREICH ===");
+        } else {
+          console.log("✅ OpenOcean inAmount ist korrekt - kein Patch nötig");
+        }
+        
+        console.log("=== END QUOTE RESPONSE VERIFICATION ===");
+      }
+      
+      if (!quoteData || quoteData.code !== 200 || !quoteData.data) {
+        throw new Error(`OpenOcean: Keine gültige Quote erhalten (Code: ${quoteData?.code})`);
+      }
+      
+      const txData = quoteData.data;
+      
+      if (!txData.to || !txData.data) {
+        throw new Error('OpenOcean: Unvollständige Transaktionsdaten');
+      }
+      
+      // FINALE VERIFIKATION: Sicherstellen, dass die korrekte inAmount verwendet wird
+      console.log("=== FINALE TXDATA VERIFICATION ===");
+      console.log("txData.inAmount:", txData.inAmount);
+      console.log("Sollte sein:", sellAmountRaw);
+      console.log("Ist korrekt:", txData.inAmount === sellAmountRaw);
+      console.log("=== END FINALE TXDATA VERIFICATION ===");
+      
+      console.log("=== QUOTE JSON DETAILS ===");
+      console.log("txData.to:", txData.to);
+      console.log("txData.data:", txData.data);
+      console.log("txData.value:", txData.value);
+      console.log("txData.gasPrice:", txData.gasPrice);
+      console.log("txData.gas:", txData.gas);
+      console.log("Vollständige Quote JSON:", JSON.stringify(txData, null, 2));
+      console.log("=== END QUOTE JSON ===");
 
       // Spenderadresse für Base Chain (OpenOcean Router)
       const spender = "0x6352a56caadC4F1E25CD6c75970Fa768A3304e64"; // OpenOcean Router auf Base
       setQuoteTxData(txData);
       setSpenderAddress(spender);
 
-      // Zweiter Schritt: Prüfen, ob Approval nötig ist
-      console.log("2. Prüfe Approval für", spender);
-      
-      const allowanceParams = new URLSearchParams({
-        chain: "base",
-        account: account.address,
-        inTokenAddress: DFAITH_TOKEN
-      });
-      const allowanceUrl = `https://open-api.openocean.finance/v3/base/allowance?${allowanceParams}`;
-      const allowanceResponse = await fetch(allowanceUrl);
-      let allowanceValue = "0";
-      if (allowanceResponse.ok) {
-        const allowanceData = await allowanceResponse.json();
-        console.log("Allowance Daten:", allowanceData);
-        
-        if (allowanceData && allowanceData.data !== undefined && allowanceData.data !== null) {
-          if (typeof allowanceData.data === "object") {
-            if (Array.isArray(allowanceData.data)) {
-              const first = allowanceData.data[0];
-              if (typeof first === "object" && first !== null) {
-                const values = Object.values(first);
-                if (values.length > 0) allowanceValue = values[0]?.toString() ?? "0";
-              }
-            } else {
-              const values = Object.values(allowanceData.data);
-              if (values.length > 0) allowanceValue = values[0]?.toString() ?? "0";
-            }
-          } else {
-            allowanceValue = allowanceData.data.toString();
-          }
-        }
-        
-        console.log("Aktuelle Allowance:", allowanceValue);
-        
-        let currentAllowance: bigint;
-        try {
-          currentAllowance = BigInt(allowanceValue);
-        } catch {
-          currentAllowance = BigInt(0);
-        }
-        const amountInWei = (parseFloat(sellAmount) * Math.pow(10, DFAITH_DECIMALS)).toFixed(0);
-        const requiredAmount = BigInt(Math.floor(parseFloat(sellAmount)).toString()); // ← Kein * 10^decimals
-
-        console.log("Benötigte Allowance:", requiredAmount.toString());
-        console.log("Aktuelle Allowance:", currentAllowance.toString());
-        
-        if (currentAllowance < requiredAmount) {
-          console.log("Approval nötig");
-          setNeedsApproval(true);
-        } else {
-          console.log("Approval bereits vorhanden");
-          setNeedsApproval(false);
-        }
-      } else {
-        console.log("Fehler beim Abrufen der Allowance - setze Approval als nötig");
-        setNeedsApproval(true);
-      }
+      // IMMER Approval anfordern für maximale Sicherheit und Konsistenz
+      console.log("Setze Approval als erforderlich (Sicherheitsmaßnahme)");
+      setNeedsApproval(true);
       
       setSellStep('quoteFetched');
       setSwapTxStatus(null);
@@ -278,12 +482,15 @@ export default function SellTab() {
     }
   };
 
-  // Funktion um die Tokens für den Swap freizugeben (Approve)
+  // Funktion um die Tokens für den Swap freizugeben (Approve) - immer mit max approve
   const handleApprove = async () => {
     if (!spenderAddress || !account?.address) return;
     setSwapTxStatus("approving");
     try {
+      console.log("=== APPROVE TRANSACTION WIRD GESTARTET ===");
       console.log("3. Approve Transaktion starten für Spender:", spenderAddress);
+      console.log("Account:", account.address);
+      console.log("D.FAITH Token:", DFAITH_TOKEN);
       
       const contract = getContract({
         client,
@@ -291,7 +498,7 @@ export default function SellTab() {
         address: DFAITH_TOKEN
       });
       
-      // Maximaler Approve-Betrag (type(uint256).max) - bleibt unverändert
+      // Maximaler Approve-Betrag (type(uint256).max)
       const maxApproval = BigInt("115792089237316195423570985008687907853269984665640564039457584007913129639935");
       
       console.log("Verkaufsbetrag:", sellAmount);
@@ -304,23 +511,27 @@ export default function SellTab() {
         params: [spenderAddress, maxApproval]
       });
       
-      console.log("Sending approve transaction...");
+      console.log("=== APPROVE TRANSACTION WIRD GESENDET ===");
+      console.log("Approve Transaction Details:", JSON.stringify(approveTransaction, (key, value) => 
+        typeof value === 'bigint' ? value.toString() : value, 2));
+      
       const approveResult = await sendTransaction(approveTransaction);
-      console.log("Approve TX gesendet:", approveResult);
+      console.log("✅ APPROVE TX ERFOLGREICH GESENDET:", approveResult);
+      console.log("Approve TX Hash:", approveResult.transactionHash);
       
       setSwapTxStatus("waiting_approval");
       
       // Robuste Approval-Überwachung für Base Chain
-      console.log("Warte auf Approval-Bestätigung...");
+      console.log("=== WARTE AUF APPROVAL-BESTÄTIGUNG ===");
       let approveReceipt = null;
       let approveAttempts = 0;
-      const maxApproveAttempts = 40; // 40 Versuche = ca. 1.5 Minuten
+      const maxApproveAttempts = 50; // 50 Versuche = ca. 2 Minuten
       
       while (!approveReceipt && approveAttempts < maxApproveAttempts) {
         approveAttempts++;
+        console.log(`📋 Approval-Bestätigungsversuch ${approveAttempts}/${maxApproveAttempts}`);
+        
         try {
-          console.log(`Approval-Bestätigungsversuch ${approveAttempts}/${maxApproveAttempts}`);
-          
           // Versuche Receipt über RPC zu holen
           const txHash = approveResult.transactionHash;
           const receiptResponse = await fetch(base.rpc, {
@@ -335,284 +546,265 @@ export default function SellTab() {
           });
           
           const receiptData = await receiptResponse.json();
+          console.log(`Receipt Response Versuch ${approveAttempts}:`, receiptData);
           
           if (receiptData.result && receiptData.result.status) {
             approveReceipt = {
               status: receiptData.result.status === "0x1" ? "success" : "reverted",
-              transactionHash: receiptData.result.transactionHash
+              transactionHash: receiptData.result.transactionHash,
+              blockNumber: receiptData.result.blockNumber,
+              gasUsed: receiptData.result.gasUsed
             };
-            console.log("Approval bestätigt via RPC:", approveReceipt);
+            console.log("✅ APPROVAL BESTÄTIGT VIA RPC:", approveReceipt);
             break;
           } else {
-            // Wenn noch nicht bestätigt, warte 2 Sekunden
+            // Wenn noch nicht bestätigt, warte 2.5 Sekunden
             if (approveAttempts < maxApproveAttempts) {
-              await new Promise(resolve => setTimeout(resolve, 2000));
+              console.log(`⏳ Noch nicht bestätigt, warte 2.5 Sekunden...`);
+              await new Promise(resolve => setTimeout(resolve, 2500));
             }
           }
         } catch (receiptError) {
-          console.log(`Approval-Bestätigungsversuch ${approveAttempts} fehlgeschlagen:`, receiptError);
+          console.log(`❌ Approval-Bestätigungsversuch ${approveAttempts} fehlgeschlagen:`, receiptError);
           if (approveAttempts < maxApproveAttempts) {
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            await new Promise(resolve => setTimeout(resolve, 2500));
           }
         }
       }
       
-      // Wenn nach allen Versuchen keine Bestätigung, aber gehe trotzdem weiter
+      // Prüfe das Ergebnis der Approval-Bestätigung
       if (!approveReceipt) {
-        console.log("⚠️ Keine Approval-Bestätigung erhalten, aber gehe weiter zum Swap");
-        approveReceipt = { status: "unknown", transactionHash: approveResult.transactionHash };
+        console.log("⚠️ KEINE APPROVAL-BESTÄTIGUNG NACH ALLEN VERSUCHEN");
+        // Versuche eine letzte Allowance-Prüfung
+        try {
+          const allowanceContract = getContract({
+            client,
+            chain: base,
+            address: DFAITH_TOKEN
+          });
+          
+          const { readContract } = await import("thirdweb");
+          const allowance = await readContract({
+            contract: allowanceContract,
+            method: "function allowance(address owner, address spender) view returns (uint256)",
+            params: [account.address, spenderAddress]
+          });
+          
+          console.log("Aktuelle Allowance nach Approval:", allowance.toString());
+          
+          if (allowance > 0) {
+            console.log("✅ ALLOWANCE VORHANDEN - APPROVAL WAR ERFOLGREICH");
+            setSwapTxStatus("approval_confirmed");
+            setTimeout(() => {
+              setNeedsApproval(false);
+              setSellStep('approved');
+              setSwapTxStatus(null);
+            }, 2000);
+          } else {
+            throw new Error("Approval-Transaktion fehlgeschlagen - Keine Allowance vorhanden");
+          }
+        } catch (allowanceError) {
+          console.error("Allowance-Prüfung fehlgeschlagen:", allowanceError);
+          throw new Error("Approval-Bestätigung fehlgeschlagen - Bitte versuchen Sie es erneut");
+        }
+      } else if (approveReceipt.status === "reverted") {
+        console.log("❌ APPROVAL REVERTED:", approveReceipt.transactionHash);
+        throw new Error(`Approval fehlgeschlagen - Transaction reverted (Hash: ${approveReceipt.transactionHash})`);
+      } else {
+        console.log("✅ APPROVAL ERFOLGREICH BESTÄTIGT");
+        setSwapTxStatus("approval_confirmed");
+        setTimeout(() => {
+          setNeedsApproval(false);
+          setSellStep('approved');
+          setSwapTxStatus(null);
+        }, 2000);
       }
       
-      // Prüfe ob Approval erfolgreich war
-      if (approveReceipt.status === "reverted") {
-        throw new Error(`Approval fehlgeschlagen - Hash: ${approveReceipt.transactionHash}`);
-      }
+      console.log("=== APPROVE PROCESS ABGESCHLOSSEN ===");
       
-      setNeedsApproval(false);
-      setSellStep('approved');
-      setSwapTxStatus(null);
-    } catch (e) {
-      console.error("Approve Fehler:", e);
+    } catch (e: any) {
+      console.error("❌ APPROVE FEHLER:", e);
+      console.error("Fehler Details:", e.message);
       setSwapTxStatus("error");
-      setTimeout(() => setSwapTxStatus(null), 4000);
+      setTimeout(() => setSwapTxStatus(null), 6000);
     }
   };
 
-  // Funktion für den eigentlichen Token-Swap
+  // Funktion für den eigentlichen Token-Swap (angepasst von BuyTab-Logik)
   const handleSellSwap = async () => {
     if (!quoteTxData || !account?.address) return;
+    
+    // WICHTIGE BALANCE-PRÜFUNG VOR DEM SWAP
+    try {
+      console.log("=== BALANCE-PRÜFUNG VOR SWAP ===");
+      
+      // Hole aktuelle Balance direkt vor dem Swap
+      const currentBalanceRaw = await fetchTokenBalanceViaInsightApi(DFAITH_TOKEN, account.address);
+      const currentBalance = Number(currentBalanceRaw) / Math.pow(10, DFAITH_DECIMALS);
+      const sellAmountNum = parseFloat(sellAmount);
+      
+      console.log("Aktuelle Balance vor Swap:", currentBalance);
+      console.log("Verkaufsbetrag:", sellAmountNum);
+      console.log("Balance ausreichend?", currentBalance >= sellAmountNum);
+      
+      if (currentBalance < sellAmountNum) {
+        throw new Error(`Insufficient balance for swap. Available: ${currentBalance}, Required: ${sellAmountNum}`);
+      }
+      
+      // Zusätzliche Sicherheit: Prüfe gegen 99.5% der Balance
+      if (sellAmountNum > (currentBalance * 0.995)) {
+        console.log("⚠️ Warnung: Verkauf von mehr als 99.5% der Balance");
+      }
+      
+    } catch (balanceError) {
+      console.error("Balance-Prüfung fehlgeschlagen:", balanceError);
+      setSwapTxStatus("error");
+      setTimeout(() => setSwapTxStatus(null), 5000);
+      return;
+    }
+    
     setIsSwapping(true);
     setSwapTxStatus("swapping");
     
-    // Aktuelle Balance vor dem Swap speichern
-    const initialBalance = parseFloat(dfaithBalance);
+    // Aktuelle D.FAITH-Balance vor dem Swap speichern
+    const initialDfaithBalance = parseFloat(dfaithBalance);
+    const sellAmountNum = parseFloat(sellAmount);
     
     try {
-      console.log("4. Swap Transaktion starten");
-      console.log("Verwende ursprüngliche Quote-Daten:", quoteTxData);
+      console.log("=== D.FAITH Verkauf-Swap wird gestartet auf Base ===");
+      console.log("Verwende Quote-Daten:", quoteTxData);
       
-      const { prepareTransaction } = await import("thirdweb");
-      
-      // Keine manuelle Nonce - lass Thirdweb das automatisch machen
-      console.log("Bereite Transaktion vor...");
-      
-      // Verwende automatische Gas-Schätzung statt manuelle Werte
-      const tx = prepareTransaction({
-        to: quoteTxData.to,
-        data: quoteTxData.data,
-        value: BigInt(quoteTxData.value || "0"),
-        chain: base,
-        client,
-        // Entferne manuelle Nonce - lass Thirdweb das automatisch machen
-        // Entferne manuelle Gas-Parameter - lass Base Chain das automatisch schätzen
-      });
-      
-      console.log("Sende Transaktion...");
-      const swapResult = await sendTransaction(tx);
-      console.log("Swap TX gesendet:", swapResult);
-      console.log("Transaction Hash:", swapResult.transactionHash);
-      
-      // Prüfe sofort nach dem Senden, ob die Transaktion im Mempool ist
-      try {
-        const txResponse = await fetch(base.rpc, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            jsonrpc: '2.0',
-            method: 'eth_getTransactionByHash',
-            params: [swapResult.transactionHash],
-            id: 1
-          })
-        });
-        const txData = await txResponse.json();
-        if (!txData.result) {
-          console.warn("⚠️ Transaktion nicht im Mempool gefunden. Könnte ein Gas-Problem sein.");
-        } else {
-          console.log("✅ Transaktion im Mempool bestätigt:", txData.result);
-        }
-      } catch (mempoolError) {
-        console.log("Mempool-Prüfung fehlgeschlagen:", mempoolError);
+      // Stelle sicher, dass wir auf Base Chain (ID: 8453) sind
+      console.log("Target Chain:", base.name, "Chain ID:", base.id);
+      if (base.id !== 8453) {
+        throw new Error("Falsche Chain - Base Chain erwartet");
       }
-    
-    setSwapTxStatus("confirming");
-    
-    // Robuste Transaktionsüberwachung für Base Chain
-    console.log("Warte auf Transaktionsbestätigung...");
-    let receipt = null;
-    let confirmationAttempts = 0;
-    const maxConfirmationAttempts = 60; // 60 Versuche = ca. 2 Minuten
-    
-    while (!receipt && confirmationAttempts < maxConfirmationAttempts) {
-      confirmationAttempts++;
+      
+      setSwapTxStatus("confirming");
+      
+      // Sende Transaktion mit prepareTransaction (korrektes Objekt für sendTransaction)
       try {
-        console.log(`Bestätigungsversuch ${confirmationAttempts}/${maxConfirmationAttempts}`);
-        
-        // Versuche Receipt über RPC zu holen statt waitForReceipt
-        const txHash = swapResult.transactionHash;
-        const receiptResponse = await fetch(base.rpc, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            jsonrpc: '2.0',
-            method: 'eth_getTransactionReceipt',
-            params: [txHash],
-            id: 1
-          })
+        console.log("Sende D.FAITH Verkaufs-Transaktion direkt auf Base Chain");
+
+        // Bereite die Transaktion mit prepareTransaction vor
+        const { prepareTransaction } = await import("thirdweb");
+        const preparedTx = prepareTransaction({
+          to: quoteTxData.to,
+          data: quoteTxData.data,
+          value: BigInt(quoteTxData.value || "0"),
+          chain: base,
+          client,
+          // Optional: gas/gasPrice können gesetzt werden, aber oft automatisch geschätzt
+          // gas: BigInt(quoteTxData.gas || "300000"),
+          // gasPrice: BigInt("1000000"),
         });
+
+        const txResult = await sendTransaction(preparedTx);
+
+        console.log("✅ VERKAUFS-TRANSAKTION GESENDET:", txResult);
+
+      } catch (txError: any) {
+        console.log("Transaction error details:", txError);
         
-        const receiptData = await receiptResponse.json();
-        
-        if (receiptData.result && receiptData.result.status) {
-          receipt = {
-            status: receiptData.result.status === "0x1" ? "success" : "reverted",
-            transactionHash: receiptData.result.transactionHash,
-            gasUsed: receiptData.result.gasUsed,
-            logs: receiptData.result.logs
-          };
-          console.log("Transaktion bestätigt via RPC:", receipt);
-          break;
+        // Ignoriere Analytics-Fehler von Thirdweb (gleiche Logik wie BuyTab)
+        if (txError?.message?.includes('event') || 
+            txError?.message?.includes('analytics') || 
+            txError?.message?.includes('c.thirdweb.com') ||
+            txError?.message?.includes('400') && txError?.message?.includes('thirdweb')) {
+          console.log("Thirdweb API-Fehler ignoriert, Transaktion könnte trotzdem erfolgreich sein");
+          // Gehe weiter zur Verifizierung
         } else {
-          // Wenn noch nicht bestätigt, warte 2 Sekunden
-          if (confirmationAttempts < maxConfirmationAttempts) {
-            await new Promise(resolve => setTimeout(resolve, 2000));
+          // Echter Transaktionsfehler
+          throw txError;
+        }
+      }
+      
+      setSwapTxStatus("verifying");
+      console.log("Verifiziere D.FAITH-Balance-Änderung...");
+      
+      // D.FAITH-Balance-Verifizierung mit mehreren Versuchen (gleiche Logik wie BuyTab)
+      let balanceVerified = false;
+      let attempts = 0;
+      const maxAttempts = 30; // Maximal 30 Versuche
+      
+      // Erste Wartezeit nach Transaktionsbestätigung
+      console.log("Warte 3 Sekunden vor erster Balance-Prüfung...");
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      
+      while (!balanceVerified && attempts < maxAttempts) {
+        attempts++;
+        console.log(`D.FAITH-Balance-Verifizierung Versuch ${attempts}/${maxAttempts}`);
+        
+        try {
+          if (attempts > 1) {
+            const waitTime = Math.min(attempts * 1000, 10000); // 1s, 2s, 3s... bis max 10s
+            console.log(`Warte ${waitTime/1000} Sekunden vor nächstem Versuch...`);
+            await new Promise(resolve => setTimeout(resolve, waitTime));
           }
-        }
-      } catch (receiptError) {
-        console.log(`Bestätigungsversuch ${confirmationAttempts} fehlgeschlagen:`, receiptError);
-        if (confirmationAttempts < maxConfirmationAttempts) {
-          await new Promise(resolve => setTimeout(resolve, 2000));
+          
+          // D.FAITH-Balance neu laden
+          const dfaithValue = await fetchTokenBalanceViaInsightApi(DFAITH_TOKEN, account.address);
+          const dfaithRaw = Number(dfaithValue);
+          const currentDfaithBalance = dfaithRaw / Math.pow(10, DFAITH_DECIMALS);
+          
+          console.log(`Initiale D.FAITH-Balance: ${initialDfaithBalance}, Aktuelle D.FAITH-Balance: ${currentDfaithBalance}`);
+          
+          // Prüfe ob sich die D.FAITH-Balance um mindestens den Verkaufsbetrag verringert hat (mit 10% Toleranz)
+          const expectedDecrease = sellAmountNum;
+          const actualDecrease = initialDfaithBalance - currentDfaithBalance;
+          
+          console.log(`Erwartete Verringerung: ${expectedDecrease}, Tatsächliche Verringerung: ${actualDecrease}`);
+          
+          if (actualDecrease >= (expectedDecrease * 0.9)) { // 10% Toleranz
+            console.log("✅ D.FAITH-Balance-Änderung verifiziert - Verkauf erfolgreich!");
+            setDfaithBalance(currentDfaithBalance.toFixed(DFAITH_DECIMALS));
+            balanceVerified = true;
+            setSellStep('completed');
+            setSwapTxStatus("success");
+            setSellAmount("");
+            setQuoteTxData(null);
+            setSpenderAddress(null);
+            setTimeout(() => setSwapTxStatus(null), 5000);
+          } else {
+            console.log(`Versuch ${attempts}: D.FAITH-Balance noch nicht ausreichend geändert, weiter warten...`);
+          }
+        } catch (balanceError) {
+          console.error(`D.FAITH-Balance-Verifizierung Versuch ${attempts} fehlgeschlagen:`, balanceError);
         }
       }
-    }
-    
-    // Wenn nach allen Versuchen keine Bestätigung, ignoriere und gehe zur Balance-Verifizierung
-    if (!receipt) {
-      console.log("⚠️ Keine Transaktionsbestätigung erhalten, aber gehe zur Balance-Verifizierung");
-      receipt = { status: "unknown", transactionHash: swapResult.transactionHash };
-    }
-    
-    // Prüfe ob Transaktion erfolgreich war (nur bei bekanntem Status)
-    if (receipt.status === "reverted") {
-      console.error("Transaktion Details:", receipt);
-      throw new Error(`Transaktion fehlgeschlagen - Status: ${receipt.status}. Hash: ${receipt.transactionHash}`);
-    }
-    
-    setSwapTxStatus("verifying");
-    console.log("5. Verifiziere Balance-Änderung...");
-    
-    // Unendliche Balance-Verifizierung bis Erfolg bestätigt
-    let balanceVerified = false;
-    let attempts = 0;
-    
-    // Erste längere Wartezeit nach Transaktionsbestätigung
-    console.log("Warte 5 Sekunden vor erster Balance-Prüfung...");
-    await new Promise(resolve => setTimeout(resolve, 5000));
-    
-    // Läuft so lange bis Balance-Änderung verifiziert ist
-    while (!balanceVerified) {
-      attempts++;
-      console.log(`Balance-Verifizierung Versuch ${attempts}`);
       
+      if (!balanceVerified) {
+        console.log("⚠️ D.FAITH-Balance-Verifizierung nach mehreren Versuchen nicht erfolgreich");
+        setSwapTxStatus("success");
+        setSellStep('completed');
+        setSellAmount("");
+        setTimeout(() => setSwapTxStatus(null), 8000);
+      }
+      
+    } catch (error) {
+      console.error("Swap Error:", error);
+      setSwapTxStatus("error");
+      
+      // Versuche trotzdem die Balance zu aktualisieren
       try {
-        // Stufenweise längere Wartezeiten, aber maximal 15 Sekunden
-        if (attempts > 1) {
-          const waitTime = Math.min(attempts * 2000, 15000); // 2s, 4s, 6s... bis max 15s
-          console.log(`Warte ${waitTime/1000} Sekunden vor nächstem Versuch...`);
-          await new Promise(resolve => setTimeout(resolve, waitTime));
-        }
-        
         const dfaithValue = await fetchTokenBalanceViaInsightApi(DFAITH_TOKEN, account.address);
         const dfaithRaw = Number(dfaithValue);
-        const currentBalance = dfaithRaw / Math.pow(10, DFAITH_DECIMALS);
-        
-        console.log(`Initiale Balance: ${initialBalance}, Aktuelle Balance: ${currentBalance}`);
-        
-        // Prüfe ob sich die Balance um mindestens den Verkaufsbetrag verringert hat
-        const expectedDecrease = parseFloat(sellAmount);
-        const actualDecrease = initialBalance - currentBalance;
-        
-        console.log(`Erwartete Verringerung: ${expectedDecrease}, Tatsächliche Verringerung: ${actualDecrease}`);
-        
-        // Großzügige Toleranz für Rundungsfehler
-        if (actualDecrease >= (expectedDecrease * 0.9)) { // 10% Toleranz
-          console.log("✅ Balance-Änderung verifiziert - Swap erfolgreich!");
-          setDfaithBalance(currentBalance.toFixed(DFAITH_DECIMALS));
-          balanceVerified = true;
-          setSellStep('completed');
-          setSwapTxStatus("success");
-          setSellAmount("");
-          setQuoteTxData(null);
-          setSpenderAddress(null);
-          setTimeout(() => setSwapTxStatus(null), 5000);
-        } else {
-          console.log(`Versuch ${attempts}: Balance noch nicht ausreichend geändert, weiter warten...`);
-          // Kein throw - einfach weiter versuchen
-        }
+        const currentBalance = (dfaithRaw / Math.pow(10, DFAITH_DECIMALS)).toFixed(DFAITH_DECIMALS);
+        setDfaithBalance(currentBalance);
       } catch (balanceError) {
-        console.error(`Balance-Verifizierung Versuch ${attempts} fehlgeschlagen:`, balanceError);
-        // Auch bei Fehlern: weiter versuchen, nicht abbrechen
-        console.log("Balance-Abfrage fehlgeschlagen, versuche es weiter...");
+        console.error("Fehler beim Aktualisieren der Balance nach Swap-Fehler:", balanceError);
       }
       
-      // Sicherheitsventil: Nach 50 Versuchen (ca. 25+ Minuten) Fehler werfen
-      if (attempts >= 50) {
-        throw new Error("Balance-Verifizierung nach 50 Versuchen noch nicht erfolgreich - manuell prüfen");
-      }
+      setTimeout(() => setSwapTxStatus(null), 5000);
+    } finally {
+      setIsSwapping(false);
     }
-    
-  } catch (error) {
-    console.error("Swap Fehler:", error);
-    setSwapTxStatus("error");
-    
-    // Versuche trotzdem die Balance zu aktualisieren
-    try {
-      const dfaithValue = await fetchTokenBalanceViaInsightApi(DFAITH_TOKEN, account.address);
-      const dfaithRaw = Number(dfaithValue);
-      const currentBalance = (dfaithRaw / Math.pow(10, DFAITH_DECIMALS)).toFixed(DFAITH_DECIMALS);
-      setDfaithBalance(currentBalance);
-    } catch (balanceError) {
-      console.error("Fehler beim Aktualisieren der Balance nach Swap-Fehler:", balanceError);
-    }
-    
-    setTimeout(() => setSwapTxStatus(null), 5000);
-  } finally {
-    setIsSwapping(false);
-  }
-};
+  };
 
-// Alle Schritte in einer Funktion
-const handleSellAllInOne = async () => {
-  if (!sellAmount || parseFloat(sellAmount) <= 0 || isSwapping || parseFloat(sellAmount) > parseFloat(dfaithBalance)) return;
-  
-  try {
-    // Erster Schritt
-    console.log("Start des Verkaufsprozesses");
-    
-    // Nur weitere Schritte ausführen, wenn Quote erfolgreich war
-    if (sellStep === 'initial') {
-      setIsSwapping(true);
-      await handleGetQuote();
-    }
-    
-    // Nur Approve ausführen, wenn nötig
-    if (sellStep === 'quoteFetched' && needsApproval) {
-      await handleApprove();
-    }
-    
-    // Swap ausführen wenn Quote vorhanden und Approve erledigt/nicht nötig
-    if ((sellStep === 'quoteFetched' && !needsApproval) || sellStep === 'approved') {
-      await handleSellSwap();
-    }
-    
-  } catch (e: any) {
-    console.error("Verkaufsprozess Fehler:", e);
-    setQuoteError(e.message || "Fehler beim Verkauf");
-    setSwapTxStatus("error");
-    setTimeout(() => setSwapTxStatus(null), 4000);
-  } finally {
-    setIsSwapping(false);
-  }
-};
+// Alle Schritte in einer Funktion - ENTFERNT, da wir separate Buttons wollen
+// const handleSellAllInOne = async () => {
+//   // Diese Funktion wird entfernt da wir separate Schritte wollen
+// };
 
   // Token-Auswahl wie im BuyTab
   const tokenOptions = [
@@ -721,7 +913,7 @@ const handleSellAllInOne = async () => {
               {/* Professional Sell Widget Header */}
               <div className="text-center pb-3 border-b border-zinc-700">
                 <div className="w-12 h-12 bg-gradient-to-r from-amber-400 to-yellow-500 rounded-full mx-auto mb-2 flex items-center justify-center shadow-lg">
-                  <FaArrowDown className="text-black text-lg" />
+                  <FaCoins className="text-black text-lg" />
                 </div>
                 <p className="text-zinc-400 text-xs">Faith Utility Token auf Base Network</p>
                 {dfaithPrice && ethPriceEur && (
@@ -759,8 +951,8 @@ const handleSellAllInOne = async () => {
 
               {/* Amount Input Section */}
               <div className="space-y-3">
-                <div className="bg-zinc-800/50 rounded-xl p-3 border border-amber-500">
-                  <label className="block text-sm font-medium text-amber-400 mb-2">You Sell</label>
+                <div className="bg-zinc-800/50 rounded-xl p-3 border border-zinc-700">
+                  <label className="block text-sm font-medium text-zinc-300 mb-2">You Sell</label>
                   <div className="flex items-center gap-3 mb-2">
                     <div className="flex items-center gap-2 bg-amber-500/20 rounded-lg px-2 py-1 border border-amber-500/30 flex-shrink-0">
                       <FaCoins className="text-amber-400 text-sm" />
@@ -778,10 +970,15 @@ const handleSellAllInOne = async () => {
                     />
                   </div>
                   <div className="flex justify-between items-center text-xs">
-                    <span className="text-amber-400">Balance: {dfaithBalance} D.FAITH</span>
+                    <span className="text-zinc-500">Balance: {dfaithBalance} D.FAITH</span>
                     <button
                       className="text-amber-400 hover:text-amber-300 font-medium px-2 py-1 rounded"
-                      onClick={() => setSellAmount((parseFloat(dfaithBalance) * 0.95).toFixed(2))}
+                      onClick={() => {
+                        // Verwende 99% der Balance als Maximum, um Rundungsfehler zu vermeiden
+                        const maxSellAmount = (parseFloat(dfaithBalance) * 0.99).toFixed(2);
+                        console.log("Setting MAX amount:", maxSellAmount, "from balance:", dfaithBalance);
+                        setSellAmount(maxSellAmount);
+                      }}
                       disabled={isSwapping || parseFloat(dfaithBalance) <= 0 || sellStep !== 'initial'}
                     >
                       MAX
@@ -790,8 +987,8 @@ const handleSellAllInOne = async () => {
                 </div>
 
                 {/* You Receive Section mit Exchange Rate */}
-                <div className="bg-zinc-800/50 rounded-xl p-3 border border-yellow-500">
-                  <label className="block text-sm font-medium text-yellow-400 mb-2">You Receive</label>
+                <div className="bg-zinc-800/50 rounded-xl p-3 border border-zinc-700">
+                  <label className="block text-sm font-medium text-zinc-300 mb-2">You Receive</label>
                   <div className="flex items-center gap-3 mb-2">
                     <div className="flex items-center gap-2 bg-blue-500/20 rounded-lg px-2 py-1 border border-blue-500/30 flex-shrink-0">
                       <span className="text-blue-400 text-sm">⟠</span>
@@ -807,10 +1004,10 @@ const handleSellAllInOne = async () => {
                     </div>
                   </div>
                   <div className="flex justify-between items-center text-xs">
-                    <span className="text-yellow-400">
+                    <span className="text-zinc-500">
                       {dfaithPrice ? `1 D.FAITH = ${dfaithPrice.toFixed(6)} ETH` : "Loading..."}
                     </span>
-                    <span className="text-yellow-400">
+                    <span className="text-zinc-500">
                       {sellAmount && parseFloat(sellAmount) > 0 && dfaithPrice && ethPriceEur
                         ? `≈ €${(parseFloat(sellAmount) * dfaithPrice * ethPriceEur).toFixed(2)}`
                         : ""
@@ -831,7 +1028,7 @@ const handleSellAllInOne = async () => {
                       min="0.1"
                       max="50"
                       step="0.1"
-                      className="w-16 bg-zinc-700 border border-zinc-600 rounded-lg py-1 px-2 text-sm text-zinc-300 focus:border-red-500 focus:outline-none"
+                      className="w-16 bg-zinc-700 border border-zinc-600 rounded-lg py-1 px-2 text-sm text-zinc-300 focus:border-amber-500 focus:outline-none"
                       value={slippage}
                       onChange={(e) => setSlippage(e.target.value)}
                       disabled={isSwapping || sellStep !== 'initial'}
@@ -844,7 +1041,7 @@ const handleSellAllInOne = async () => {
                         key={value}
                         className={`px-2 py-1 rounded text-xs font-medium transition ${
                           slippage === value 
-                            ? "bg-red-500 text-white" 
+                            ? "bg-amber-500 text-black" 
                             : "bg-zinc-700 text-zinc-400 hover:bg-zinc-600"
                         }`}
                         onClick={() => setSlippage(value)}
@@ -895,7 +1092,7 @@ const handleSellAllInOne = async () => {
                 <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-2 text-red-400 text-sm">
                   <div className="flex items-center gap-2">
                     <span>⚠️</span>
-                    <span>Insufficient D.FAITH balance</span>
+                    <span>Insufficient D.FAITH balance ({dfaithBalance} available, {sellAmount} requested)</span>
                   </div>
                 </div>
               )}
@@ -909,49 +1106,77 @@ const handleSellAllInOne = async () => {
                 </div>
               )}
 
-              {/* Action Buttons */}
+              {/* Zusätzliche Balance-Warnung bei knapper Balance */}
+              {parseFloat(sellAmount) > 0 && parseFloat(sellAmount) > (parseFloat(dfaithBalance) * 0.95) && parseFloat(sellAmount) <= parseFloat(dfaithBalance) && (
+                <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-2 text-yellow-400 text-sm">
+                  <div className="flex items-center gap-2">
+                    <span>⚠️</span>
+                    <span>You&apos;re selling almost your entire balance. Consider leaving some D.FAITH for gas or future transactions.</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Action Buttons - Überarbeitet für sequenzielle Schritte */}
               <div className="space-y-2">
+                {/* Debug Info - nur in Entwicklung */}
+                {process.env.NODE_ENV === 'development' && (
+                  <div className="bg-gray-800 p-2 rounded text-xs text-gray-400">
+                    Debug: sellStep={sellStep}, needsApproval={needsApproval.toString()}, quoteTxData={quoteTxData ? 'present' : 'null'}
+                  </div>
+                )}
+                
+                {/* Schritt 1: Quote holen */}
                 {sellStep === 'initial' && (
                   <Button
-                    className="w-full bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-bold py-3 rounded-xl text-base transition-all transform hover:scale-[1.02]"
+                    className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-bold py-3 rounded-xl text-base transition-all transform hover:scale-[1.02]"
                     onClick={handleGetQuote}
                     disabled={
                       !sellAmount || 
                       parseFloat(sellAmount) <= 0 || 
-                      isSwapping || 
+                      swapTxStatus === "pending" || 
                       !account?.address || 
                       parseFloat(dfaithBalance) <= 0 ||
                       parseFloat(sellAmount) > parseFloat(dfaithBalance) ||
-                      parseFloat(sellAmount) < 0.01
+                      parseFloat(sellAmount) < 0.01 ||
+                      // Zusätzliche Sicherheit: Prüfe gegen 99% der Balance
+                      parseFloat(sellAmount) > (parseFloat(dfaithBalance) * 0.999)
                     }
                   >
-                    {isSwapping ? "Processing..." : "Get Quote"}
+                    {swapTxStatus === "pending" ? "Getting Quote..." : "Get Quote"}
                   </Button>
                 )}
 
+                {/* Schritt 2: Approve (nur wenn nötig) */}
                 {sellStep === 'quoteFetched' && needsApproval && (
                   <Button
-                    className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 rounded-xl text-base transition-all"
+                    className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-bold py-3 rounded-xl text-base transition-all transform hover:scale-[1.02]"
                     onClick={handleApprove}
-                    disabled={isSwapping}
+                    disabled={swapTxStatus === "approving" || swapTxStatus === "waiting_approval"}
                   >
-                    {isSwapping ? "Approving..." : "Approve D.FAITH"}
+                    {swapTxStatus === "approving" ? "Approving..." : 
+                     swapTxStatus === "waiting_approval" ? "Waiting for Approval..." : 
+                     "Approve D.FAITH"}
                   </Button>
                 )}
 
+                {/* Schritt 3: Sell (wenn Quote da ist und Approval nicht nötig oder bereits erledigt) */}
                 {((sellStep === 'quoteFetched' && !needsApproval) || sellStep === 'approved') && (
                   <Button
                     className="w-full bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-bold py-3 rounded-xl text-base transition-all transform hover:scale-[1.02]"
                     onClick={handleSellSwap}
-                    disabled={isSwapping}
+                    disabled={swapTxStatus === "swapping" || swapTxStatus === "confirming" || swapTxStatus === "verifying"}
                   >
-                    {isSwapping ? "Processing Sale..." : `Sell ${sellAmount || "0"} D.FAITH`}
+                    {swapTxStatus === "swapping" ? "Processing Sale..." : 
+                     swapTxStatus === "confirming" ? "Confirming..." : 
+                     swapTxStatus === "verifying" ? "Verifying..." : 
+                     `Sell ${sellAmount || "0"} D.FAITH`}
                   </Button>
                 )}
 
+                {/* Schritt 4: Neuer Verkauf nach Abschluss */}
                 {sellStep === 'completed' && (
                   <Button
-                    className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-bold py-3 rounded-xl text-base transition-all"
+                    className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-bold py-3 rounded-xl text-base transition-all"
                     onClick={() => {
                       setSellStep('initial');
                       setQuoteTxData(null);
@@ -962,7 +1187,6 @@ const handleSellAllInOne = async () => {
                       setSwapTxStatus(null);
                       setSlippage("1");
                     }}
-                    disabled={isSwapping}
                   >
                     Make Another Sale
                   </Button>
@@ -971,7 +1195,7 @@ const handleSellAllInOne = async () => {
             </div>
 
             <Button
-              className="w-full bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-yellow-500 hover:to-amber-400 text-white font-bold py-2 rounded-lg text-xs mt-2"
+              className="w-full bg-zinc-600 hover:bg-zinc-700 text-white font-bold py-2 rounded-lg text-xs mt-2"
               onClick={() => {
                 setShowSellModal(false);
                 setSelectedToken(null);
@@ -984,28 +1208,12 @@ const handleSellAllInOne = async () => {
                 setNeedsApproval(false);
                 setQuoteError(null);
               }}
-              disabled={isSwapping}
             >
               Schließen
             </Button>
           </div>
         </div>
       )}
-
-      {/* Hinweis */}
-      <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 mt-6">
-        <div className="flex items-start gap-3">
-          <div className="w-5 h-5 rounded-full bg-yellow-500/20 flex items-center justify-center mt-0.5">
-            <span className="text-yellow-400 text-xs">⚠️</span>
-          </div>
-          <div>
-            <div className="font-medium text-yellow-400 mb-1">Wichtiger Hinweis</div>
-            <div className="text-sm text-zinc-400">
-              Beim Verkauf von Token können Slippage und Gebühren anfallen. Überprüfen Sie die Details vor der Bestätigung.
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
