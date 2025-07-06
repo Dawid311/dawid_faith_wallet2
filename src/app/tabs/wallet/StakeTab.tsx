@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { Button } from "../../../../components/ui/button";
 import { Card } from "../../../../components/ui/card";
 import { FaLock, FaUnlock, FaCoins, FaClock, FaInfoCircle, FaTimes } from "react-icons/fa";
@@ -467,6 +467,45 @@ export default function StakeTab({ onStakeChanged }: StakeTabProps) {
     })();
   }, [account?.address]);
 
+  // State für echte Contract-Zeitberechnung
+  const [timeToMinClaimForAmount, setTimeToMinClaimForAmount] = useState<number | null>(null);
+  
+  // Funktion: Echte Contract-Zeit für einen Betrag abfragen
+  const getTimeToMinClaimFromContract = useCallback(async (amount: number) => {
+    if (!amount || amount <= 0) {
+      setTimeToMinClaimForAmount(null);
+      return;
+    }
+    
+    try {
+      console.log("🔍 Lade getTimeToMinClaim für", amount, "D.INVEST Token...");
+      
+      const staking = getContract({ client, chain: base, address: STAKING_CONTRACT });
+      const result = await readContract({
+        contract: staking,
+        method: "function getTimeToMinClaim(uint256) view returns (uint256)",
+        params: [BigInt(amount)]
+      });
+      
+      const timeInSeconds = Number(result);
+      console.log("⏳ Contract getTimeToMinClaim für", amount, "Token:", timeInSeconds, "Sekunden (≈", (timeInSeconds / 3600).toFixed(1), "Stunden)");
+      
+      setTimeToMinClaimForAmount(timeInSeconds);
+    } catch (error) {
+      console.error("❌ Fehler beim Laden getTimeToMinClaim:", error);
+      setTimeToMinClaimForAmount(null);
+    }
+  }, []);
+  
+  // Effekt: Lade Contract-Zeit wenn Stake-Betrag sich ändert
+  useEffect(() => {
+    if (stakeAmount && parseInt(stakeAmount) > 0) {
+      getTimeToMinClaimFromContract(parseInt(stakeAmount));
+    } else {
+      setTimeToMinClaimForAmount(null);
+    }
+  }, [stakeAmount, getTimeToMinClaimFromContract]);
+
   // Stake Function (echtes Staking mit Approval-Check)
   const handleStake = async () => {
     if (!stakeAmount || parseInt(stakeAmount) <= 0 || !account?.address) {
@@ -906,6 +945,13 @@ export default function StakeTab({ onStakeChanged }: StakeTabProps) {
   const formatTime = (seconds: number) => {
     if (seconds <= 0) return "0h 0m";
     
+    // Prüfe auf uint256.max oder ähnlich große Werte (Contract-Bug)
+    const MAX_UINT256 = "115792089237316195423570985008687907853269984665640564039457584007913129639935";
+    if (seconds.toString() === MAX_UINT256 || seconds > 1e15) {
+      console.warn("formatTime: Contract-Bug erkannt - uint256.max oder extrem großer Wert:", seconds);
+      return "Nicht verfügbar";
+    }
+    
     // Contract-Logik: Maximal ~60480 Sekunden (16.8 Stunden)
     // Wenn der Wert größer ist, ist wahrscheinlich ein Fehler aufgetreten
     if (seconds > 86400) { // Mehr als 24 Stunden = wahrscheinlich Fehler
@@ -1212,25 +1258,33 @@ export default function StakeTab({ onStakeChanged }: StakeTabProps) {
               <div className="text-xs text-zinc-500 mt-2">
                 {(() => {
                   const amount = parseInt(stakeAmount);
-                  const rate = currentRewardRate;
-                  const minClaim = Number(minClaimAmount);
-                  if (isNaN(amount) || isNaN(rate) || isNaN(minClaim)) return "Reward aktuell nicht verfügbar";
+                  if (isNaN(amount) || amount <= 0) return "Reward aktuell nicht verfügbar";
                   
-                  // Korrekte Berechnung: Zeit bis MIN_CLAIM_AMOUNT erreicht wird
-                  const rewardPerSecond = (amount * rate) / (100 * 604800); // 604800 = Sekunden pro Woche
-                  if (rewardPerSecond > 0) {
-                    const secondsToMinClaim = minClaim / rewardPerSecond;
-                    
-                    // Validation: Bei 1 D.INVEST Token sollte es ca. 16-17 Stunden dauern
-                    if (amount === 1 && rate === 10) {
-                      const expectedTime = (0.01 * 604800) / (1 * 10 / 100); // ~60480 Sekunden ≈ 16.8 Stunden
-                      console.log("⏳ Erwartete Zeit für 1 Token:", expectedTime, "Sekunden (≈", (expectedTime / 3600).toFixed(1), "Stunden)");
-                    }
-                    
-                    return `Nächster Claim möglich in: ${formatTime(secondsToMinClaim)}`;
-                  } else {
-                    return "Reward aktuell nicht verfügbar";
+                  // Zeige echte Contract-Zeit wenn verfügbar, sonst Schätzung
+                  if (timeToMinClaimForAmount !== null) {
+                    return `Nächster Claim möglich in: ${formatTime(timeToMinClaimForAmount)} (Contract)`;
                   }
+                  
+                  // Fallback: Vereinfachte Schätzung basierend auf wöchentlichem Reward
+                  const rate = currentRewardRate;
+                  if (rate === 0) return "Reward aktuell nicht verfügbar";
+                  
+                  const weeklyReward = (amount * rate) / 100; // D.FAITH pro Woche
+                  const minClaimValue = Number(minClaimAmount) || 0.01;
+                  
+                  if (weeklyReward <= 0) return "Reward aktuell nicht verfügbar";
+                  
+                  const weeksToMinClaim = minClaimValue / weeklyReward;
+                  const secondsToMinClaim = weeksToMinClaim * 604800;
+                  
+                  // Debug-Log für 1 Token
+                  if (amount === 1) {
+                    console.log("⏳ Wöchentlicher Reward für 1 Token:", weeklyReward, "D.FAITH");
+                    console.log("⏳ Wochen bis Min-Claim:", weeksToMinClaim);
+                    console.log("⏳ Zeit für 1 Token (Schätzung):", secondsToMinClaim, "Sekunden (≈", (secondsToMinClaim / 3600).toFixed(1), "Stunden)");
+                  }
+                  
+                  return `Nächster Claim möglich in: ${formatTime(secondsToMinClaim)} (geschätzt)`;
                 })()}
               </div>
             </div>
