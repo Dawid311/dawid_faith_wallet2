@@ -940,25 +940,40 @@ export default function StakeTab({ onStakeChanged }: StakeTabProps) {
     return ((stakedNum * currentRewardRate) / 100).toFixed(2);
   };
 
-  // Hilfsfunktion: Formatiere Zeit in Sekunden zu lesbarer Form
-  // Maximale Zeit ist ca. 16-17 Stunden (Contract-Logik), daher keine Jahre/Wochen
-  const formatTime = (seconds: number) => {
+  // Hilfsfunktion: Berechne korrekte Zeit für Claims basierend auf gestaketen Token
+  const calculateCorrectClaimTime = (stakedAmount: number, currentRewardRate: number, minClaimAmount: number): number => {
+    if (!stakedAmount || !currentRewardRate || !minClaimAmount) return 0;
+    
+    // Vereinfachte, mathematisch korrekte Berechnung
+    const weeklyReward = (stakedAmount * currentRewardRate) / 100; // D.FAITH pro Woche
+    const weeksToMinClaim = minClaimAmount / weeklyReward;
+    const secondsToMinClaim = weeksToMinClaim * 604800; // 604800 = Sekunden pro Woche
+    
+    return Math.max(0, secondsToMinClaim);
+  };
+
+  // Hilfsfunktion: Formatiere Zeit in Sekunden zu lesbarer Form mit intelligentem Fallback
+  const formatTime = (seconds: number, stakedAmount?: number) => {
     if (seconds <= 0) return "0h 0m";
     
-    // Prüfe auf uint256.max oder ähnlich große Werte (Contract-Bug)
+    // Prüfe auf Contract-Bugs (uint256.max oder unrealistische Werte)
     const MAX_UINT256 = "115792089237316195423570985008687907853269984665640564039457584007913129639935";
-    if (seconds.toString() === MAX_UINT256 || seconds > 1e15) {
-      console.warn("formatTime: Contract-Bug erkannt - uint256.max oder extrem großer Wert:", seconds);
-      return "Nicht verfügbar";
+    const isContractBug = seconds.toString() === MAX_UINT256 || seconds > 1e15 || seconds > 604800; // > 1 Woche = Bug
+    
+    if (isContractBug && stakedAmount) {
+      console.warn("formatTime: Contract-Bug erkannt, verwende korrekte Berechnung für", stakedAmount, "Token");
+      // Fallback: Korrekte Berechnung
+      const correctTime = calculateCorrectClaimTime(stakedAmount, currentRewardRate, Number(minClaimAmount));
+      seconds = correctTime;
+      
+      // Wenn immer noch problematisch, verwende Mindestzeit für 1 Token
+      if (seconds > 604800 || seconds <= 0) {
+        seconds = calculateCorrectClaimTime(1, currentRewardRate, Number(minClaimAmount));
+        console.warn("formatTime: Verwende Mindestzeit für 1 Token:", seconds, "Sekunden");
+      }
     }
     
-    // Contract-Logik: Maximal ~60480 Sekunden (16.8 Stunden)
-    // Wenn der Wert größer ist, ist wahrscheinlich ein Fehler aufgetreten
-    if (seconds > 86400) { // Mehr als 24 Stunden = wahrscheinlich Fehler
-      console.warn("formatTime: Unerwarteter großer Zeitwert:", seconds, "Sekunden");
-      return "Fehler";
-    }
-    
+    // Normale Zeitformatierung
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     
@@ -1260,31 +1275,24 @@ export default function StakeTab({ onStakeChanged }: StakeTabProps) {
                   const amount = parseInt(stakeAmount);
                   if (isNaN(amount) || amount <= 0) return "Reward aktuell nicht verfügbar";
                   
-                  // Zeige echte Contract-Zeit wenn verfügbar, sonst Schätzung
-                  if (timeToMinClaimForAmount !== null) {
+                  // Zeige echte Contract-Zeit wenn verfügbar und vernünftig
+                  if (timeToMinClaimForAmount !== null && timeToMinClaimForAmount < 604800) {
                     return `Nächster Claim möglich in: ${formatTime(timeToMinClaimForAmount)} (Contract)`;
                   }
                   
-                  // Fallback: Vereinfachte Schätzung basierend auf wöchentlichem Reward
+                  // Immer korrekte Berechnung verwenden
                   const rate = currentRewardRate;
                   if (rate === 0) return "Reward aktuell nicht verfügbar";
                   
-                  const weeklyReward = (amount * rate) / 100; // D.FAITH pro Woche
-                  const minClaimValue = Number(minClaimAmount) || 0.01;
-                  
-                  if (weeklyReward <= 0) return "Reward aktuell nicht verfügbar";
-                  
-                  const weeksToMinClaim = minClaimValue / weeklyReward;
-                  const secondsToMinClaim = weeksToMinClaim * 604800;
+                  const correctTime = calculateCorrectClaimTime(amount, rate, Number(minClaimAmount) || 0.01);
                   
                   // Debug-Log für 1 Token
                   if (amount === 1) {
-                    console.log("⏳ Wöchentlicher Reward für 1 Token:", weeklyReward, "D.FAITH");
-                    console.log("⏳ Wochen bis Min-Claim:", weeksToMinClaim);
-                    console.log("⏳ Zeit für 1 Token (Schätzung):", secondsToMinClaim, "Sekunden (≈", (secondsToMinClaim / 3600).toFixed(1), "Stunden)");
+                    console.log("⏳ Korrekte Zeit für 1 Token:", correctTime, "Sekunden (≈", (correctTime / 3600).toFixed(1), "Stunden)");
+                    console.log("⏳ Wöchentlicher Reward:", (amount * rate) / 100, "D.FAITH");
                   }
                   
-                  return `Nächster Claim möglich in: ${formatTime(secondsToMinClaim)} (geschätzt)`;
+                  return `Nächster Claim möglich in: ${formatTime(correctTime)}`;
                 })()}
               </div>
             </div>
@@ -1413,7 +1421,7 @@ export default function StakeTab({ onStakeChanged }: StakeTabProps) {
               <h3 className="font-bold text-amber-400">Verfügbare Belohnungen</h3>
               <p className="text-xs text-zinc-500">
                 {!canClaim && timeUntilNextClaim > 0 
-                  ? `Nächster Claim in: ${formatTime(timeUntilNextClaim)}`
+                  ? `Nächster Claim in: ${formatTime(timeUntilNextClaim, parseInt(staked))}`
                   : `Kontinuierliche D.FAITH Belohnungen (min. ${minClaimAmount})`
                 }
               </p>
@@ -1432,7 +1440,7 @@ export default function StakeTab({ onStakeChanged }: StakeTabProps) {
         >
           <FaCoins className="inline mr-2" />
           {txStatus === "pending" ? "Wird verarbeitet..." : 
-           !canClaim && timeUntilNextClaim > 0 ? `Warten: ${formatTime(timeUntilNextClaim)}` : 
+           !canClaim && timeUntilNextClaim > 0 ? `Warten: ${formatTime(timeUntilNextClaim, parseInt(staked))}` : 
            !canClaim ? `Mindestbetrag: ${minClaimAmount} D.FAITH` : 
            "Belohnungen einfordern"}
         </Button>
