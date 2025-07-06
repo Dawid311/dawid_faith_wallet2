@@ -7,6 +7,7 @@ import { getContract, prepareContractCall } from "thirdweb";
 import { client } from "../../client";
 import { balanceOf } from "thirdweb/extensions/erc20";
 
+// ÜBERPRÜFUNG: Ist das die korrekte D.FAITH Contract-Adresse auf Base?
 const DFAITH_TOKEN = "0xeB6f60E08AaAd7951896BdefC65cB789633BbeAd"; // D.FAITH auf Base (NEU Juli 2025)
 const DFAITH_DECIMALS = 2;
 
@@ -119,13 +120,23 @@ export default function SellTab() {
           const ethData = await ethResponse.json();
           setEthPriceEur(ethData['ethereum']?.eur || 3000);
         }
+        
+        // Preis-Abfrage: 1 D.FAITH (ohne Dezimalstellen) = 100 (da 2 Dezimalstellen)
+        const oneTokenRaw = Math.pow(10, DFAITH_DECIMALS).toString(); // "100" für 2 Dezimalstellen
+        
         const params = new URLSearchParams({
           chain: "base",
           inTokenAddress: DFAITH_TOKEN,
           outTokenAddress: "0x0000000000000000000000000000000000000000", // Native ETH
-          amount: "1",
+          amount: oneTokenRaw, // RAW-Wert: 100 (entspricht 1.00 D.FAITH)
           gasPrice: "1000000", // Base Chain: 0.001 Gwei (1000000 Wei)
         });
+        
+        console.log("=== PRICE FETCH DEBUG ===");
+        console.log("Price fetch amount (raw):", oneTokenRaw);
+        console.log("This represents:", oneTokenRaw, "raw units =", Number(oneTokenRaw) / Math.pow(10, DFAITH_DECIMALS), "D.FAITH");
+        console.log("=== END PRICE FETCH DEBUG ===");
+        
         const response = await fetch(`https://open-api.openocean.finance/v3/base/quote?${params}`);
         if (response.ok) {
           const data = await response.json();
@@ -173,6 +184,97 @@ export default function SellTab() {
     }
   };
 
+  // Erweiterte Debugging-Funktion für Contract-Verifikation
+  const verifyContractAndBalance = async () => {
+    if (!account?.address) return;
+    
+    try {
+      console.log("=== CONTRACT VERIFICATION ===");
+      console.log("D.FAITH Contract:", DFAITH_TOKEN);
+      console.log("User Address:", account.address);
+      console.log("Expected Decimals:", DFAITH_DECIMALS);
+      
+      // Prüfe Contract mit Thirdweb
+      const contract = getContract({
+        client,
+        chain: base,
+        address: DFAITH_TOKEN
+      });
+      
+      // Hole Balance über Thirdweb
+      const thirdwebBalance = await balanceOf({
+        contract,
+        address: account.address,
+      });
+      
+      console.log("Thirdweb Balance (Raw):", thirdwebBalance.toString());
+      console.log("Thirdweb Balance (Display):", (Number(thirdwebBalance) / Math.pow(10, DFAITH_DECIMALS)).toFixed(DFAITH_DECIMALS));
+      
+      // Hole Balance über API
+      const apiBalance = await fetchTokenBalanceViaInsightApi(DFAITH_TOKEN, account.address);
+      console.log("API Balance (Raw):", apiBalance);
+      console.log("API Balance (Display):", (Number(apiBalance) / Math.pow(10, DFAITH_DECIMALS)).toFixed(DFAITH_DECIMALS));
+      
+      // Vergleiche die Ergebnisse
+      const thirdwebRaw = Number(thirdwebBalance);
+      const apiRaw = Number(apiBalance);
+      
+      console.log("Balance Comparison:");
+      console.log("Thirdweb Raw:", thirdwebRaw);
+      console.log("API Raw:", apiRaw);
+      console.log("Difference:", Math.abs(thirdwebRaw - apiRaw));
+      console.log("Match:", thirdwebRaw === apiRaw);
+      
+      // Prüfe Contract-Details
+      try {
+        const { readContract } = await import("thirdweb");
+        
+        const name = await readContract({
+          contract,
+          method: "function name() view returns (string)",
+          params: []
+        });
+        console.log("Contract Name:", name);
+        
+        const symbol = await readContract({
+          contract,
+          method: "function symbol() view returns (string)",
+          params: []
+        });
+        console.log("Contract Symbol:", symbol);
+        
+        const decimals = await readContract({
+          contract,
+          method: "function decimals() view returns (uint8)",
+          params: []
+        });
+        console.log("Contract Decimals:", decimals);
+        console.log("Expected Decimals:", DFAITH_DECIMALS);
+        console.log("Decimals Match:", Number(decimals) === DFAITH_DECIMALS);
+        
+        if (Number(decimals) !== DFAITH_DECIMALS) {
+          console.error("❌ DECIMALS MISMATCH!");
+          console.error("Contract has", decimals, "decimals, but we're using", DFAITH_DECIMALS);
+        }
+        
+      } catch (contractError) {
+        console.error("Contract details error:", contractError);
+      }
+      
+      console.log("=== END CONTRACT VERIFICATION ===");
+      
+    } catch (error) {
+      console.error("Contract verification failed:", error);
+    }
+  };
+
+  // Teste die Contract-Verifikation beim Start
+  useEffect(() => {
+    if (account?.address) {
+      verifyContractAndBalance();
+    }
+  }, [account?.address]);
+
   // Funktion um eine Verkaufs-Quote zu erhalten (angepasst von BuyTab-Logik)
   const handleGetQuote = async () => {
     setSwapTxStatus("pending");
@@ -184,9 +286,14 @@ export default function SellTab() {
     try {
       if (!sellAmount || parseFloat(sellAmount) <= 0 || !account?.address) return;
 
-      console.log("=== OpenOcean Quote Request für Base ===");
-      console.log("D.FAITH Amount:", sellAmount);
+      console.log("=== ENHANCED QUOTE REQUEST DEBUG ===");
+      console.log("D.FAITH Contract:", DFAITH_TOKEN);
+      console.log("User Address:", account.address);
+      console.log("Sell Amount Input:", sellAmount);
       console.log("D.FAITH Balance:", dfaithBalance);
+      
+      // Verifikation der Contract-Adresse vor Quote
+      await verifyContractAndBalance();
       
       // WICHTIG: Prüfe Balance VOR der Konvertierung
       const sellAmountNum = parseFloat(sellAmount);
@@ -199,23 +306,60 @@ export default function SellTab() {
         throw new Error(`Insufficient balance. Available: ${balanceNum}, Requested: ${sellAmountNum}`);
       }
       
-      // Verwende eine konservativere Konvertierung ohne Math.floor
-      const sellAmountRaw = Math.round(sellAmountNum * Math.pow(10, DFAITH_DECIMALS)).toString();
+      // Hole die aktuellste Balance direkt vom Contract
+      const contract = getContract({
+        client,
+        chain: base,
+        address: DFAITH_TOKEN
+      });
       
-      console.log("Verkaufsbetrag (Raw):", sellAmountRaw);
-      console.log("Verkaufsbetrag (Decimal Check):", sellAmountRaw, "=", sellAmountNum * Math.pow(10, DFAITH_DECIMALS));
+      const currentBalance = await balanceOf({
+        contract,
+        address: account.address,
+      });
+      
+      const currentBalanceNum = Number(currentBalance) / Math.pow(10, DFAITH_DECIMALS);
+      console.log("Current Contract Balance:", currentBalanceNum);
+      
+      if (sellAmountNum > currentBalanceNum) {
+        throw new Error(`Insufficient balance (fresh check). Available: ${currentBalanceNum}, Requested: ${sellAmountNum}`);
+      }
+      
+      // WICHTIG: Konvertiere zu Raw-Werten OHNE Dezimalstellen für OpenOcean
+      // D.FAITH hat 2 Dezimalstellen, also multipliziere mit 10^2 = 100
+      const sellAmountRaw = Math.floor(sellAmountNum * Math.pow(10, DFAITH_DECIMALS)).toString();
+      
+      console.log("=== ENHANCED DECIMAL CONVERSION CHECK ===");
+      console.log("DFAITH_DECIMALS:", DFAITH_DECIMALS);
+      console.log("Verkaufsbetrag (Display):", sellAmountNum);
+      console.log("Verkaufsbetrag (Raw ohne Dezimalstellen):", sellAmountRaw);
+      console.log("Conversion Check:", sellAmountNum, "* 10^" + DFAITH_DECIMALS, "=", sellAmountNum * Math.pow(10, DFAITH_DECIMALS));
+      console.log("Nach Math.floor:", Math.floor(sellAmountNum * Math.pow(10, DFAITH_DECIMALS)));
+      console.log("Balance (Raw):", Number(currentBalance).toString());
+      console.log("Raw Balance >= Raw Sell Amount:", Number(currentBalance) >= Math.floor(sellAmountNum * Math.pow(10, DFAITH_DECIMALS)));
+      console.log("=== END ENHANCED CONVERSION CHECK ===");
+      
+      // Zusätzliche Sicherheit: Prüfe ob Raw-Werte sinnvoll sind
+      if (Number(sellAmountRaw) > Number(currentBalance)) {
+        throw new Error(`Raw amount exceeds balance. Raw sell: ${sellAmountRaw}, Raw balance: ${currentBalance}`);
+      }
       
       const quoteParams = new URLSearchParams({
         chain: "base",
-        inTokenAddress: DFAITH_TOKEN,
+        inTokenAddress: DFAITH_TOKEN, // Verwende exakt die gleiche Adresse
         outTokenAddress: "0x0000000000000000000000000000000000000000", // Native ETH
-        amount: sellAmountRaw,
+        amount: sellAmountRaw, // RAW-Wert ohne Dezimalstellen
         slippage: slippage,
         gasPrice: "1000000", // Base Chain: 0.001 Gwei (1000000 Wei)
         account: account.address,
       });
       
+      console.log("=== OPENOCEAN REQUEST DEBUG ===");
       console.log("Quote URL:", `https://open-api.openocean.finance/v3/base/swap_quote?${quoteParams}`);
+      console.log("inTokenAddress:", DFAITH_TOKEN);
+      console.log("amount (raw):", sellAmountRaw);
+      console.log("account:", account.address);
+      console.log("=== END OPENOCEAN REQUEST DEBUG ===");
       
       const quoteUrl = `https://open-api.openocean.finance/v3/base/swap_quote?${quoteParams}`;
       const quoteResponse = await fetch(quoteUrl);
@@ -228,7 +372,7 @@ export default function SellTab() {
       console.log("Quote Response:", quoteData);
       
       if (!quoteData || quoteData.code !== 200 || !quoteData.data) {
-        throw new Error('OpenOcean: Keine gültige Quote erhalten');
+        throw new Error(`OpenOcean: Keine gültige Quote erhalten (Code: ${quoteData?.code})`);
       }
       
       const txData = quoteData.data;
@@ -991,28 +1135,12 @@ export default function SellTab() {
                 setNeedsApproval(false);
                 setQuoteError(null);
               }}
-              disabled={isSwapping}
             >
               Schließen
             </Button>
           </div>
         </div>
       )}
-
-      {/* Hinweis */}
-      <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 mt-6">
-        <div className="flex items-start gap-3">
-          <div className="w-5 h-5 rounded-full bg-yellow-500/20 flex items-center justify-center mt-0.5">
-            <span className="text-yellow-400 text-xs">⚠️</span>
-          </div>
-          <div>
-            <div className="font-medium text-yellow-400 mb-1">Wichtiger Hinweis</div>
-            <div className="text-sm text-zinc-400">
-              Beim Verkauf von Token können Slippage und Gebühren anfallen. Überprüfen Sie die Details vor der Bestätigung.
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
