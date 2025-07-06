@@ -214,38 +214,32 @@ export default function StakeTab() {
                   });
                   console.log("✅ getTimeToMinClaim erfolgreich:", timeToMinClaim.toString());
                   
-                  // Wenn der Wert zu groß ist (type(uint256).max), setze eine Schätzung
-                  if (Number(timeToMinClaim) > 10 * 365 * 24 * 60 * 60) {
-                    console.log("⏳ Zeit zu groß, verwende Fallback-Berechnung");
-                    const remainingRewards = minClaim - claimableAmountFromReward;
-                    const rewardRate = currentRewardRate;
-                    const rewardPerSecond = (Number(stakedAmount) * rewardRate) / (100 * 604800);
-                    
-                    if (rewardPerSecond > 0) {
-                      const estimatedSeconds = (remainingRewards * 100) / rewardPerSecond;
-                      setTimeUntilNextClaim(Math.max(0, estimatedSeconds));
-                      console.log("⏳ Claiming (Fallback) in:", estimatedSeconds, "Sekunden");
-                    } else {
-                      setTimeUntilNextClaim(3600);
-                      console.log("⏳ Claiming nicht verfügbar (Rate 0)");
-                    }
-                  } else {
-                    setTimeUntilNextClaim(Number(timeToMinClaim));
-                    console.log("⏳ Claiming (Contract) in:", Number(timeToMinClaim), "Sekunden");
-                  }
+                  // Contract-Wert direkt verwenden - keine unrealistisch großen Werte bei festen Reward-Raten
+                  setTimeUntilNextClaim(Number(timeToMinClaim));
+                  console.log("⏳ Claiming (Contract) in:", Number(timeToMinClaim), "Sekunden");
+                  
+                  // Validation: Bei 1 D.INVEST Token sollte es ca. 16-17 Stunden dauern (0.01 D.FAITH bei 0.10% pro Woche)
+                  const expectedMinTimeFor1Token = (0.01 * 604800) / (1 * 10 / 100); // ~60480 Sekunden ≈ 16.8 Stunden
+                  console.log("⏳ Erwartete Mindestzeit für 1 Token:", expectedMinTimeFor1Token, "Sekunden (≈", (expectedMinTimeFor1Token / 3600).toFixed(1), "Stunden)");
                 } catch (timeError) {
                   console.error("❌ getTimeToMinClaim fehlgeschlagen:", timeError);
                   console.log("🔄 Verwende Fallback-Berechnung für Zeit...");
                   
                   // Fallback: Zeit bis MIN_CLAIM_AMOUNT erreicht wird
                   const remainingRewards = minClaim - claimableAmountFromReward;
-                  const rewardRate = currentRewardRate;
-                  const rewardPerSecond = (Number(stakedAmount) * rewardRate) / (100 * 604800);
+                  const rewardRate = currentRewardRate; // z.B. 10 für 0.10%
+                  
+                  // Korrekte Berechnung: Reward pro Sekunde für gestakte Token
+                  const rewardPerSecond = (Number(stakedAmount) * rewardRate) / (100 * 604800); // 604800 = Sekunden pro Woche
                   
                   if (rewardPerSecond > 0) {
-                    const estimatedSeconds = (remainingRewards * 100) / rewardPerSecond;
+                    const estimatedSeconds = remainingRewards / rewardPerSecond;
                     setTimeUntilNextClaim(Math.max(0, estimatedSeconds));
                     console.log("⏳ Claiming (Fallback) in:", estimatedSeconds, "Sekunden");
+                    
+                    // Validation: Bei 1 D.INVEST Token (Rate 10) sollte es ca. 16-17 Stunden dauern
+                    const expectedMinTimeFor1Token = (0.01 * 604800) / (1 * 10 / 100); // ~60480 Sekunden ≈ 16.8 Stunden
+                    console.log("⏳ Erwartete Mindestzeit für 1 Token:", expectedMinTimeFor1Token, "Sekunden (≈", (expectedMinTimeFor1Token / 3600).toFixed(1), "Stunden)");
                   } else {
                     setTimeUntilNextClaim(3600);
                     console.log("⏳ Claiming nicht verfügbar (Rate 0)");
@@ -1107,10 +1101,17 @@ export default function StakeTab() {
                   const minClaim = Number(minClaimAmount);
                   if (isNaN(amount) || isNaN(rate) || isNaN(minClaim)) return "Reward aktuell nicht verfügbar";
                   
-                  // Einfache Berechnung: Zeit bis MIN_CLAIM_AMOUNT erreicht wird
+                  // Korrekte Berechnung: Zeit bis MIN_CLAIM_AMOUNT erreicht wird
                   const rewardPerSecond = (amount * rate) / (100 * 604800); // 604800 = Sekunden pro Woche
                   if (rewardPerSecond > 0) {
-                    const secondsToMinClaim = (minClaim * 100) / (amount * rate / 604800);
+                    const secondsToMinClaim = minClaim / rewardPerSecond;
+                    
+                    // Validation: Bei 1 D.INVEST Token sollte es ca. 16-17 Stunden dauern
+                    if (amount === 1 && rate === 10) {
+                      const expectedTime = (0.01 * 604800) / (1 * 10 / 100); // ~60480 Sekunden ≈ 16.8 Stunden
+                      console.log("⏳ Erwartete Zeit für 1 Token:", expectedTime, "Sekunden (≈", (expectedTime / 3600).toFixed(1), "Stunden)");
+                    }
+                    
                     return `Nächster Claim möglich in: ${formatTime(secondsToMinClaim)}`;
                   } else {
                     return "Reward aktuell nicht verfügbar";
