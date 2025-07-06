@@ -186,9 +186,24 @@ export default function SellTab() {
 
       console.log("=== OpenOcean Quote Request für Base ===");
       console.log("D.FAITH Amount:", sellAmount);
+      console.log("D.FAITH Balance:", dfaithBalance);
       
-      // Verwende gleiche Logik wie BuyTab für Mengen-Konvertierung
-      const sellAmountRaw = Math.floor(parseFloat(sellAmount) * Math.pow(10, DFAITH_DECIMALS)).toString();
+      // WICHTIG: Prüfe Balance VOR der Konvertierung
+      const sellAmountNum = parseFloat(sellAmount);
+      const balanceNum = parseFloat(dfaithBalance);
+      
+      console.log("Verkaufsbetrag (Float):", sellAmountNum);
+      console.log("Balance (Float):", balanceNum);
+      
+      if (sellAmountNum > balanceNum) {
+        throw new Error(`Insufficient balance. Available: ${balanceNum}, Requested: ${sellAmountNum}`);
+      }
+      
+      // Verwende eine konservativere Konvertierung ohne Math.floor
+      const sellAmountRaw = Math.round(sellAmountNum * Math.pow(10, DFAITH_DECIMALS)).toString();
+      
+      console.log("Verkaufsbetrag (Raw):", sellAmountRaw);
+      console.log("Verkaufsbetrag (Decimal Check):", sellAmountRaw, "=", sellAmountNum * Math.pow(10, DFAITH_DECIMALS));
       
       const quoteParams = new URLSearchParams({
         chain: "base",
@@ -199,6 +214,8 @@ export default function SellTab() {
         gasPrice: "1000000", // Base Chain: 0.001 Gwei (1000000 Wei)
         account: account.address,
       });
+      
+      console.log("Quote URL:", `https://open-api.openocean.finance/v3/base/swap_quote?${quoteParams}`);
       
       const quoteUrl = `https://open-api.openocean.finance/v3/base/swap_quote?${quoteParams}`;
       const quoteResponse = await fetch(quoteUrl);
@@ -399,6 +416,36 @@ export default function SellTab() {
   // Funktion für den eigentlichen Token-Swap (angepasst von BuyTab-Logik)
   const handleSellSwap = async () => {
     if (!quoteTxData || !account?.address) return;
+    
+    // WICHTIGE BALANCE-PRÜFUNG VOR DEM SWAP
+    try {
+      console.log("=== BALANCE-PRÜFUNG VOR SWAP ===");
+      
+      // Hole aktuelle Balance direkt vor dem Swap
+      const currentBalanceRaw = await fetchTokenBalanceViaInsightApi(DFAITH_TOKEN, account.address);
+      const currentBalance = Number(currentBalanceRaw) / Math.pow(10, DFAITH_DECIMALS);
+      const sellAmountNum = parseFloat(sellAmount);
+      
+      console.log("Aktuelle Balance vor Swap:", currentBalance);
+      console.log("Verkaufsbetrag:", sellAmountNum);
+      console.log("Balance ausreichend?", currentBalance >= sellAmountNum);
+      
+      if (currentBalance < sellAmountNum) {
+        throw new Error(`Insufficient balance for swap. Available: ${currentBalance}, Required: ${sellAmountNum}`);
+      }
+      
+      // Zusätzliche Sicherheit: Prüfe gegen 99.5% der Balance
+      if (sellAmountNum > (currentBalance * 0.995)) {
+        console.log("⚠️ Warnung: Verkauf von mehr als 99.5% der Balance");
+      }
+      
+    } catch (balanceError) {
+      console.error("Balance-Prüfung fehlgeschlagen:", balanceError);
+      setSwapTxStatus("error");
+      setTimeout(() => setSwapTxStatus(null), 5000);
+      return;
+    }
+    
     setIsSwapping(true);
     setSwapTxStatus("swapping");
     
@@ -409,14 +456,6 @@ export default function SellTab() {
     try {
       console.log("=== D.FAITH Verkauf-Swap wird gestartet auf Base ===");
       console.log("Verwende Quote-Daten:", quoteTxData);
-      console.log("=== SWAP TRANSACTION DETAILS ===");
-      console.log("Transaction TO:", quoteTxData.to);
-      console.log("Transaction DATA:", quoteTxData.data);
-      console.log("Transaction VALUE:", quoteTxData.value);
-      console.log("Transaction GAS:", quoteTxData.gas);
-      console.log("Transaction GASPRICE:", quoteTxData.gasPrice);
-      console.log("Vollständige Swap TX JSON:", JSON.stringify(quoteTxData, null, 2));
-      console.log("=== END SWAP TX JSON ===");
       
       // Stelle sicher, dass wir auf Base Chain (ID: 8453) sind
       console.log("Target Chain:", base.name, "Chain ID:", base.id);
@@ -424,38 +463,29 @@ export default function SellTab() {
         throw new Error("Falsche Chain - Base Chain erwartet");
       }
       
-      // Verwende die Quote-Daten direkt als Transaktion (wie im BuyTab)
-      console.log("=== VERWENDE QUOTE-DATEN DIREKT FÜR SWAP ===");
-      console.log("Quote TO:", quoteTxData.to);
-      console.log("Quote DATA:", quoteTxData.data);
-      console.log("Quote VALUE:", quoteTxData.value);
-      console.log("Quote GAS:", quoteTxData.gas);
-      console.log("=== QUOTE-DATEN WERDEN DIREKT VERWENDET ===");
-      
       setSwapTxStatus("confirming");
       
-      // Sende Transaktion direkt mit Quote-Daten
+      // Sende Transaktion mit prepareTransaction (korrektes Objekt für sendTransaction)
       try {
         console.log("Sende D.FAITH Verkaufs-Transaktion direkt auf Base Chain");
-        
-        // Verwende thirdweb sendTransaction mit den Quote-Daten direkt
+
+        // Bereite die Transaktion mit prepareTransaction vor
         const { prepareTransaction } = await import("thirdweb");
-        
-        const swapTransaction = await prepareTransaction({
+        const preparedTx = prepareTransaction({
           to: quoteTxData.to,
           data: quoteTxData.data,
           value: BigInt(quoteTxData.value || "0"),
           chain: base,
           client,
-          gasPrice: BigInt("1000000"), // 0.001 Gwei für Base Chain
-          gas: BigInt(quoteTxData.gas || "300000"),
+          // Optional: gas/gasPrice können gesetzt werden, aber oft automatisch geschätzt
+          // gas: BigInt(quoteTxData.gas || "300000"),
+          // gasPrice: BigInt("1000000"),
         });
-        
-        const txResult = await sendTransaction(swapTransaction);
+
+        const txResult = await sendTransaction(preparedTx);
+
         console.log("✅ VERKAUFS-TRANSAKTION GESENDET:", txResult);
-        
-        // Da sendTransaction void zurückgibt, können wir nicht sofort die TxHash prüfen
-        // Die Balance-Verifizierung wird das Ergebnis bestätigen
+
       } catch (txError: any) {
         console.log("Transaction error details:", txError);
         
