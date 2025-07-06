@@ -1000,6 +1000,24 @@ export default function BuyTab() {
                 >
                   Weiter zu Stripe
                 </Button>
+                <Button
+                  className="w-full bg-zinc-600 hover:bg-zinc-700 text-white font-bold py-2 rounded-lg text-xs mt-2"
+                  onClick={() => {
+                    setShowBuyModal(false);
+                    setSelectedToken(null);
+                    setSwapAmountEth("");
+                    setSlippage("1");
+                    setSwapTxStatus(null);
+                    setBuyStep('initial');
+                    setQuoteTxData(null);
+                    setSpenderAddress(null);
+                    setNeedsApproval(false);
+                    setQuoteError(null);
+                  }}
+                  disabled={isSwapping}
+                >
+                  Schließen
+                </Button>
               </>
             )}
             {selectedToken === "ETH" && (
@@ -1014,24 +1032,6 @@ export default function BuyTab() {
                 />
               </div>
             )}
-            <Button
-              className="w-full bg-zinc-600 hover:bg-zinc-700 text-white font-bold py-2 rounded-lg text-xs mt-2"
-              onClick={() => {
-                setShowBuyModal(false);
-                setSelectedToken(null);
-                setSwapAmountEth("");
-                setSlippage("1");
-                setSwapTxStatus(null);
-                setBuyStep('initial');
-                setQuoteTxData(null);
-                setSpenderAddress(null);
-                setNeedsApproval(false);
-                setQuoteError(null);
-              }}
-              disabled={isSwapping}
-            >
-              Schließen
-            </Button>
           </div>
         </div>
       )}

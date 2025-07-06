@@ -972,25 +972,6 @@ const handleSellAllInOne = async () => {
                 )}
               </div>
             </div>
-
-            <Button
-              className="w-full bg-zinc-600 hover:bg-zinc-700 text-white font-bold py-2 rounded-lg text-xs mt-2"
-              onClick={() => {
-                setShowSellModal(false);
-                setSelectedToken(null);
-                setSellAmount("");
-                setSlippage("1");
-                setSwapTxStatus(null);
-                setSellStep('initial');
-                setQuoteTxData(null);
-                setSpenderAddress(null);
-                setNeedsApproval(false);
-                setQuoteError(null);
-              }}
-              disabled={isSwapping}
-            >
-              Schließen
-            </Button>
           </div>
         </div>
       )}

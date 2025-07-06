@@ -69,14 +69,19 @@ function TokenTransferModal({
   // Success Modal
   if (showSuccess) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-        <div className="bg-zinc-900 rounded-xl w-full max-w-sm mx-4 p-8 flex flex-col items-center border border-green-500">
-          <div className="text-5xl mb-4">✅</div>
-          <div className="text-green-400 text-xl font-bold mb-2">Token gesendet!</div>
-          <div className="text-zinc-300 text-center mb-4">Deine Transaktion wurde erfolgreich abgeschickt.</div>
-          <Button className="w-full bg-gradient-to-r from-green-400 to-green-600 text-black font-bold py-3 rounded-xl mt-2" onClick={onSuccessClose}>
-            Schließen
-          </Button>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 overflow-y-auto p-4 pt-20">
+        <div className="bg-zinc-900 rounded-xl p-6 max-w-sm w-full border border-green-500 my-4">
+          <div className="text-center">
+            <div className="text-4xl mb-3">✅</div>
+            <div className="text-green-400 text-xl font-bold mb-2">Token gesendet!</div>
+            <div className="text-zinc-300 text-sm mb-4">Deine Transaktion wurde erfolgreich abgeschickt.</div>
+            <Button 
+              className="w-full bg-gradient-to-r from-green-400 to-green-600 text-black font-bold py-3 rounded-xl" 
+              onClick={onSuccessClose}
+            >
+              Schließen
+            </Button>
+          </div>
         </div>
       </div>
     );
@@ -84,143 +89,136 @@ function TokenTransferModal({
 
   return (
     <div 
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 overflow-y-auto p-4 pt-20"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="bg-zinc-900 rounded-xl w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto shadow-2xl border border-zinc-700">
+      <div className="bg-zinc-900 rounded-xl p-3 sm:p-6 max-w-sm w-full border border-amber-400 max-h-[85vh] overflow-y-auto my-4 relative">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-zinc-700">
-          <div className="flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-full bg-gradient-to-r ${token.color} flex items-center justify-center`}>
-              {token.icon}
-            </div>
-            <div>
-              <h3 className="font-bold text-lg text-white">{token.label} senden</h3>
-              <p className="text-zinc-400 text-sm">Verfügbar: {token.balance}</p>
-            </div>
-          </div>
+        <div className="flex items-center justify-end mb-2">
           <button 
-            className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg transition-all"
+            className="p-2 text-amber-400 hover:text-yellow-300 hover:bg-zinc-800 rounded-lg transition-all flex-shrink-0"
             onClick={onClose}
+            disabled={isSending}
           >
-            <FaTimes size={16} />
+            <span className="text-lg">✕</span>
           </button>
         </div>
         
+        {/* Modal Header */}
+        <div className="text-center pb-3 border-b border-zinc-700 mb-4">
+          <div className={`w-12 h-12 rounded-full bg-gradient-to-r ${token.color} mx-auto mb-2 flex items-center justify-center shadow-lg`}>
+            {getTokenIcon(token.key)}
+          </div>
+          <h3 className="text-xl font-bold text-white mb-1">{token.label} senden</h3>
+          <p className="text-zinc-400 text-xs">Verfügbar: {token.balance} {token.symbol}</p>
+        </div>
+        
         {/* Content */}
-        <div className="p-6 space-y-6">
+        <div className="space-y-4">
           {/* Betrag Eingabe */}
-          <div className="space-y-3">
-            <label className="text-sm font-semibold text-zinc-300 flex items-center gap-2">
-              <FaExchangeAlt className="text-amber-400" />
-              Betrag eingeben:
-            </label>
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-zinc-300">Betrag</label>
             
-            <div className="bg-zinc-800/50 rounded-xl border border-zinc-700 p-4">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="flex-1">
-                  <input
-                    type="number"
-                    placeholder="0.00"
-                    min="0"
-                    step={token.key === "DINVEST" ? "1" : "0.000001"}
-                    className={`w-full bg-transparent text-2xl font-bold placeholder-zinc-500 focus:outline-none ${
-                      sendAmount && parseFloat(sendAmount) > parseFloat(token.balance.replace(",", ".")) 
-                        ? 'text-red-400' 
-                        : 'text-white'
-                    }`}
-                    value={sendAmount}
-                    onChange={e => {
-                      let val = e.target.value.replace(",", ".");
-                      if (token.key === "DINVEST") val = val.replace(/\..*$/, "");
-                      setSendAmount(val);
-                    }}
-                  />
-                  <div className="flex items-center justify-between mt-1">
-                    <span className="text-zinc-400 text-sm">
-                      Verfügbar: {token.balance} {token.symbol}
-                    </span>
-                    <button
-                      className="bg-gradient-to-r from-amber-500 to-yellow-600 text-black px-4 py-1 rounded-lg text-sm font-bold hover:opacity-90 transition-opacity"
-                      type="button"
-                      onClick={handleMax}
-                    >
-                      MAX
-                    </button>
-                  </div>
+            <div className="bg-zinc-800/50 rounded-xl border border-zinc-700 p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <div className={`flex items-center gap-2 bg-gradient-to-r ${token.color} bg-opacity-20 rounded-lg px-2 py-1 border border-opacity-30 flex-shrink-0`}>
+                  {getTokenIcon(token.key)}
+                  <span className="text-xs font-semibold">{token.symbol}</span>
                 </div>
+                <input
+                  type="number"
+                  placeholder="0.00"
+                  min="0"
+                  step={token.key === "DINVEST" ? "1" : "0.000001"}
+                  className={`flex-1 bg-transparent text-lg font-bold placeholder-zinc-500 focus:outline-none min-w-0 ${
+                    sendAmount && parseFloat(sendAmount) > parseFloat(token.balance.replace(",", ".")) 
+                      ? 'text-red-400' 
+                      : 'text-white'
+                  }`}
+                  value={sendAmount}
+                  onChange={e => {
+                    let val = e.target.value.replace(",", ".");
+                    if (token.key === "DINVEST") val = val.replace(/\..*$/, "");
+                    setSendAmount(val);
+                  }}
+                  disabled={isSending}
+                />
               </div>
-              {/* Balance-Validierung */}
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-zinc-500">Balance: {token.balance}</span>
+                <button
+                  className="text-amber-400 hover:text-amber-300 font-medium px-2 py-1 rounded"
+                  type="button"
+                  onClick={handleMax}
+                  disabled={isSending}
+                >
+                  MAX
+                </button>
+              </div>
+              {/* Validation */}
               {sendAmount && parseFloat(sendAmount) > parseFloat(token.balance.replace(",", ".")) && (
-                <div className="mt-2 text-sm text-red-400 bg-red-500/20 border border-red-500/30 rounded-lg p-2 flex items-center gap-2">
-                  <span>❌</span>
+                <div className="mt-2 text-xs text-red-400 bg-red-500/20 border border-red-500/30 rounded-lg p-2 flex items-center gap-2">
+                  <span>⚠️</span>
                   <span>Nicht genügend {token.symbol} verfügbar</span>
-                </div>
-              )}
-              {txError && (
-                <div className="mt-2 text-sm text-red-400 bg-red-500/20 border border-red-500/30 rounded-lg p-2 flex items-center gap-2">
-                  <span>❌</span>
-                  <span>{txError}</span>
                 </div>
               )}
             </div>
           </div>
 
           {/* Empfänger Eingabe */}
-          <div className="space-y-3">
-            <label className="text-sm font-semibold text-zinc-300 flex items-center gap-2">
-              <FaWallet className="text-amber-400" />
-              Empfänger Adresse:
-            </label>
-            <div className="bg-zinc-800/50 rounded-xl border border-zinc-700 p-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-zinc-300">Empfänger</label>
+            <div className="bg-zinc-800/50 rounded-xl border border-zinc-700 p-3">
               <input
                 type="text"
                 placeholder="0x... oder ENS Name"
-                className="w-full bg-transparent text-white placeholder-zinc-500 focus:outline-none font-mono"
+                className="w-full bg-transparent text-white placeholder-zinc-500 focus:outline-none text-sm font-mono"
                 value={sendToAddress}
                 onChange={e => setSendToAddress(e.target.value)}
-                autoComplete="off"
-                inputMode="text"
+                disabled={isSending}
               />
-              <div className="text-xs text-zinc-500 mt-2">
-                Base Network Adresse eingeben
+              <div className="text-xs text-zinc-500 mt-1">
+                Base Network Adresse
               </div>
             </div>
           </div>
 
-          {/* Transaktionsübersicht */}
+          {/* Transaktionsübersicht - Kompakt */}
           {sendAmount && sendToAddress && isAmountValid && (
-            <div className="bg-gradient-to-r from-zinc-800/60 to-zinc-900/60 rounded-xl p-4 border border-zinc-600/50">
-              <h4 className="font-semibold text-white mb-3 flex items-center gap-2">
-                <FaPaperPlane className="text-amber-400" />
-                Transaktionsübersicht
-              </h4>
-              <div className="space-y-2 text-sm">
+            <div className="bg-zinc-800/30 rounded-xl p-3 border border-zinc-700">
+              <h4 className="font-medium text-white mb-2 text-sm">Übersicht</h4>
+              <div className="space-y-1 text-xs">
                 <div className="flex justify-between">
-                  <span className="text-zinc-400">Du sendest:</span>
-                  <span className="text-white font-semibold">{sendAmount} {token.symbol}</span>
+                  <span className="text-zinc-400">Betrag:</span>
+                  <span className="text-white font-medium">{sendAmount} {token.symbol}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-zinc-400">An:</span>
-                  <span className="text-amber-400 font-mono text-xs">
-                    {sendToAddress.slice(0, 8)}...{sendToAddress.slice(-6)}
+                  <span className="text-amber-400 font-mono">
+                    {sendToAddress.slice(0, 6)}...{sendToAddress.slice(-4)}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-zinc-400">Netzwerkgebühr:</span>
+                  <span className="text-zinc-400">Gebühr:</span>
                   <span className="text-zinc-300">~0.001 ETH</span>
                 </div>
-                <div className="border-t border-zinc-600 pt-2 flex justify-between">
-                  <span className="text-zinc-300 font-semibold">Geschätzte Zeit:</span>
-                  <span className="text-green-400 font-semibold">~30 Sekunden</span>
-                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Error Display */}
+          {txError && (
+            <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 text-red-400 text-sm">
+              <div className="flex items-center gap-2">
+                <span>❌</span>
+                <span>{txError}</span>
               </div>
             </div>
           )}
 
           {/* Senden Button */}
           <Button
-            className={`w-full py-4 font-bold rounded-xl text-lg shadow-lg transition-all ${
+            className={`w-full py-3 font-bold rounded-xl text-base transition-all ${
               isAmountValid && sendToAddress && !isSending
                 ? `bg-gradient-to-r ${token.color} text-black hover:opacity-90 transform hover:scale-[1.02]`
                 : "bg-zinc-700 text-zinc-400 cursor-not-allowed"
@@ -234,23 +232,20 @@ function TokenTransferModal({
                 <span>Wird gesendet...</span>
               </div>
             ) : (
-              <div className="flex items-center justify-center gap-2">
-                <FaPaperPlane />
-                <span>
-                  {sendAmount || "0"} {token.symbol} senden
-                </span>
-              </div>
+              <span>
+                {sendAmount || "0"} {token.symbol} senden
+              </span>
             )}
           </Button>
 
-          {/* Sicherheitshinweis */}
-          <div className="bg-yellow-500/20 border border-yellow-500/40 rounded-xl p-4 text-sm">
-            <div className="flex items-start gap-3">
-              <span className="text-yellow-400 text-lg">⚠️</span>
+          {/* Sicherheitshinweis - Kompakt */}
+          <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-3 text-xs">
+            <div className="flex items-start gap-2">
+              <span className="text-yellow-400">⚠️</span>
               <div>
-                <p className="text-yellow-200 font-semibold mb-1">Wichtiger Sicherheitshinweis</p>
-                <p className="text-yellow-100 text-xs leading-relaxed">
-                  Überprüfe die Empfängeradresse sorgfältig. Blockchain-Transaktionen sind irreversibel und können nicht rückgängig gemacht werden.
+                <p className="text-yellow-200 font-medium mb-1">Sicherheitshinweis</p>
+                <p className="text-yellow-100 leading-relaxed">
+                  Überprüfe die Empfängeradresse sorgfältig. Transaktionen sind irreversibel.
                 </p>
               </div>
             </div>

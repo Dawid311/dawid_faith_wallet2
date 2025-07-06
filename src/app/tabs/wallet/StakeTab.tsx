@@ -988,8 +988,8 @@ export default function StakeTab({ onStakeChanged }: StakeTabProps) {
   };
 
   return (
-    <div className="flex flex-col gap-6 p-6">
-      <div className="text-center mb-6">
+    <div className="flex flex-col gap-3 p-6">
+      <div className="text-center mb-3">
         <div className="flex items-center justify-center gap-3 mb-2">
           <h2 className="text-2xl font-bold bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 bg-clip-text text-transparent">
             D.INVEST Staking
@@ -1153,7 +1153,7 @@ export default function StakeTab({ onStakeChanged }: StakeTabProps) {
       )}
 
       {/* Aktuelle Reward-Stufe */}
-      <div className="bg-gradient-to-br from-blue-800/30 to-blue-900/30 rounded-xl p-4 border border-blue-700/50 mb-6">
+      <div className="bg-gradient-to-br from-blue-800/30 to-blue-900/30 rounded-xl p-4 border border-blue-700/50">
         <div className="flex items-center justify-between">
           <div>
             <div className="text-sm font-medium text-blue-400">Aktuelle Reward-Stufe</div>
@@ -1169,7 +1169,7 @@ export default function StakeTab({ onStakeChanged }: StakeTabProps) {
       </div>
 
       {/* Staking Overview: Verfügbar, Gestaked, Reward */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-3 gap-4">
         <div className="bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl p-4 border border-zinc-700 text-center">
           <div className="text-sm text-zinc-500 mb-1">Verfügbar</div>
           <div className="text-xl font-bold text-amber-400">
@@ -1194,7 +1194,7 @@ export default function StakeTab({ onStakeChanged }: StakeTabProps) {
       </div>
 
       {/* Verfügbare Belohnungen */}
-      <div className="bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl p-6 border border-zinc-700 mb-6">
+      <div className="bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl p-6 border border-zinc-700">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-gradient-to-r from-yellow-400 to-amber-600 rounded-full">
@@ -1250,7 +1250,7 @@ export default function StakeTab({ onStakeChanged }: StakeTabProps) {
       </div>
 
       {/* Stake/Unstake Tabs */}
-      <div className="flex bg-zinc-800/50 rounded-xl p-1 mb-6">
+      <div className="flex bg-zinc-800/50 rounded-xl p-1">
         <button 
           className={`flex-1 py-3 px-4 rounded-lg font-medium transition ${
             activeTab === "stake" 
