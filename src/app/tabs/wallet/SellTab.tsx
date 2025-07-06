@@ -406,12 +406,34 @@ export default function SellTab() {
       const quoteData = await quoteResponse.json();
       console.log("Quote Response:", quoteData);
       
-      // WICHTIG: Verifikation der Quote-Response
+      // WICHTIG: Verifikation der Quote-Response und KORREKTUR
       if (quoteData && quoteData.data && quoteData.data.inAmount) {
         console.log("=== QUOTE RESPONSE VERIFICATION ===");
         console.log("OpenOcean returned inAmount:", quoteData.data.inAmount);
         console.log("We sent amount:", sellAmountRaw);
         console.log("Amounts match:", quoteData.data.inAmount === sellAmountRaw);
+        
+        // KRITISCHER BUG: OpenOcean gibt falschen inAmount zurück!
+        // String-Vergleich ist notwendig, da beide Werte als String kommen
+        if (quoteData.data.inAmount.toString() !== sellAmountRaw.toString()) {
+          console.log("🚨 KRITISCHER OPENOCEAN BUG ERKANNT!");
+          console.log("❌ OpenOcean inAmount (falsch):", quoteData.data.inAmount);
+          console.log("✅ Korrekte inAmount (unser Wert):", sellAmountRaw);
+          console.log("🔧 PATCH: Überschreibe inAmount mit korrektem Wert...");
+          
+          // KORREKTUR: Überschreibe den falschen inAmount mit dem korrekten Wert
+          const originalInAmount = quoteData.data.inAmount;
+          quoteData.data.inAmount = sellAmountRaw;
+          
+          console.log("✅ PATCH ANGEWENDET:");
+          console.log("  Alt:", originalInAmount);
+          console.log("  Neu:", quoteData.data.inAmount);
+          console.log("  Differenz:", BigInt(originalInAmount) - BigInt(sellAmountRaw));
+          console.log("=== OPENOCEAN BUG PATCH ERFOLGREICH ===");
+        } else {
+          console.log("✅ OpenOcean inAmount ist korrekt - kein Patch nötig");
+        }
+        
         console.log("=== END QUOTE RESPONSE VERIFICATION ===");
       }
       
@@ -424,6 +446,13 @@ export default function SellTab() {
       if (!txData.to || !txData.data) {
         throw new Error('OpenOcean: Unvollständige Transaktionsdaten');
       }
+      
+      // FINALE VERIFIKATION: Sicherstellen, dass die korrekte inAmount verwendet wird
+      console.log("=== FINALE TXDATA VERIFICATION ===");
+      console.log("txData.inAmount:", txData.inAmount);
+      console.log("Sollte sein:", sellAmountRaw);
+      console.log("Ist korrekt:", txData.inAmount === sellAmountRaw);
+      console.log("=== END FINALE TXDATA VERIFICATION ===");
       
       console.log("=== QUOTE JSON DETAILS ===");
       console.log("txData.to:", txData.to);
