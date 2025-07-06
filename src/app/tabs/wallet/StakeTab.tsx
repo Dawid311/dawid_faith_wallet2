@@ -993,9 +993,13 @@ export default function StakeTab() {
           <div className="text-xs text-zinc-500">D.INVEST</div>
         </div>
         <div className="bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl p-4 border border-zinc-700 text-center flex flex-col items-center justify-center">
-          <div className="text-sm text-zinc-500 mb-1">Rewards</div>
+          <div className="text-sm text-zinc-500 mb-1">Reward pro Woche</div>
           <div className="text-xl font-bold text-green-400 break-words max-w-full" style={{wordBreak:'break-word'}}>
-            {claimableRewards}
+            {(() => {
+              const stakedNum = parseInt(staked) || 0;
+              const weeklyReward = ((stakedNum * currentRewardRate) / 100).toFixed(2);
+              return weeklyReward;
+            })()}
           </div>
           <div className="text-xs text-zinc-500">D.FAITH</div>
         </div>
@@ -1230,21 +1234,6 @@ export default function StakeTab() {
               {!txStatus && staked !== "0" && canUnstake && `Alle ${staked} D.INVEST unstaken`}
             </Button>
           </div>
-
-          {/* Info Box für Unstaking */}
-          {staked !== "0" && (
-            <div className="bg-zinc-800/30 rounded-xl p-4 border border-zinc-700">
-              <div className="text-sm text-zinc-400">
-                <div className="font-medium text-zinc-300 mb-2">📝 Unstaking Informationen:</div>
-                <div className="space-y-1">
-                  <div>• <strong>Teilweise unstaken:</strong> Sie können einen gewünschten Betrag unstaken</div>
-                  <div>• <strong>Vollständig unstaken:</strong> Alle Token werden unstaked</div>
-                  <div>• <strong>Rewards:</strong> Beim Unstaking werden alle verfügbaren Rewards automatisch ausgezahlt</div>
-                  <div>• <strong>Mindestzeit:</strong> 7 Tage nach dem ersten Stake</div>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       )}
 
