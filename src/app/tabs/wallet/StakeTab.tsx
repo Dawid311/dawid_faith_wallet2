@@ -15,7 +15,11 @@ const DINVEST_TOKEN = "0x9D7a06c24F114f987d8C08f0fc8Aa422910F3902"; // D.INVEST 
 const DINVEST_DECIMALS = 0;
 const client = createThirdwebClient({ clientId: process.env.NEXT_PUBLIC_TEMPLATE_CLIENT_ID! });
 
-export default function StakeTab() {
+interface StakeTabProps {
+  onStakeChanged?: () => void;
+}
+
+export default function StakeTab({ onStakeChanged }: StakeTabProps) {
   const account = useActiveAccount();
   const { mutate: sendTransaction, isPending } = useSendTransaction();
   const [stakeAmount, setStakeAmount] = useState("");
@@ -80,6 +84,102 @@ export default function StakeTab() {
   };
 
   // Fetch balances und Contract-Status
+  // Funktion zum Aktualisieren der Stake-Informationen
+  const fetchStakeInfo = async () => {
+    if (!account?.address) return;
+    
+    try {
+      const staking = getContract({ client, chain: base, address: STAKING_CONTRACT });
+      
+      // User's Complete Stake Info abrufen - mit verbesserter Fallback-Strategie
+      try {
+        console.log("🔄 Versuche getUserStakeInfo aufzurufen...");
+        const userInfo = await readContract({
+          contract: staking,
+          method: "function getUserStakeInfo(address) view returns (uint256, uint256, uint256, uint256, bool, uint256, bool)",
+          params: [account.address]
+        });
+        
+        console.log("✅ getUserStakeInfo erfolgreich:", userInfo);
+        // userInfo = [stakedAmount, claimableReward, stakeTimestamp, timeUntilUnstake, canUnstake, timeUntilNextClaim, canClaim]
+        setStaked(userInfo[0].toString());
+        setClaimableRewards((Number(userInfo[1]) / Math.pow(10, 2)).toFixed(2));
+        setStakeTimestamp(Number(userInfo[2]));
+        setTimeUntilUnstake(Number(userInfo[3]));
+        setCanUnstake(userInfo[4]);
+        setTimeUntilNextClaim(Number(userInfo[5]));
+        setCanClaim(userInfo[6]);
+      } catch (fallbackError) {
+        console.log("❌ getUserStakeInfo fehlgeschlagen, verwende Fallback-Strategie:", fallbackError);
+        
+        // Fallback: Direkte Contract-Calls für einzelne Werte
+        try {
+          const stakedAmount = await readContract({
+            contract: staking,
+            method: "function stakes(address) view returns (uint256)",
+            params: [account.address]
+          });
+          setStaked(stakedAmount.toString());
+          
+          const claimable = await readContract({
+            contract: staking,
+            method: "function getClaimableReward(address) view returns (uint256)",
+            params: [account.address]
+          });
+          setClaimableRewards((Number(claimable) / Math.pow(10, 2)).toFixed(2));
+          
+          const timestamp = await readContract({
+            contract: staking,
+            method: "function stakeTimestamps(address) view returns (uint256)",
+            params: [account.address]
+          });
+          setStakeTimestamp(Number(timestamp));
+          
+          const canUnstakeValue = await readContract({
+            contract: staking,
+            method: "function canUnstake(address) view returns (bool)",
+            params: [account.address]
+          });
+          setCanUnstake(canUnstakeValue);
+          
+          const canClaimValue = await readContract({
+            contract: staking,
+            method: "function canClaim(address) view returns (bool)",
+            params: [account.address]
+          });
+          setCanClaim(canClaimValue);
+          
+          // Zeit-basierte Berechnungen
+          const timeToUnstake = await readContract({
+            contract: staking,
+            method: "function getTimeToUnstake(address) view returns (uint256)",
+            params: [account.address]
+          });
+          setTimeUntilUnstake(Number(timeToUnstake));
+          
+          const timeToMinClaim = await readContract({
+            contract: staking,
+            method: "function getTimeToMinClaim(address) view returns (uint256)",
+            params: [account.address]
+          });
+          setTimeUntilNextClaim(Number(timeToMinClaim));
+          
+        } catch (directError) {
+          console.error("❌ Auch direkte Contract-Calls fehlgeschlagen:", directError);
+          // Setze Fallback-Werte
+          setStaked("0");
+          setClaimableRewards("0.00");
+          setCanUnstake(false);
+          setCanClaim(false);
+          setTimeUntilUnstake(0);
+          setTimeUntilNextClaim(0);
+        }
+      }
+    } catch (error) {
+      console.error("❌ Fehler beim Abrufen der Stake-Informationen:", error);
+    }
+  };
+
   useEffect(() => {
     if (!account?.address) return;
     setLoading(true);
@@ -601,6 +701,17 @@ export default function StakeTab() {
             console.log("✅ Staking erfolgreich mit korrektem Contract:", result);
             setTxStatus("success");
             setStakeAmount("");
+            
+            // Callback für Parent-Komponente
+            if (onStakeChanged) {
+              onStakeChanged();
+            }
+            
+            // Stake-Info aktualisieren
+            setTimeout(() => {
+              fetchStakeInfo();
+            }, 1000);
+            
             setTimeout(() => setTxStatus(null), 3000);
             resolve();
           },
@@ -704,6 +815,17 @@ export default function StakeTab() {
           onSuccess: () => {
             console.log(`${isPartial ? 'Partielles' : 'Vollständiges'} Unstaking erfolgreich`);
             setTxStatus("success");
+            
+            // Callback für Parent-Komponente
+            if (onStakeChanged) {
+              onStakeChanged();
+            }
+            
+            // Stake-Info aktualisieren
+            setTimeout(() => {
+              fetchStakeInfo();
+            }, 1000);
+            
             setTimeout(() => setTxStatus(null), 3000);
             resolve();
           },
@@ -780,35 +902,22 @@ export default function StakeTab() {
   };
 
   // Hilfsfunktion: Formatiere Zeit in Sekunden zu lesbarer Form
+  // Maximale Zeit ist ca. 16-17 Stunden (Contract-Logik), daher keine Jahre/Wochen
   const formatTime = (seconds: number) => {
-    if (seconds <= 0) return "Jetzt verfügbar";
+    if (seconds <= 0) return "0h 0m";
     
-    // Wenn Zeitwert unrealistisch groß ist (z.B. > 1 Jahr), zeige sinnvolle Schätzung
-    if (seconds > 365 * 24 * 60 * 60) {
-      const years = Math.floor(seconds / (365 * 24 * 60 * 60));
-      if (years > 100) return "Sehr lange Zeit (niedrige Reward-Rate)";
-      return `Etwa ${years} Jahr${years > 1 ? 'e' : ''}`;
+    // Maximal 24 Stunden anzeigen (Contract-Logik erlaubt max ~16-17h)
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    
+    // Nur Stunden und Minuten anzeigen
+    if (hours > 0) {
+      return `${hours}h ${minutes}m`;
     }
-    
-    const days = Math.floor(seconds / (24 * 60 * 60));
-    const hours = Math.floor((seconds % (24 * 60 * 60)) / (60 * 60));
-    const minutes = Math.floor((seconds % (60 * 60)) / 60);
-    
-    // Zeige nur die relevantesten Zeiteinheiten
-    if (days > 0) {
-      if (days >= 7) {
-        const weeks = Math.floor(days / 7);
-        const remainingDays = days % 7;
-        if (remainingDays > 0) {
-          return `${weeks} Woche${weeks > 1 ? 'n' : ''} ${remainingDays} Tag${remainingDays > 1 ? 'e' : ''}`;
-        }
-        return `${weeks} Woche${weeks > 1 ? 'n' : ''}`;
-      }
-      return `${days} Tag${days > 1 ? 'e' : ''} ${hours}h`;
+    if (minutes > 0) {
+      return `${minutes}m`;
     }
-    if (hours > 0) return `${hours}h ${minutes}m`;
-    if (minutes > 0) return `${minutes} Min`;
-    return "Weniger als 1 Min";
+    return "< 1m";
   };
 
   return (
@@ -993,15 +1102,11 @@ export default function StakeTab() {
           <div className="text-xs text-zinc-500">D.INVEST</div>
         </div>
         <div className="bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl p-4 border border-zinc-700 text-center flex flex-col items-center justify-center">
-          <div className="text-sm text-zinc-500 mb-1">Reward pro Woche</div>
+          <div className="text-sm text-zinc-500 mb-1">Rate</div>
           <div className="text-xl font-bold text-green-400 break-words max-w-full" style={{wordBreak:'break-word'}}>
-            {(() => {
-              const stakedNum = parseInt(staked) || 0;
-              const weeklyReward = ((stakedNum * currentRewardRate) / 100).toFixed(2);
-              return weeklyReward;
-            })()}
+            {formatRewardRate(currentRewardRate)}%
           </div>
-          <div className="text-xs text-zinc-500">D.FAITH</div>
+          <div className="text-xs text-zinc-500">pro Woche</div>
         </div>
       </div>
 

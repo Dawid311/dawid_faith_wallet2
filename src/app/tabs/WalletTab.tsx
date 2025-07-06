@@ -923,7 +923,7 @@ export default function WalletTab() {
             {/* Staking Modal mit verbesserter Integration */}
             <Modal open={showStakeModal} onClose={() => setShowStakeModal(false)} title="Staking">
               <div className="min-h-[400px]">
-                <StakeTab />
+                <StakeTab onStakeChanged={fetchStakedBalance} />
               </div>
             </Modal>
 
