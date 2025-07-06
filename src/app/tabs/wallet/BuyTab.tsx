@@ -226,7 +226,7 @@ export default function BuyTab() {
     // Preis alle 2 Minuten aktualisieren
     const interval = setInterval(fetchDfaithPrice, 120000);
     return () => clearInterval(interval);
-  }, [lastKnownPrices.dfaith, lastKnownPrices.dfaithEur, lastKnownPrices.ethEur]);
+  }, [lastKnownPrices.dfaith, lastKnownPrices.dfaithEur, lastKnownPrices.ethEur, dfaithPrice]);
 
 
   // Entfernt: handleInvestBuy, handleInvestContinue, setShowInvestModal, investBuyModalRef, showInvestModal

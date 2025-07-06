@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import { useState, useEffect } from "react";
 import { Button } from "../../../../components/ui/button";
 import { FaPaperPlane, FaArrowDown, FaExchangeAlt, FaCoins, FaLock } from "react-icons/fa";
@@ -160,7 +161,7 @@ export default function HistoryTab() {
 
 
   // Funktion zum Neuladen der Transaktionen
-  const refreshTransactions = async () => {
+  const refreshTransactions = useCallback(async () => {
     if (!userAddress) {
       setTransactions([]);
       return;
@@ -283,11 +284,11 @@ export default function HistoryTab() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [userAddress]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     refreshTransactions();
-  }, [userAddress]);
+  }, [userAddress, refreshTransactions]);
 
   // Hilfsfunktionen für Anzeige
   const getTransactionIcon = (type: string) => {
@@ -343,7 +344,7 @@ export default function HistoryTab() {
           <h3 className="text-sm font-semibold text-amber-400 mb-2">Debug Info</h3>
           <div className="text-xs text-zinc-400 space-y-1">
             <div>Alchemy API Key: {ALCHEMY_API_KEY ? '✓ Konfiguriert' : '✗ Fehlt'}</div>
-            <div>API: Alchemy Enhanced API (Base Chain - ohne 'internal' Kategorie)</div>
+            <div>API: Alchemy Enhanced API (Base Chain - ohne &apos;internal&apos; Kategorie)</div>
             <div>Base URL: {ALCHEMY_BASE_URL.substring(0, 50)}...</div>
             <div>Chain ID: 8453 (Base)</div>
             <div>Wallet: {userAddress || 'Nicht verbunden'}</div>

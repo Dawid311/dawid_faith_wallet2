@@ -239,7 +239,7 @@ export default function StakeTab() {
         setLoading(false);
       }
     })();
-  }, [account?.address, txStatus]);
+  }, [account?.address, txStatus, minClaimAmount]);
 
   // D.FAITH und D.INVEST Balances abrufen
   useEffect(() => {

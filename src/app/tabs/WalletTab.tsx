@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { createThirdwebClient, getContract, readContract } from "thirdweb";
 import { useActiveAccount, useActiveWalletConnectionStatus, useSendTransaction } from "thirdweb/react";
 import { ConnectButton } from "thirdweb/react";
@@ -319,7 +319,7 @@ export default function WalletTab() {
         console.log("🛑 Preis-Aktualisierung gestoppt");
       }
     };
-  }, [account?.address]);
+  }, [account?.address]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // D.FAITH EUR-Preis holen mit mehreren Anbietern für ETH/EUR und Fallback System
   const fetchDfaithPrice = async () => {
@@ -586,7 +586,7 @@ export default function WalletTab() {
   const formatAddress = (address: string) => `${address.slice(0, 6)}...${address.slice(-4)}`;
 
   // Zentrale Funktion zur EUR-Wert-Berechnung (wie BuyTab/SellTab)
-  const calculateEurValue = (balance: string): string => {
+  const calculateEurValue = useCallback((balance: string): string => {
     const balanceFloat = parseFloat(balance);
     if (balanceFloat <= 0) return "0.00";
 
@@ -643,7 +643,7 @@ export default function WalletTab() {
     }
 
     return "0.00";
-  };
+  }, [dfaithPriceEur, lastKnownPrices]);
 
   // Lade gespeicherte Preise beim Start
   useEffect(() => {
@@ -684,7 +684,7 @@ export default function WalletTab() {
     } else if (!dfaithBalance?.displayValue) {
       setDfaithEurValue("0.00");
     }
-  }, [dfaithPriceEur, dfaithBalance?.displayValue, lastKnownPrices.dfaithEur, pricesLoaded]);
+  }, [dfaithPriceEur, dfaithBalance?.displayValue, lastKnownPrices.dfaithEur, pricesLoaded, calculateEurValue]);
 
   // Entferne fetchTokenBalanceViaContract komplett (nicht mehr benötigt)
 
