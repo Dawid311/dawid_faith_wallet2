@@ -418,38 +418,41 @@ export default function SellTab() {
       console.log("Vollständige Swap TX JSON:", JSON.stringify(quoteTxData, null, 2));
       console.log("=== END SWAP TX JSON ===");
       
-      const { prepareTransaction } = await import("thirdweb");
-      
       // Stelle sicher, dass wir auf Base Chain (ID: 8453) sind
       console.log("Target Chain:", base.name, "Chain ID:", base.id);
       if (base.id !== 8453) {
         throw new Error("Falsche Chain - Base Chain erwartet");
       }
       
-      const transaction = await prepareTransaction({
-        to: quoteTxData.to,
-        data: quoteTxData.data,
-        value: BigInt(quoteTxData.value || "0"),
-        chain: base, // Explizit Base Chain
-        client,
-        // Base Chain optimierte Gas-Parameter
-        gasPrice: BigInt("1000000"), // 0.001 Gwei für Base Chain
-        gas: BigInt(quoteTxData.gas || "300000"),
-      });
-      
-      console.log("Prepared Transaction:", transaction);
-      console.log("=== PREPARED TRANSACTION ===");
-      console.log("Prepared TX:", JSON.stringify(transaction, (key, value) => 
-        typeof value === 'bigint' ? value.toString() : value, 2));
-      console.log("=== END PREPARED TX ===");
+      // Verwende die Quote-Daten direkt als Transaktion (wie im BuyTab)
+      console.log("=== VERWENDE QUOTE-DATEN DIREKT FÜR SWAP ===");
+      console.log("Quote TO:", quoteTxData.to);
+      console.log("Quote DATA:", quoteTxData.data);
+      console.log("Quote VALUE:", quoteTxData.value);
+      console.log("Quote GAS:", quoteTxData.gas);
+      console.log("=== QUOTE-DATEN WERDEN DIREKT VERWENDET ===");
       
       setSwapTxStatus("confirming");
       
-      // Sende Transaktion mit verbesserter Fehlerbehandlung
+      // Sende Transaktion direkt mit Quote-Daten
       try {
-        console.log("Sende Transaktion auf Base Chain (ID: 8453)");
-        sendTransaction(transaction);
-        console.log("Transaction sent successfully on Base Chain");
+        console.log("Sende D.FAITH Verkaufs-Transaktion direkt auf Base Chain");
+        
+        // Verwende thirdweb sendTransaction mit den Quote-Daten direkt
+        const { prepareTransaction } = await import("thirdweb");
+        
+        const swapTransaction = await prepareTransaction({
+          to: quoteTxData.to,
+          data: quoteTxData.data,
+          value: BigInt(quoteTxData.value || "0"),
+          chain: base,
+          client,
+          gasPrice: BigInt("1000000"), // 0.001 Gwei für Base Chain
+          gas: BigInt(quoteTxData.gas || "300000"),
+        });
+        
+        const txResult = await sendTransaction(swapTransaction);
+        console.log("✅ VERKAUFS-TRANSAKTION GESENDET:", txResult);
         
         // Da sendTransaction void zurückgibt, können wir nicht sofort die TxHash prüfen
         // Die Balance-Verifizierung wird das Ergebnis bestätigen
