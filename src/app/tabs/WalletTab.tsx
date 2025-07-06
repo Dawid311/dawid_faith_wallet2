@@ -125,6 +125,20 @@ export default function WalletTab() {
     symbol: "ETH"
   };
 
+  // Token-Icon-Funktion
+  const getTokenIcon = (tokenSymbol: string, size: string = "w-6 h-6") => {
+    switch (tokenSymbol) {
+      case 'D.FAITH':
+        return <img src="/token-icons/dfaith.png" alt="D.FAITH" className={`${size} object-contain`} />;
+      case 'D.INVEST':
+        return <img src="/token-icons/dinvest.png" alt="D.INVEST" className={`${size} object-contain`} />;
+      case 'ETH':
+        return <img src="/token-icons/eth.png" alt="ETH" className={`${size} object-contain`} />;
+      default:
+        return <FaCoins className={`text-amber-400 ${size}`} />;
+    }
+  };
+
   // Neue Funktion für Balance via Thirdweb Insight API (für Base Chain)
   const fetchTokenBalanceViaInsightApi = async (
     tokenAddress: string,
@@ -765,7 +779,10 @@ export default function WalletTab() {
   const renderDinvestSection = () => {
     return (
       <div className="flex flex-col items-center p-4 bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl border border-zinc-700 w-full">
-        <div className="uppercase text-xs tracking-widest text-amber-500/80 mb-2">D.INVEST</div>
+        <div className="flex items-center gap-2 mb-2">
+          {getTokenIcon('D.INVEST', 'w-5 h-5')}
+          <div className="uppercase text-xs tracking-widest text-amber-500/80">D.INVEST</div>
+        </div>
         <div className="text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 mb-2 flex items-center">
           {dinvestBalance?.displayValue || "0"}
           {(isLoadingBalances || isRefreshing) && (
@@ -864,9 +881,12 @@ export default function WalletTab() {
               </div>
             </div>
 
-            {/* DFAITH Token-Karte - jetzt mit D.FAITH */}
+            {/* DFAITH Token-Karte - jetzt mit D.FAITH und Icon */}
             <div className="flex flex-col items-center p-4 bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl border border-zinc-700 w-full mb-6">
-              <span className="uppercase text-xs tracking-widest text-amber-500/80 mb-2">D.FAITH</span>
+              <div className="flex items-center gap-2 mb-2">
+                {getTokenIcon('D.FAITH', 'w-5 h-5')}
+                <span className="uppercase text-xs tracking-widest text-amber-500/80">D.FAITH</span>
+              </div>
               <div className="text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 drop-shadow-sm">
                 {dfaithBalance ? dfaithBalance.displayValue : "0.00"}
                 {(isLoadingBalances || isRefreshing) && (

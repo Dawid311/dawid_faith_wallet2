@@ -7,6 +7,20 @@ import { getContract, prepareContractCall } from "thirdweb";
 import { client } from "../../client";
 import { fetchAllBalances, TOKEN_ADDRESSES, TOKEN_DECIMALS } from "../../utils/balanceUtils";
 
+// Token-Icon-Funktion
+const getTokenIcon = (tokenSymbol: string, size: string = "w-6 h-6") => {
+  switch (tokenSymbol) {
+    case 'D.FAITH':
+      return <img src="/token-icons/dfaith.png" alt="D.FAITH" className={`${size} object-contain`} />;
+    case 'D.INVEST':
+      return <img src="/token-icons/dinvest.png" alt="D.INVEST" className={`${size} object-contain`} />;
+    case 'ETH':
+      return <img src="/token-icons/eth.png" alt="ETH" className={`${size} object-contain`} />;
+    default:
+      return <FaCoins className={`text-amber-400 ${size}`} />;
+  }
+};
+
 // Modal Komponente für Token Transfer (mit echter Transaktion und Bestätigung)
 function TokenTransferModal({ 
   open, 
@@ -107,7 +121,7 @@ function TokenTransferModal({
         {/* Modal Header */}
         <div className="text-center pb-3 border-b border-zinc-700 mb-4">
           <div className={`w-12 h-12 rounded-full bg-gradient-to-r ${token.color} mx-auto mb-2 flex items-center justify-center shadow-lg`}>
-            {getTokenIcon(token.key)}
+            {getTokenIcon(token.key, "w-8 h-8")}
           </div>
           <h3 className="text-xl font-bold text-white mb-1">{token.label} senden</h3>
           <p className="text-zinc-400 text-xs">Verfügbar: {token.balance} {token.symbol}</p>
@@ -122,7 +136,7 @@ function TokenTransferModal({
             <div className="bg-zinc-800/50 rounded-xl border border-zinc-700 p-3">
               <div className="flex items-center gap-2 mb-2">
                 <div className={`flex items-center gap-2 bg-gradient-to-r ${token.color} bg-opacity-20 rounded-lg px-2 py-1 border border-opacity-30 flex-shrink-0`}>
-                  {getTokenIcon(token.key)}
+                  {getTokenIcon(token.key, "w-4 h-4")}
                   <span className="text-xs font-semibold">{token.symbol}</span>
                 </div>
                 <input
@@ -256,19 +270,6 @@ function TokenTransferModal({
   );
 }
 
-const getTokenIcon = (tokenKey: string) => {
-    switch (tokenKey) {
-      case "DFAITH":
-        return <FaCoins className="text-amber-400" />;
-      case "DINVEST":
-        return <FaWallet className="text-blue-400" />;
-      case "ETH":
-        return <FaEthereum className="text-purple-400" />;
-      default:
-        return <FaCoins className="text-gray-400" />;
-    }
-  };
-
 export default function SendTab() {
   const [selectedToken, setSelectedToken] = useState<any | null>(null);
   const [showTransferModal, setShowTransferModal] = useState(false);
@@ -388,7 +389,6 @@ export default function SendTab() {
       label: "D.FAITH", 
       symbol: "DFAITH",
       balance: dfaithBalance,
-      icon: "🚀",
       color: "from-amber-400 to-yellow-500",
       description: "Dawid Faith Token"
     },
@@ -397,7 +397,6 @@ export default function SendTab() {
       label: "D.INVEST", 
       symbol: "DINVEST",
       balance: dinvestBalance,
-      icon: "💎",
       color: "from-blue-400 to-blue-600",
       description: "Investment Token"
     },
@@ -406,7 +405,6 @@ export default function SendTab() {
       label: "Ethereum", 
       symbol: "ETH",
       balance: ethBalance,
-      icon: "⟠",
       color: "from-purple-400 to-purple-600",
       description: "Native ETH"
     },
@@ -436,7 +434,7 @@ export default function SendTab() {
           {/* Token-Auswahl Grid */}
           <div className="space-y-3">
             <label className="text-sm font-semibold text-zinc-300 flex items-center gap-2">
-              <FaCoins className="text-amber-400" />
+              {getTokenIcon('D.FAITH', 'w-5 h-5')}
               Token auswählen:
             </label>
             <div className="grid gap-3">
@@ -449,7 +447,7 @@ export default function SendTab() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className={`w-12 h-12 rounded-full bg-gradient-to-r ${token.color} flex items-center justify-center text-white font-bold text-lg shadow-lg`}>
-                        {getTokenIcon(token.key)}
+                        {getTokenIcon(token.key, "w-8 h-8")}
                       </div>
                       <div>
                         <h3 className="font-bold text-white text-lg">{token.label}</h3>

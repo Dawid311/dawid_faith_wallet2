@@ -4,6 +4,22 @@ import { Button } from "../../../../components/ui/button";
 import { FaPaperPlane, FaArrowDown, FaExchangeAlt, FaCoins, FaLock } from "react-icons/fa";
 import { useActiveAccount } from "thirdweb/react";
 
+// Token-Icon-Funktion
+const getTokenIcon = (tokenSymbol: string, size: string = "w-6 h-6") => {
+  switch (tokenSymbol) {
+    case 'D.FAITH':
+    case 'DFAITH':
+      return <img src="/token-icons/dfaith.png" alt="D.FAITH" className={`${size} object-contain`} />;
+    case 'D.INVEST':
+    case 'DINVEST':
+      return <img src="/token-icons/dinvest.png" alt="D.INVEST" className={`${size} object-contain`} />;
+    case 'ETH':
+      return <img src="/token-icons/eth.png" alt="ETH" className={`${size} object-contain`} />;
+    default:
+      return <FaCoins className={`text-amber-400 ${size}`} />;
+  }
+};
+
 type Transaction = {
   id: string;
   type: "send" | "receive";
@@ -376,8 +392,8 @@ export default function HistoryTab() {
       {!isLoading && !error && userAddress && transactions.length === 0 && (
         <div className="text-center py-8">
           <div className="bg-zinc-800/50 rounded-lg p-6 border border-zinc-700">
-            <FaCoins className="text-4xl text-zinc-500 mx-auto mb-4" />
-            <p className="text-zinc-400 text-lg mb-2">Keine Transaktionen gefunden</p>
+            {getTokenIcon('D.FAITH', 'w-16 h-16')}
+            <p className="text-zinc-400 text-lg mb-2 mt-4">Keine Transaktionen gefunden</p>
             <p className="text-zinc-500 text-sm">
               Diese Wallet-Adresse hat noch keine aufgezeichneten Transaktionen auf Base Network.
             </p>
@@ -404,8 +420,11 @@ export default function HistoryTab() {
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className={`font-bold text-lg ${getAmountColor(tx.amount)}`}>
-                    {tx.amount}
+                  <div className="flex items-center justify-end gap-2 mb-1">
+                    {getTokenIcon(tx.token, 'w-4 h-4')}
+                    <div className={`font-bold text-lg ${getAmountColor(tx.amount)}`}>
+                      {tx.amount}
+                    </div>
                   </div>
                   <div className="text-sm font-semibold text-zinc-400">{tx.token}</div>
                 </div>

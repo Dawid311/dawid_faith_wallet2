@@ -14,6 +14,20 @@ const DINVEST_DECIMALS = 0; // D.INVEST hat keine Dezimalstellen
 const ETH_TOKEN = "0x0000000000000000000000000000000000000000"; // Native ETH
 const ETH_DECIMALS = 18;
 
+// Token-Icon-Funktion
+const getTokenIcon = (tokenSymbol: string, size: string = "w-6 h-6") => {
+  switch (tokenSymbol) {
+    case 'D.FAITH':
+      return <img src="/token-icons/dfaith.png" alt="D.FAITH" className={`${size} object-contain`} />;
+    case 'D.INVEST':
+      return <img src="/token-icons/dinvest.png" alt="D.INVEST" className={`${size} object-contain`} />;
+    case 'ETH':
+      return <img src="/token-icons/eth.png" alt="ETH" className={`${size} object-contain`} />;
+    default:
+      return <FaCoins className={`text-amber-400 ${size}`} />;
+  }
+};
+
 export default function BuyTab() {
   // Globale Fehlerbehandlung für Thirdweb Analytics
   useEffect(() => {
@@ -625,7 +639,7 @@ export default function BuyTab() {
       description: "Dawid Faith Token",
       price: dfaithPriceEur ? `${dfaithPriceEur.toFixed(4)}€ pro D.FAITH` : (isLoadingPrice ? "Laden..." : (priceError || "Preis nicht verfügbar")),
       sub: dfaithPrice ? `1 ETH = ${(1 / dfaithPrice).toFixed(2)} D.FAITH` : "Wird geladen...",
-      icon: <FaCoins className="text-amber-400" />,
+      icon: getTokenIcon('D.FAITH', 'w-8 h-8'),
     },
     {
       key: "DINVEST",
@@ -636,7 +650,7 @@ export default function BuyTab() {
       description: "Investment & Staking Token",
       price: "5€ pro D.INVEST",
       sub: "Minimum: 5 EUR",
-      icon: <FaLock className="text-blue-400" />,
+      icon: getTokenIcon('D.INVEST', 'w-8 h-8'),
     },
     {
       key: "ETH",
@@ -647,7 +661,7 @@ export default function BuyTab() {
       description: "Ethereum Native Token",
       price: ethPriceEur ? `${ethPriceEur.toFixed(2)}€ pro ETH` : "~3000€ pro ETH",
       sub: "mit EUR kaufen",
-      icon: <span className="text-white text-lg font-bold">⟠</span>,
+      icon: getTokenIcon('ETH', 'w-8 h-8'),
     },
   ];
 
@@ -731,7 +745,7 @@ export default function BuyTab() {
                 {/* Professional Buy Widget Header */}
                 <div className="text-center pb-3 border-b border-zinc-700 mb-4">
                   <div className="w-12 h-12 bg-gradient-to-r from-amber-400 to-yellow-500 rounded-full mx-auto mb-2 flex items-center justify-center shadow-lg">
-                    <FaCoins className="text-black text-lg" />
+                    {getTokenIcon('D.FAITH', 'w-6 h-6')}
                   </div>
                   <h3 className="text-xl font-bold text-white mb-1">D.FAITH kaufen</h3>
                   <p className="text-zinc-400 text-xs">Dawid Faith Token auf Base</p>
@@ -774,7 +788,7 @@ export default function BuyTab() {
                     <label className="block text-sm font-medium text-zinc-300 mb-2">You Pay</label>
                     <div className="flex items-center gap-3 mb-2">
                       <div className="flex items-center gap-2 bg-blue-500/20 rounded-lg px-2 py-1 border border-blue-500/30 flex-shrink-0">
-                        <span className="text-blue-400 text-sm">⟠</span>
+                        {getTokenIcon('ETH', 'w-4 h-4')}
                         <span className="text-blue-300 font-semibold text-xs">ETH</span>
                       </div>
                       <input
@@ -805,7 +819,7 @@ export default function BuyTab() {
                     <label className="block text-sm font-medium text-zinc-300 mb-2">You Receive</label>
                     <div className="flex items-center gap-3 mb-2">
                       <div className="flex items-center gap-2 bg-amber-500/20 rounded-lg px-2 py-1 border border-amber-500/30 flex-shrink-0">
-                        <FaCoins className="text-amber-400 text-sm" />
+                        {getTokenIcon('D.FAITH', 'w-4 h-4')}
                         <span className="text-amber-300 font-semibold text-xs">D.FAITH</span>
                       </div>
                       <div className="flex-1 min-w-0">
@@ -973,7 +987,7 @@ export default function BuyTab() {
               <>
                 <div className="text-center pb-3 border-b border-zinc-700 mb-4">
                   <div className="w-12 h-12 bg-gradient-to-r from-blue-400 to-blue-600 rounded-full mx-auto mb-2 flex items-center justify-center shadow-lg">
-                    <FaLock className="text-white text-lg" />
+                    {getTokenIcon('D.INVEST', 'w-6 h-6')}
                   </div>
                   <h3 className="text-xl font-bold text-white mb-1">D.INVEST kaufen</h3>
                   <p className="text-zinc-400 text-xs">Investment & Staking Token</p>

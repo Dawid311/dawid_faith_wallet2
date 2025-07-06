@@ -11,6 +11,20 @@ import { balanceOf } from "thirdweb/extensions/erc20";
 const DFAITH_TOKEN = "0xeB6f60E08AaAd7951896BdefC65cB789633BbeAd"; // D.FAITH auf Base (NEU Juli 2025)
 const DFAITH_DECIMALS = 2;
 
+// Token-Icon-Funktion
+const getTokenIcon = (tokenSymbol: string, size: string = "w-6 h-6") => {
+  switch (tokenSymbol) {
+    case 'D.FAITH':
+      return <img src="/token-icons/dfaith.png" alt="D.FAITH" className={`${size} object-contain`} />;
+    case 'D.INVEST':
+      return <img src="/token-icons/dinvest.png" alt="D.INVEST" className={`${size} object-contain`} />;
+    case 'ETH':
+      return <img src="/token-icons/eth.png" alt="ETH" className={`${size} object-contain`} />;
+    default:
+      return <FaCoins className={`text-amber-400 ${size}`} />;
+  }
+};
+
 export default function SellTab() {
   const [selectedToken, setSelectedToken] = useState<"DFAITH" | "ETH" | null>(null);
   const [sellAmount, setSellAmount] = useState("");
@@ -627,7 +641,7 @@ const handleSellAllInOne = async () => {
       description: "Dawid Faith Token",
       price: dfaithPrice && ethPriceEur ? `~${(dfaithPrice * ethPriceEur).toFixed(4)}€ pro D.FAITH` : (isLoadingPrice ? "Laden..." : (priceError || "Preis nicht verfügbar")),
       sub: dfaithPrice ? `1 D.FAITH = ${dfaithPrice.toFixed(6)} ETH` : "Wird geladen...",
-      icon: <FaCoins className="text-amber-400" />,
+      icon: getTokenIcon('D.FAITH', 'w-8 h-8'),
     },
     {
       key: "ETH",
@@ -638,7 +652,7 @@ const handleSellAllInOne = async () => {
       description: "Ethereum Native Token",
       price: ethPriceEur ? `${ethPriceEur.toFixed(2)}€ pro ETH` : "~3000€ pro ETH",
       sub: "via Transak verkaufen",
-      icon: <span className="text-white text-lg font-bold">⟠</span>,
+      icon: getTokenIcon('ETH', 'w-8 h-8'),
     },
   ];
 
@@ -723,7 +737,7 @@ const handleSellAllInOne = async () => {
               {/* Professional Sell Widget Header */}
               <div className="text-center pb-3 border-b border-zinc-700 mb-4">
                 <div className="w-12 h-12 bg-gradient-to-r from-amber-400 to-yellow-500 rounded-full mx-auto mb-2 flex items-center justify-center shadow-lg">
-                  <FaArrowDown className="text-black text-lg" />
+                  {getTokenIcon('D.FAITH', 'w-6 h-6')}
                 </div>
                 <h3 className="text-xl font-bold text-white mb-1">D.FAITH verkaufen</h3>
                 <p className="text-zinc-400 text-xs">Dawid Faith Token auf Base</p>
@@ -766,7 +780,7 @@ const handleSellAllInOne = async () => {
                   <label className="block text-sm font-medium text-zinc-300 mb-2">You Sell</label>
                   <div className="flex items-center gap-3 mb-2">
                     <div className="flex items-center gap-2 bg-amber-500/20 rounded-lg px-2 py-1 border border-amber-500/30 flex-shrink-0">
-                      <FaCoins className="text-amber-400 text-sm" />
+                      {getTokenIcon('D.FAITH', 'w-4 h-4')}
                       <span className="text-amber-300 font-semibold text-xs">D.FAITH</span>
                     </div>
                     <input
@@ -797,7 +811,7 @@ const handleSellAllInOne = async () => {
                   <label className="block text-sm font-medium text-zinc-300 mb-2">You Receive</label>
                   <div className="flex items-center gap-3 mb-2">
                     <div className="flex items-center gap-2 bg-blue-500/20 rounded-lg px-2 py-1 border border-blue-500/30 flex-shrink-0">
-                      <span className="text-blue-400 text-sm">⟠</span>
+                      {getTokenIcon('ETH', 'w-4 h-4')}
                       <span className="text-blue-300 font-semibold text-xs">ETH</span>
                     </div>
                     <div className="flex-1 min-w-0">

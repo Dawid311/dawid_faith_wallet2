@@ -8,6 +8,22 @@ import { base } from "thirdweb/chains";
 import { useSendTransaction } from "thirdweb/react";
 import { balanceOf, approve } from "thirdweb/extensions/erc20";
 
+// Token-Icon-Funktion
+const getTokenIcon = (tokenSymbol: string, size: string = "w-6 h-6") => {
+  switch (tokenSymbol) {
+    case 'D.FAITH':
+    case 'DFAITH':
+      return <img src="/token-icons/dfaith.png" alt="D.FAITH" className={`${size} object-contain`} />;
+    case 'D.INVEST':
+    case 'DINVEST':
+      return <img src="/token-icons/dinvest.png" alt="D.INVEST" className={`${size} object-contain`} />;
+    case 'ETH':
+      return <img src="/token-icons/eth.png" alt="ETH" className={`${size} object-contain`} />;
+    default:
+      return <FaCoins className={`text-amber-400 ${size}`} />;
+  }
+};
+
 const STAKING_CONTRACT = "0x6Ea0f270FfE448D85cCf68F90B5405F30b1bA479"; // Staking Contract - KORREKT!
 const DFAITH_TOKEN = "0xeB6f60E08AaAd7951896BdefC65cB789633BbeAd"; // D.FAITH Token
 const DFAITH_DECIMALS = 2;
@@ -1198,7 +1214,7 @@ export default function StakeTab({ onStakeChanged }: StakeTabProps) {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-gradient-to-r from-yellow-400 to-amber-600 rounded-full">
-              <FaCoins className="text-black text-lg" />
+              {getTokenIcon('D.FAITH', 'w-5 h-5')}
             </div>
             <div>
               <h3 className="font-bold text-amber-400">Verfügbare Belohnungen</h3>
@@ -1221,11 +1237,13 @@ export default function StakeTab({ onStakeChanged }: StakeTabProps) {
           disabled={!canClaim || loading || txStatus === "pending"}
           onClick={handleClaim}
         >
-          <FaCoins className="inline mr-2" />
-          {txStatus === "pending" ? "Wird verarbeitet..." : 
-           !canClaim && timeUntilNextClaim > 0 ? `Warten: ${formatTime(timeUntilNextClaim, parseInt(staked))}` : 
-           !canClaim ? `Mindestbetrag: ${minClaimAmount} D.FAITH` : 
-           "Belohnungen einfordern"}
+          {getTokenIcon('D.FAITH', 'w-5 h-5')}
+          <span className="ml-2">
+            {txStatus === "pending" ? "Wird verarbeitet..." : 
+             !canClaim && timeUntilNextClaim > 0 ? `Warten: ${formatTime(timeUntilNextClaim, parseInt(staked))}` : 
+             !canClaim ? `Mindestbetrag: ${minClaimAmount} D.FAITH` : 
+             "Belohnungen einfordern"}
+          </span>
         </Button>
         {/* Status-Meldungen */}
         {(txStatus === "success" || txStatus === "error" || txStatus === "pending") && (
@@ -1259,8 +1277,8 @@ export default function StakeTab({ onStakeChanged }: StakeTabProps) {
           }`}
           onClick={() => setActiveTab("stake")}
         >
-          <FaLock className="inline mr-2" />
-          Staken
+          {getTokenIcon('D.INVEST', 'w-5 h-5')}
+          <span className="ml-2">Staken</span>
         </button>
         <button 
           className={`flex-1 py-3 px-4 rounded-lg font-medium transition ${
@@ -1359,17 +1377,19 @@ export default function StakeTab({ onStakeChanged }: StakeTabProps) {
             disabled={!stakeAmount || parseInt(stakeAmount) <= 0 || parseInt(stakeAmount) > parseInt(available) || loading || txStatus === "pending" || txStatus === "approving" || txStatus === "staking"}
             onClick={handleStake}
           >
-            <FaLock className="inline mr-2" />
-            {txStatus === "approving" && "Approval läuft..."}
-            {txStatus === "staking" && (parseInt(staked) > 0 ? "Token hinzufügen..." : "Staking läuft...")}
-            {txStatus === "pending" && "Wird verarbeitet..."}
-            {!txStatus && (!stakeAmount || parseInt(stakeAmount) <= 0) && "Betrag eingeben (min. 1)"}
-            {!txStatus && stakeAmount && parseInt(stakeAmount) > parseInt(available) && "Nicht genügend Token"}
-            {!txStatus && stakeAmount && parseInt(stakeAmount) > 0 && parseInt(stakeAmount) <= parseInt(available) && (
-              parseInt(staked) > 0 
-                ? `${stakeAmount} D.INVEST hinzufügen` 
-                : `${stakeAmount} D.INVEST staken`
-            )}
+            {getTokenIcon('D.INVEST', 'w-5 h-5')}
+            <span className="ml-2">
+              {txStatus === "approving" && "Approval läuft..."}
+              {txStatus === "staking" && (parseInt(staked) > 0 ? "Token hinzufügen..." : "Staking läuft...")}
+              {txStatus === "pending" && "Wird verarbeitet..."}
+              {!txStatus && (!stakeAmount || parseInt(stakeAmount) <= 0) && "Betrag eingeben (min. 1)"}
+              {!txStatus && stakeAmount && parseInt(stakeAmount) > parseInt(available) && "Nicht genügend Token"}
+              {!txStatus && stakeAmount && parseInt(stakeAmount) > 0 && parseInt(stakeAmount) <= parseInt(available) && (
+                parseInt(staked) > 0 
+                  ? `${stakeAmount} D.INVEST hinzufügen` 
+                  : `${stakeAmount} D.INVEST staken`
+              )}
+            </span>
           </Button>
 
         {/* Status kompakt als Info-Box */}
