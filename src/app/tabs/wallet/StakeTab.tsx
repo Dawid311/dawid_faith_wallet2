@@ -649,11 +649,35 @@ export default function StakeTab() {
         }
       };
 
-  // Unstake Function (unstakes all)
-  const handleUnstake = async () => {
+  // Unstake Function (supports both full and partial unstaking)
+  const handleUnstake = async (isPartial: boolean = false) => {
     if (!account?.address || staked === "0" || !canUnstake) {
       console.log("Keine Token zum Unstaken verfügbar oder Mindestzeit nicht erreicht");
       return;
+    }
+    
+    let unstakeAmountNum = 0;
+    
+    if (isPartial) {
+      // Für partielles Unstaking: Benutzer nach Betrag fragen
+      const userInput = prompt(`Wie viele D.INVEST Token möchten Sie unstaken?\nVerfügbar: ${staked} Token`, "");
+      if (!userInput) return; // Benutzer hat abgebrochen
+      
+      unstakeAmountNum = parseInt(userInput);
+      
+      // Validierung
+      if (isNaN(unstakeAmountNum) || unstakeAmountNum <= 0) {
+        console.log("Ungültiger Betrag eingegeben");
+        return;
+      }
+      
+      if (unstakeAmountNum > parseInt(staked)) {
+        console.log("Nicht genügend Token gestaked");
+        return;
+      }
+    } else {
+      // Für vollständiges Unstaking: alle Token
+      unstakeAmountNum = parseInt(staked);
     }
     
     setTxStatus("pending");
@@ -661,24 +685,36 @@ export default function StakeTab() {
     try {
       const staking = getContract({ client, chain: base, address: STAKING_CONTRACT });
       
-      console.log("Unstaking alle Token:", staked);
+      console.log(`${isPartial ? 'Partielles' : 'Vollständiges'} Unstaking:`, unstakeAmountNum, "Token");
       
-      const unstakeTx = prepareContractCall({
-        contract: staking,
-        method: "function unstake()",
-        params: []
-      });
+      let unstakeTx;
+      
+      if (isPartial) {
+        // Verwende unstakePartial Funktion
+        unstakeTx = prepareContractCall({
+          contract: staking,
+          method: "function unstakePartial(uint256)",
+          params: [BigInt(unstakeAmountNum)]
+        });
+      } else {
+        // Verwende unstake Funktion (komplett)
+        unstakeTx = prepareContractCall({
+          contract: staking,
+          method: "function unstake()",
+          params: []
+        });
+      }
       
       await new Promise<void>((resolve, reject) => {
         sendTransaction(unstakeTx, {
           onSuccess: () => {
-            console.log("Unstaking erfolgreich");
+            console.log(`${isPartial ? 'Partielles' : 'Vollständiges'} Unstaking erfolgreich`);
             setTxStatus("success");
             setTimeout(() => setTxStatus(null), 3000);
             resolve();
           },
           onError: (error) => {
-            console.error("Unstaking fehlgeschlagen:", error);
+            console.error(`${isPartial ? 'Partielles' : 'Vollständiges'} Unstaking fehlgeschlagen:`, error);
             setTxStatus("error");
             setTimeout(() => setTxStatus(null), 5000);
             reject(error);
@@ -893,7 +929,8 @@ export default function StakeTab() {
                 <div className="space-y-2 text-sm text-zinc-300">
                   <div>• <strong>Mindest-Staking-Zeit:</strong> 7 Tage (1 Woche)</div>
                   <div>• <strong>Rewards:</strong> Kontinuierliche Berechnung pro Sekunde</div>
-                  <div>• <strong>Unstaking:</strong> Nur komplett möglich, alle Token auf einmal</div>
+                  <div>• <strong>Unstaking:</strong> Vollständig oder teilweise möglich</div>
+                  <div>• <strong>Partielles Unstaking:</strong> Sie können einen gewünschten Betrag unstaken</div>
                   <div>• <strong>Automatischer Claim:</strong> Beim Unstaking werden alle Rewards automatisch ausgezahlt</div>
                   <div>• <strong>Sicherheit:</strong> ReentrancyGuard & Pausable Contract</div>
                 </div>
@@ -1137,9 +1174,9 @@ export default function StakeTab() {
                 <span className="text-orange-400 text-xs">⚠</span>
               </div>
               <div className="text-sm text-zinc-300">
-                <div className="font-medium">Vollständiges Unstaking</div>
+                <div className="font-medium">Unstaking Optionen</div>
                 <div className="text-xs text-zinc-500 mt-1">
-                  Alle gestakten Token ({staked} D.INVEST) werden unstaked.
+                  Gestakt: {staked} D.INVEST Token.
                   Unstaking ist nur nach mindestens 7 Tagen möglich.
                   {!canUnstake && timeUntilUnstake > 0 && (
                     <span className="block text-orange-400 mt-1">
@@ -1164,17 +1201,49 @@ export default function StakeTab() {
             </div>
           )}
 
-          <Button 
-            className="w-full bg-zinc-700/50 hover:bg-zinc-600/50 text-zinc-300 font-bold py-3 rounded-xl border border-zinc-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={staked === "0" || loading || txStatus === "pending" || !canUnstake}
-            onClick={handleUnstake}
-          >
-            <FaUnlock className="inline mr-2" />
-            {txStatus === "pending" && "Wird verarbeitet..."}
-            {!txStatus && staked === "0" && "Keine Token gestaked"}
-            {!txStatus && staked !== "0" && !canUnstake && `Warten: ${formatTime(timeUntilUnstake)}`}
-            {!txStatus && staked !== "0" && canUnstake && `Alle ${staked} D.INVEST unstaken`}
-          </Button>
+          {/* Unstaking Buttons */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Partial Unstaking */}
+            <Button 
+              className="w-full bg-orange-700/50 hover:bg-orange-600/50 text-orange-300 font-bold py-3 rounded-xl border border-orange-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={staked === "0" || loading || txStatus === "pending" || !canUnstake}
+              onClick={() => handleUnstake(true)}
+            >
+              <FaUnlock className="inline mr-2" />
+              {txStatus === "pending" && "Wird verarbeitet..."}
+              {!txStatus && staked === "0" && "Keine Token gestaked"}
+              {!txStatus && staked !== "0" && !canUnstake && `Warten: ${formatTime(timeUntilUnstake)}`}
+              {!txStatus && staked !== "0" && canUnstake && "Teilweise unstaken"}
+            </Button>
+
+            {/* Full Unstaking */}
+            <Button 
+              className="w-full bg-zinc-700/50 hover:bg-zinc-600/50 text-zinc-300 font-bold py-3 rounded-xl border border-zinc-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={staked === "0" || loading || txStatus === "pending" || !canUnstake}
+              onClick={() => handleUnstake(false)}
+            >
+              <FaUnlock className="inline mr-2" />
+              {txStatus === "pending" && "Wird verarbeitet..."}
+              {!txStatus && staked === "0" && "Keine Token gestaked"}
+              {!txStatus && staked !== "0" && !canUnstake && `Warten: ${formatTime(timeUntilUnstake)}`}
+              {!txStatus && staked !== "0" && canUnstake && `Alle ${staked} D.INVEST unstaken`}
+            </Button>
+          </div>
+
+          {/* Info Box für Unstaking */}
+          {staked !== "0" && (
+            <div className="bg-zinc-800/30 rounded-xl p-4 border border-zinc-700">
+              <div className="text-sm text-zinc-400">
+                <div className="font-medium text-zinc-300 mb-2">📝 Unstaking Informationen:</div>
+                <div className="space-y-1">
+                  <div>• <strong>Teilweise unstaken:</strong> Sie können einen gewünschten Betrag unstaken</div>
+                  <div>• <strong>Vollständig unstaken:</strong> Alle Token werden unstaked</div>
+                  <div>• <strong>Rewards:</strong> Beim Unstaking werden alle verfügbaren Rewards automatisch ausgezahlt</div>
+                  <div>• <strong>Mindestzeit:</strong> 7 Tage nach dem ersten Stake</div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
