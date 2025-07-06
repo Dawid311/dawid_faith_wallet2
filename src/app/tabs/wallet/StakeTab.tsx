@@ -26,7 +26,7 @@ export default function StakeTab() {
   const [loading, setLoading] = useState(false);
   const [txStatus, setTxStatus] = useState<string | null>(null);
   const [currentStage, setCurrentStage] = useState(1);
-  const [currentRewardRate, setCurrentRewardRate] = useState(0);
+  const [currentRewardRate, setCurrentRewardRate] = useState(10); // Default auf 10 (erste Stufe)
   const [totalRewardsDistributed, setTotalRewardsDistributed] = useState("0");
   const [totalStakedTokens, setTotalStakedTokens] = useState("0");
   const [userCount, setUserCount] = useState(0);
@@ -408,14 +408,14 @@ export default function StakeTab() {
     }
   };
 
-  // Reward Rate formatieren - Contract gibt direkte Werte zurück (10 = 0.10%)
+  // Reward Rate formatieren - Contract gibt direkte Werte zurück (10 = 10%)
   const formatRewardRate = (rate: number) => {
     return (rate / 100).toFixed(2);
   };
 
   // Hilfsfunktion für den User-Reward pro Woche
   const getUserWeeklyReward = () => {
-    // staked ist ein String, currentRewardRate ist direkt die Rate (z.B. 10 für 0.10%)
+    // staked ist ein String, currentRewardRate ist direkt die Rate (z.B. 10 für 10%)
     const stakedNum = parseInt(staked) || 0;
     return ((stakedNum * currentRewardRate) / 100).toFixed(2);
   };
@@ -600,7 +600,7 @@ export default function StakeTab() {
                   if (isNaN(amount) || isNaN(rate) || isNaN(minClaim)) return "Reward aktuell nicht verfügbar";
                   const rewardPerSecond = (amount * rate) / (100 * SECONDS_PER_WEEK);
                   if (rewardPerSecond > 0) {
-                    // Contract-Logik: Zeit bis minClaim = (MIN_CLAIM_AMOUNT * 100 * SECONDS_PER_WEEK) / (amount * rate)
+                    // Zeit bis minClaim erreicht wird basierend auf Contract getTimeToMinClaim
                     const secondsToMinClaim = (minClaim * 100 * SECONDS_PER_WEEK) / (amount * rate);
                     // Hilfsfunktion für Zeitformatierung (aus dem Code oben)
                     const formatTime = (seconds: number) => {
