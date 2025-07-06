@@ -1465,62 +1465,6 @@ export default function StakeTab({ onStakeChanged }: StakeTabProps) {
           </div>
         </div>
       )}
-
-      {/* Rewards Section */}
-      <div className="bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl p-6 border border-zinc-700">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-gradient-to-r from-yellow-400 to-amber-600 rounded-full">
-              <FaCoins className="text-black text-lg" />
-            </div>
-            <div>
-              <h3 className="font-bold text-amber-400">Verfügbare Belohnungen</h3>
-              <p className="text-xs text-zinc-500">
-                {!canClaim && timeUntilNextClaim > 0 
-                  ? `Nächster Claim in: ${formatTime(timeUntilNextClaim, parseInt(staked))}`
-                  : `Kontinuierliche D.FAITH Belohnungen (min. ${minClaimAmount})`
-                }
-              </p>
-            </div>
-          </div>
-          <div className="text-right">
-            <div className="text-xl font-bold text-amber-400">{claimableRewards}</div>
-            <div className="text-xs text-zinc-500">D.FAITH</div>
-          </div>
-        </div>
-        
-        <Button 
-          className="w-full bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-bold py-3 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
-          disabled={!canClaim || loading || txStatus === "pending"}
-          onClick={handleClaim}
-        >
-          <FaCoins className="inline mr-2" />
-          {txStatus === "pending" ? "Wird verarbeitet..." : 
-           !canClaim && timeUntilNextClaim > 0 ? `Warten: ${formatTime(timeUntilNextClaim, parseInt(staked))}` : 
-           !canClaim ? `Mindestbetrag: ${minClaimAmount} D.FAITH` : 
-           "Belohnungen einfordern"}
-        </Button>
-        {/* Status-Meldungen */}
-        {(txStatus === "success" || txStatus === "error" || txStatus === "pending") && (
-          <div className={`mt-3 p-3 rounded-lg text-center text-sm font-medium border ${
-            txStatus === "success" ? "bg-green-500/20 text-green-400 border-green-500/30" :
-            txStatus === "error" ? "bg-red-500/20 text-red-400 border-red-500/30" :
-            txStatus === "pending" ? "bg-yellow-500/20 text-yellow-400 border-yellow-500/30" :
-            ""
-          }`}>
-            <div className="flex items-center justify-center gap-2">
-              {txStatus === "pending" && (
-                <div className="animate-spin rounded-full h-4 w-4 border-2 border-current border-t-transparent"></div>
-              )}
-              <span>
-                {txStatus === "success" && "✅ Belohnungen erfolgreich eingefordert!"}
-                {txStatus === "error" && "❌ Fehler beim Einfordern der Belohnungen!"}
-                {txStatus === "pending" && "⏳ Belohnungen werden eingefordert..."}
-              </span>
-            </div>
-          </div>
-        )}
-      </div>
     </div>
   );
 }

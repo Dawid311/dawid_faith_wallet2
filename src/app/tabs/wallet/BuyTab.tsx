@@ -1034,20 +1034,6 @@ export default function BuyTab() {
           </div>
         </div>
       )}
-      {/* Hinweis nur einmal anzeigen */}
-      <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4 mt-6">
-        <div className="flex items-start gap-3">
-          <div className="w-5 h-5 rounded-full bg-blue-500/20 flex items-center justify-center mt-0.5">
-            <span className="text-blue-400 text-xs">ℹ</span>
-          </div>
-          <div>
-            <div className="font-medium text-blue-400 mb-1">Hinweis</div>
-            <div className="text-sm text-zinc-400">
-              Stellen Sie sicher, dass Sie genügend ETH für Transaktionsgebühren in Ihrem Wallet haben.
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
