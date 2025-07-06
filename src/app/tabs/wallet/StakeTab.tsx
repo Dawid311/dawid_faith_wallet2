@@ -105,7 +105,7 @@ export default function StakeTab() {
           setMinClaimAmount("0.01");
         }
         
-        // User's Complete Stake Info abrufen - mit Fallback-Strategie
+        // User's Complete Stake Info abrufen - mit verbesserter Fallback-Strategie
         try {
           console.log("🔄 Versuche getUserStakeInfo aufzurufen...");
           const userInfo = await readContract({
@@ -125,62 +125,109 @@ export default function StakeTab() {
           setCanClaim(userInfo[6]);
         } catch (e) {
           console.error("❌ getUserStakeInfo fehlgeschlagen:", e);
-          console.log("🔄 Versuche einzelne Funktionen als Fallback...");
+          console.log("🔄 Versuche einzelne Funktionen als verbesserte Fallback-Strategie...");
           
-          // Fallback: Versuche einzelne Contract-Funktionen
+          // Verbesserte Fallback-Strategie: Direkt StakeInfo struct abrufen
           try {
-            // Hole gestakte Menge direkt über das stakers mapping
+            console.log("🔄 Versuche stakers mapping direkt abzurufen...");
             const stakerInfo = await readContract({
               contract: staking,
               method: "function stakers(address) view returns (uint256, uint256, uint256, uint256)",
               params: [account.address]
             });
-            console.log("✅ stakers mapping:", stakerInfo);
-            setStaked(stakerInfo[0].toString());
-            setStakeTimestamp(Number(stakerInfo[2]));
+            console.log("✅ stakers mapping erfolgreich:", stakerInfo);
             
-            // Versuche claimable rewards separat zu holen
+            // StakeInfo struct: [amount, lastRewardUpdate, stakeTimestamp, accumulatedRewards]
+            const stakedAmount = stakerInfo[0];
+            const lastRewardUpdate = stakerInfo[1];
+            const stakeTime = stakerInfo[2];
+            const accumulatedRewards = stakerInfo[3];
+            
+            setStaked(stakedAmount.toString());
+            setStakeTimestamp(Number(stakeTime));
+            
+            console.log("📊 Stake Info Details:");
+            console.log("- Staked Amount:", stakedAmount.toString());
+            console.log("- Last Reward Update:", lastRewardUpdate.toString());
+            console.log("- Stake Timestamp:", stakeTime.toString());
+            console.log("- Accumulated Rewards:", accumulatedRewards.toString());
+            
+            // Berechne claimable rewards mit separater Funktion
             let currentClaimableReward = BigInt(0);
             try {
+              console.log("🔄 Versuche getClaimableReward...");
               currentClaimableReward = await readContract({
                 contract: staking,
                 method: "function getClaimableReward(address) view returns (uint256)",
                 params: [account.address]
               });
-              console.log("✅ getClaimableReward:", currentClaimableReward);
+              console.log("✅ getClaimableReward erfolgreich:", currentClaimableReward.toString());
               setClaimableRewards((Number(currentClaimableReward) / Math.pow(10, 2)).toFixed(2));
             } catch (claimError) {
               console.error("❌ getClaimableReward fehlgeschlagen:", claimError);
-              setClaimableRewards("0.00");
+              console.log("🔄 Verwende accumulated rewards als Fallback...");
+              setClaimableRewards((Number(accumulatedRewards) / Math.pow(10, 2)).toFixed(2));
+              currentClaimableReward = accumulatedRewards;
             }
             
-            // Berechne unstake-Verfügbarkeit
-            const stakeTime = Number(stakerInfo[2]);
-            if (stakeTime > 0) {
+            // Berechne unstake-Verfügbarkeit basierend auf Contract-Logik
+            if (Number(stakeTime) > 0) {
               const currentTime = Math.floor(Date.now() / 1000);
               const weekInSeconds = 7 * 24 * 60 * 60;
-              const unlockTime = stakeTime + weekInSeconds;
+              const unlockTime = Number(stakeTime) + weekInSeconds;
               
               if (currentTime >= unlockTime) {
                 setCanUnstake(true);
                 setTimeUntilUnstake(0);
+                console.log("✅ Unstaking verfügbar");
               } else {
                 setCanUnstake(false);
                 setTimeUntilUnstake(unlockTime - currentTime);
+                console.log("⏳ Unstaking in:", unlockTime - currentTime, "Sekunden");
               }
             } else {
               setCanUnstake(false);
               setTimeUntilUnstake(0);
+              console.log("❌ Nichts gestaked, kein Unstaking möglich");
             }
             
-            // Berechne claim-Verfügbarkeit (vereinfacht)
+            // Berechne claim-Verfügbarkeit basierend auf MIN_CLAIM_AMOUNT
             const claimableAmountFromReward = Number(currentClaimableReward) / Math.pow(10, 2);
             const minClaim = Number(minClaimAmount);
-            setCanClaim(claimableAmountFromReward >= minClaim);
-            setTimeUntilNextClaim(claimableAmountFromReward >= minClaim ? 0 : 3600); // 1 Stunde Schätzung
+            
+            if (claimableAmountFromReward >= minClaim) {
+              setCanClaim(true);
+              setTimeUntilNextClaim(0);
+              console.log("✅ Claiming verfügbar:", claimableAmountFromReward, ">=", minClaim);
+            } else {
+              setCanClaim(false);
+              
+              // Berechne Zeit bis zum nächsten Claim (vereinfachte Schätzung)
+              if (Number(stakedAmount) > 0) {
+                // Zeit bis MIN_CLAIM_AMOUNT erreicht wird
+                const remainingRewards = minClaim - claimableAmountFromReward;
+                const rewardRate = currentRewardRate; // Aktuelle Rate in Prozent
+                const rewardPerSecond = (Number(stakedAmount) * rewardRate) / (100 * 604800); // 604800 = Sekunden pro Woche
+                
+                if (rewardPerSecond > 0) {
+                  const estimatedSeconds = (remainingRewards * 100) / rewardPerSecond;
+                  setTimeUntilNextClaim(Math.max(0, estimatedSeconds));
+                  console.log("⏳ Claiming in:", estimatedSeconds, "Sekunden");
+                } else {
+                  setTimeUntilNextClaim(3600); // 1 Stunde als Fallback
+                  console.log("⏳ Claiming nicht verfügbar (Rate 0)");
+                }
+              } else {
+                setTimeUntilNextClaim(0);
+                console.log("❌ Nichts gestaked, kein Claiming möglich");
+              }
+            }
             
           } catch (fallbackError) {
-            console.error("❌ Auch Fallback-Methoden fehlgeschlagen:", fallbackError);
+            console.error("❌ Auch verbesserte Fallback-Methoden fehlgeschlagen:", fallbackError);
+            console.log("🔄 Setze sichere Fallback-Werte...");
+            
+            // Sichere Fallback-Werte setzen
             setStaked("0");
             setClaimableRewards("0.00");
             setStakeTimestamp(0);
@@ -188,6 +235,30 @@ export default function StakeTab() {
             setCanUnstake(false);
             setTimeUntilNextClaim(0);
             setCanClaim(false);
+            
+            // Versuche wenigstens grundlegende Contract-Funktionen zu testen
+            try {
+              console.log("🔄 Teste grundlegende Contract-Funktionen...");
+              
+              // Test: Versuche nur die Balance zu lesen
+              const testBalance = await readContract({
+                contract: staking,
+                method: "function totalStakedTokens() view returns (uint256)",
+                params: []
+              });
+              console.log("✅ Contract ist grundsätzlich erreichbar. Total Staked:", testBalance.toString());
+              
+              // Test: Versuche User Count zu lesen
+              const testUserCount = await readContract({
+                contract: staking,
+                method: "function userCount() view returns (uint256)",
+                params: []
+              });
+              console.log("✅ User Count erfolgreich gelesen:", testUserCount.toString());
+              
+            } catch (testError) {
+              console.error("❌ Contract ist möglicherweise nicht erreichbar oder nicht korrekt deployed:", testError);
+            }
           }
         }
         
