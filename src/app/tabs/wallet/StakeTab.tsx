@@ -203,20 +203,53 @@ export default function StakeTab() {
             } else {
               setCanClaim(false);
               
-              // Berechne Zeit bis zum nächsten Claim (vereinfachte Schätzung)
+              // Berechne Zeit bis zum nächsten Claim mit Contract-Funktion
               if (Number(stakedAmount) > 0) {
-                // Zeit bis MIN_CLAIM_AMOUNT erreicht wird
-                const remainingRewards = minClaim - claimableAmountFromReward;
-                const rewardRate = currentRewardRate; // Aktuelle Rate in Prozent
-                const rewardPerSecond = (Number(stakedAmount) * rewardRate) / (100 * 604800); // 604800 = Sekunden pro Woche
-                
-                if (rewardPerSecond > 0) {
-                  const estimatedSeconds = (remainingRewards * 100) / rewardPerSecond;
-                  setTimeUntilNextClaim(Math.max(0, estimatedSeconds));
-                  console.log("⏳ Claiming in:", estimatedSeconds, "Sekunden");
-                } else {
-                  setTimeUntilNextClaim(3600); // 1 Stunde als Fallback
-                  console.log("⏳ Claiming nicht verfügbar (Rate 0)");
+                try {
+                  console.log("🔄 Versuche getTimeToMinClaim...");
+                  const timeToMinClaim = await readContract({
+                    contract: staking,
+                    method: "function getTimeToMinClaim(uint256) view returns (uint256)",
+                    params: [stakedAmount]
+                  });
+                  console.log("✅ getTimeToMinClaim erfolgreich:", timeToMinClaim.toString());
+                  
+                  // Wenn der Wert zu groß ist (type(uint256).max), setze eine Schätzung
+                  if (Number(timeToMinClaim) > 10 * 365 * 24 * 60 * 60) {
+                    console.log("⏳ Zeit zu groß, verwende Fallback-Berechnung");
+                    const remainingRewards = minClaim - claimableAmountFromReward;
+                    const rewardRate = currentRewardRate;
+                    const rewardPerSecond = (Number(stakedAmount) * rewardRate) / (100 * 604800);
+                    
+                    if (rewardPerSecond > 0) {
+                      const estimatedSeconds = (remainingRewards * 100) / rewardPerSecond;
+                      setTimeUntilNextClaim(Math.max(0, estimatedSeconds));
+                      console.log("⏳ Claiming (Fallback) in:", estimatedSeconds, "Sekunden");
+                    } else {
+                      setTimeUntilNextClaim(3600);
+                      console.log("⏳ Claiming nicht verfügbar (Rate 0)");
+                    }
+                  } else {
+                    setTimeUntilNextClaim(Number(timeToMinClaim));
+                    console.log("⏳ Claiming (Contract) in:", Number(timeToMinClaim), "Sekunden");
+                  }
+                } catch (timeError) {
+                  console.error("❌ getTimeToMinClaim fehlgeschlagen:", timeError);
+                  console.log("🔄 Verwende Fallback-Berechnung für Zeit...");
+                  
+                  // Fallback: Zeit bis MIN_CLAIM_AMOUNT erreicht wird
+                  const remainingRewards = minClaim - claimableAmountFromReward;
+                  const rewardRate = currentRewardRate;
+                  const rewardPerSecond = (Number(stakedAmount) * rewardRate) / (100 * 604800);
+                  
+                  if (rewardPerSecond > 0) {
+                    const estimatedSeconds = (remainingRewards * 100) / rewardPerSecond;
+                    setTimeUntilNextClaim(Math.max(0, estimatedSeconds));
+                    console.log("⏳ Claiming (Fallback) in:", estimatedSeconds, "Sekunden");
+                  } else {
+                    setTimeUntilNextClaim(3600);
+                    console.log("⏳ Claiming nicht verfügbar (Rate 0)");
+                  }
                 }
               } else {
                 setTimeUntilNextClaim(0);
@@ -716,14 +749,21 @@ export default function StakeTab() {
     return ((stakedNum * currentRewardRate) / 100).toFixed(2);
   };
 
-  // Hilfsfunktion: Formatiere Zeit in Sekunden zu lesbarer Form, mit Schutz gegen zu große Werte
+  // Hilfsfunktion: Formatiere Zeit in Sekunden zu lesbarer Form
   const formatTime = (seconds: number) => {
     if (seconds <= 0) return "Jetzt verfügbar";
-    // Wenn Zeitwert unrealistisch groß ist (z.B. > 10 Jahre), als nicht verfügbar anzeigen
-    if (seconds > 10 * 365 * 24 * 60 * 60) return "Nicht verfügbar";
+    
+    // Wenn Zeitwert unrealistisch groß ist (z.B. > 1 Jahr), zeige sinnvolle Schätzung
+    if (seconds > 365 * 24 * 60 * 60) {
+      const years = Math.floor(seconds / (365 * 24 * 60 * 60));
+      if (years > 100) return "Sehr lange Zeit (niedrige Reward-Rate)";
+      return `Etwa ${years} Jahr${years > 1 ? 'e' : ''}`;
+    }
+    
     const days = Math.floor(seconds / (24 * 60 * 60));
     const hours = Math.floor((seconds % (24 * 60 * 60)) / (60 * 60));
     const minutes = Math.floor((seconds % (60 * 60)) / 60);
+    
     // Zeige nur die relevantesten Zeiteinheiten
     if (days > 0) {
       if (days >= 7) {
@@ -1025,38 +1065,15 @@ export default function StakeTab() {
               {/* Nächster Reward verfügbar in ... */}
               <div className="text-xs text-zinc-500 mt-2">
                 {(() => {
-                  // Contract-Logik: rewardPerSecond = (amount * rate) / (100 * SECONDS_PER_WEEK)
                   const amount = parseInt(stakeAmount);
                   const rate = currentRewardRate;
                   const minClaim = Number(minClaimAmount);
-                  const SECONDS_PER_WEEK = 604800;
                   if (isNaN(amount) || isNaN(rate) || isNaN(minClaim)) return "Reward aktuell nicht verfügbar";
-                  const rewardPerSecond = (amount * rate) / (100 * SECONDS_PER_WEEK);
+                  
+                  // Einfache Berechnung: Zeit bis MIN_CLAIM_AMOUNT erreicht wird
+                  const rewardPerSecond = (amount * rate) / (100 * 604800); // 604800 = Sekunden pro Woche
                   if (rewardPerSecond > 0) {
-                    // Zeit bis minClaim erreicht wird basierend auf Contract getTimeToMinClaim
-                    const secondsToMinClaim = (minClaim * 100 * SECONDS_PER_WEEK) / (amount * rate);
-                    // Hilfsfunktion für Zeitformatierung (aus dem Code oben)
-                    const formatTime = (seconds: number) => {
-                      if (seconds <= 0) return "Jetzt verfügbar";
-                      if (seconds > 10 * 365 * 24 * 60 * 60) return "Nicht verfügbar";
-                      const days = Math.floor(seconds / (24 * 60 * 60));
-                      const hours = Math.floor((seconds % (24 * 60 * 60)) / (60 * 60));
-                      const minutes = Math.floor((seconds % (60 * 60)) / 60);
-                      if (days > 0) {
-                        if (days >= 7) {
-                          const weeks = Math.floor(days / 7);
-                          const remainingDays = days % 7;
-                          if (remainingDays > 0) {
-                            return `${weeks} Woche${weeks > 1 ? 'n' : ''} ${remainingDays} Tag${remainingDays > 1 ? 'e' : ''}`;
-                          }
-                          return `${weeks} Woche${weeks > 1 ? 'n' : ''}`;
-                        }
-                        return `${days} Tag${days > 1 ? 'e' : ''} ${hours}h`;
-                      }
-                      if (hours > 0) return `${hours}h ${minutes}m`;
-                      if (minutes > 0) return `${minutes} Min`;
-                      return "Weniger als 1 Min";
-                    };
+                    const secondsToMinClaim = (minClaim * 100) / (amount * rate / 604800);
                     return `Nächster Claim möglich in: ${formatTime(secondsToMinClaim)}`;
                   } else {
                     return "Reward aktuell nicht verfügbar";
