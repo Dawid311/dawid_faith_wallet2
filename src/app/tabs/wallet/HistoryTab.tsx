@@ -63,8 +63,10 @@ export default function HistoryTab() {
   const getTransactionsFromAlchemy = async (address: string) => {
     try {
       console.log("🚀 Verwende Alchemy API für Base Chain Transaktionen");
+      console.log("📍 Wallet Adresse:", address);
       
-      // Hole die neuesten Transaktionen über Alchemy Enhanced API
+      // Hole ausgehende Transaktionen
+      console.log("🔄 Lade ausgehende Transaktionen...");
       const response = await fetch(ALCHEMY_BASE_URL, {
         method: 'POST',
         headers: {
@@ -78,8 +80,8 @@ export default function HistoryTab() {
               fromBlock: "0x0",
               toBlock: "latest",
               fromAddress: address,
-              category: ["external", "internal", "erc20", "erc721", "erc1155"],
-              withMetadata: false,
+              category: ["external", "erc20", "erc721", "erc1155"], // "internal" entfernt für Base Chain
+              withMetadata: true, // Aktiviert für bessere Zeitstempel
               excludeZeroValue: true,
               maxCount: "0x32" // 50 Transaktionen
             }
@@ -89,13 +91,21 @@ export default function HistoryTab() {
       });
 
       if (!response.ok) {
-        throw new Error(`Alchemy API Fehler: ${response.status}`);
+        throw new Error(`Alchemy API Fehler: ${response.status} ${response.statusText}`);
       }
 
       const data = await response.json();
-      console.log("Alchemy API Response (FROM):", data);
       
-      // Hole auch eingehende Transaktionen
+      // Prüfe auf API-Fehler
+      if (data.error) {
+        console.error("❌ Alchemy API Error (Outgoing):", data.error);
+        throw new Error(`Alchemy API Error: ${data.error.message}`);
+      }
+      
+      console.log("✅ Alchemy API Response (FROM):", data);
+      
+      // Hole eingehende Transaktionen
+      console.log("🔄 Lade eingehende Transaktionen...");
       const responseIncoming = await fetch(ALCHEMY_BASE_URL, {
         method: 'POST',
         headers: {
@@ -109,8 +119,8 @@ export default function HistoryTab() {
               fromBlock: "0x0",
               toBlock: "latest",
               toAddress: address,
-              category: ["external", "internal", "erc20", "erc721", "erc1155"],
-              withMetadata: false,
+              category: ["external", "erc20", "erc721", "erc1155"], // "internal" entfernt für Base Chain
+              withMetadata: true, // Aktiviert für bessere Zeitstempel
               excludeZeroValue: true,
               maxCount: "0x32" // 50 Transaktionen
             }
@@ -119,17 +129,30 @@ export default function HistoryTab() {
         })
       });
 
+      if (!responseIncoming.ok) {
+        throw new Error(`Alchemy API Fehler (Incoming): ${responseIncoming.status} ${responseIncoming.statusText}`);
+      }
+
       const dataIncoming = await responseIncoming.json();
-      console.log("Alchemy API Response (TO):", dataIncoming);
+      
+      // Prüfe auf API-Fehler
+      if (dataIncoming.error) {
+        console.error("❌ Alchemy API Error (Incoming):", dataIncoming.error);
+        throw new Error(`Alchemy API Error (Incoming): ${dataIncoming.error.message}`);
+      }
+
+      console.log("✅ Alchemy API Response (TO):", dataIncoming);
       
       // Kombiniere ausgehende und eingehende Transaktionen
       const outgoingTransfers = data.result?.transfers || [];
       const incomingTransfers = dataIncoming.result?.transfers || [];
       const allTransfers = [...outgoingTransfers, ...incomingTransfers];
       
+      console.log(`📊 Transaktionen gefunden: ${outgoingTransfers.length} ausgehend, ${incomingTransfers.length} eingehend, ${allTransfers.length} total`);
+      
       return allTransfers;
     } catch (error) {
-      console.error("Alchemy API Error:", error);
+      console.error("❌ Alchemy API Error:", error);
       throw error;
     }
   };
@@ -163,7 +186,19 @@ export default function HistoryTab() {
       // Transaktionen verarbeiten und sortieren
       const mappedTransactions: Transaction[] = alchemyTransfers
         .map((transfer: any) => {
-          const timestamp = new Date(transfer.metadata?.blockTimestamp || Date.now());
+          // Verbesserte Zeitstempel-Verarbeitung
+          let timestamp: Date;
+          if (transfer.metadata?.blockTimestamp) {
+            timestamp = new Date(transfer.metadata.blockTimestamp);
+          } else if (transfer.blockNum) {
+            // Fallback: Schätze Zeit basierend auf Block-Nummer (ungefähr)
+            const currentTime = Date.now();
+            const estimatedTime = currentTime - (transfer.blockNum * 2000); // Ungefähr 2s pro Block
+            timestamp = new Date(estimatedTime);
+          } else {
+            timestamp = new Date();
+          }
+          
           const time = timestamp.toLocaleString("de-DE", {
             day: "2-digit",
             month: "2-digit", 
@@ -191,11 +226,23 @@ export default function HistoryTab() {
             amount = "-" + (transfer.value || "0");
           }
 
-          // Token-Symbol bestimmen
+          // Token-Symbol und Dezimalstellen richtig verarbeiten
           if (transfer.category === "erc20") {
             token = transfer.asset || "TOKEN";
-          } else if (transfer.category === "external" || transfer.category === "internal") {
+            // Formatiere den Betrag basierend auf Dezimalstellen
+            if (transfer.rawContract?.decimals && transfer.rawContract.value) {
+              const decimals = parseInt(transfer.rawContract.decimals);
+              const rawValue = transfer.rawContract.value;
+              const formattedValue = (parseInt(rawValue) / Math.pow(10, decimals)).toFixed(decimals > 6 ? 6 : decimals);
+              amount = type === "receive" ? "+" + formattedValue : "-" + formattedValue;
+            }
+          } else if (transfer.category === "external") {
             token = "ETH";
+            // ETH hat 18 Dezimalstellen
+            if (transfer.value) {
+              const ethValue = parseFloat(transfer.value).toFixed(6);
+              amount = type === "receive" ? "+" + ethValue : "-" + ethValue;
+            }
           }
 
           return {
@@ -209,13 +256,14 @@ export default function HistoryTab() {
             status: "success" as const, // Alchemy gibt nur bestätigte Transaktionen zurück
           };
         })
-        .filter((tx: Transaction) => tx.hash) // Nur Transaktionen mit Hash
+        .filter((tx: Transaction) => tx.hash && tx.address) // Nur vollständige Transaktionen
         .sort((a: Transaction, b: Transaction) => {
           // Sortiere nach Zeit (neueste zuerst)
           return new Date(b.time).getTime() - new Date(a.time).getTime();
         })
         .slice(0, 50); // Limitiere auf 50 Transaktionen
 
+      console.log(`📋 Verarbeitete Transaktionen: ${mappedTransactions.length}`);
       setTransactions(mappedTransactions);
       
       // Statistiken basierend auf geladenen Transaktionen
@@ -295,12 +343,14 @@ export default function HistoryTab() {
           <h3 className="text-sm font-semibold text-amber-400 mb-2">Debug Info</h3>
           <div className="text-xs text-zinc-400 space-y-1">
             <div>Alchemy API Key: {ALCHEMY_API_KEY ? '✓ Konfiguriert' : '✗ Fehlt'}</div>
-            <div>API: Alchemy Enhanced API (Base Chain)</div>
+            <div>API: Alchemy Enhanced API (Base Chain - ohne 'internal' Kategorie)</div>
+            <div>Base URL: {ALCHEMY_BASE_URL.substring(0, 50)}...</div>
             <div>Chain ID: 8453 (Base)</div>
             <div>Wallet: {userAddress || 'Nicht verbunden'}</div>
             <div>Loading: {isLoading ? 'Ja' : 'Nein'}</div>
             <div>Error: {error || 'Keine'}</div>
             <div>Transactions: {transactions.length}</div>
+            <div>Kategorien: external, erc20, erc721, erc1155 (internal entfernt)</div>
             {stats && <div>Stats: {stats.transactionCount} total, {stats.totalValue.toFixed(6)} ETH, Ø {stats.avgGas.toFixed(6)} gas</div>}
           </div>
         </div>
