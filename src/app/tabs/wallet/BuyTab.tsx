@@ -729,10 +729,11 @@ export default function BuyTab() {
             {selectedToken === "DFAITH" && (
               <div className="w-full space-y-4">
                 {/* Professional Buy Widget Header */}
-                <div className="text-center pb-3 border-b border-zinc-700">
+                <div className="text-center pb-3 border-b border-zinc-700 mb-4">
                   <div className="w-12 h-12 bg-gradient-to-r from-amber-400 to-yellow-500 rounded-full mx-auto mb-2 flex items-center justify-center shadow-lg">
                     <FaCoins className="text-black text-lg" />
                   </div>
+                  <h3 className="text-xl font-bold text-white mb-1">D.FAITH kaufen</h3>
                   <p className="text-zinc-400 text-xs">Dawid Faith Token auf Base</p>
                   {dfaithPriceEur && (
                     <div className="mt-2 px-2 py-1 bg-amber-500/10 border border-amber-500/20 rounded-full inline-block">
