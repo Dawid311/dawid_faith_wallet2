@@ -115,7 +115,7 @@ export default function WalletTab() {
   };
 
   const STAKING_CONTRACT = {
-    address: "0xeB6f60E08AaAd7951896BdefC65cB789633BbeAd", // D.INVEST Staking Contract NEU
+    address: "0x9D7a06c24F114f987d8C08f0fc8Aa422910F3902", // Korrekte Staking Contract Adresse
     name: "D.INVEST Staking"
   };
 
@@ -226,22 +226,45 @@ export default function WalletTab() {
     }
 
     try {
+      // Korrekte Staking Contract Adresse verwenden
       const stakingContract = getContract({ 
         client, 
         chain: base, 
-        address: STAKING_CONTRACT.address 
+        address: "0x9D7a06c24F114f987d8C08f0fc8Aa422910F3902" // Korrekte Staking Contract Adresse
       });
 
-      const stakeInfo = await readContract({
+      // Verwende die korrekte Funktion wie in StakeTab
+      const stakedAmount = await readContract({
         contract: stakingContract,
-        method: "function stakers(address) view returns (uint256, uint256)",
+        method: "function stakes(address) view returns (uint256)",
         params: [account.address]
       });
-      // stakeInfo[0] ist die gestakte Menge
-      setStakedBalance(stakeInfo[0].toString());
+      
+      console.log("Gestakte Balance abgerufen:", stakedAmount.toString());
+      setStakedBalance(stakedAmount.toString());
     } catch (error) {
       console.error("Fehler beim Abrufen der gestakten Balance:", error);
-      setStakedBalance("0");
+      // Fallback: Versuche getUserStakeInfo wie in StakeTab
+      try {
+        const stakingContract = getContract({ 
+          client, 
+          chain: base, 
+          address: "0x9D7a06c24F114f987d8C08f0fc8Aa422910F3902"
+        });
+        
+        const userInfo = await readContract({
+          contract: stakingContract,
+          method: "function getUserStakeInfo(address) view returns (uint256, uint256, uint256, uint256, bool, uint256, bool)",
+          params: [account.address]
+        });
+        
+        // userInfo[0] ist die gestakte Menge
+        console.log("Gestakte Balance via getUserStakeInfo:", userInfo[0].toString());
+        setStakedBalance(userInfo[0].toString());
+      } catch (fallbackError) {
+        console.error("Auch Fallback für gestakte Balance fehlgeschlagen:", fallbackError);
+        setStakedBalance("0");
+      }
     }
   };
 

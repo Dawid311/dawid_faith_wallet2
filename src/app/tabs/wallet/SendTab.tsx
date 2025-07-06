@@ -395,7 +395,7 @@ export default function SendTab() {
       balance: dfaithBalance,
       icon: "🚀",
       color: "from-amber-400 to-yellow-500",
-      description: "Faith Token"
+      description: "Dawid Faith Token"
     },
     { 
       key: "DINVEST", 

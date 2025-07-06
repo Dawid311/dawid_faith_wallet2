@@ -622,7 +622,7 @@ export default function BuyTab() {
       symbol: "DFAITH",
       balance: dfaithBalance,
       color: "from-amber-400 to-yellow-500",
-      description: "Faith Utility Token",
+      description: "Dawid Faith Token",
       price: dfaithPriceEur ? `${dfaithPriceEur.toFixed(4)}€ pro D.FAITH` : (isLoadingPrice ? "Laden..." : (priceError || "Preis nicht verfügbar")),
       sub: dfaithPrice ? `1 ETH = ${(1 / dfaithPrice).toFixed(2)} D.FAITH` : "Wird geladen...",
       icon: <FaCoins className="text-amber-400" />,
@@ -733,7 +733,7 @@ export default function BuyTab() {
                   <div className="w-12 h-12 bg-gradient-to-r from-amber-400 to-yellow-500 rounded-full mx-auto mb-2 flex items-center justify-center shadow-lg">
                     <FaCoins className="text-black text-lg" />
                   </div>
-                  <p className="text-zinc-400 text-xs">Faith Utility Token auf Base Network</p>
+                  <p className="text-zinc-400 text-xs">Dawid Faith Token auf Base</p>
                   {dfaithPriceEur && (
                     <div className="mt-2 px-2 py-1 bg-amber-500/10 border border-amber-500/20 rounded-full inline-block">
                       <span className="text-amber-400 text-xs font-semibold">
@@ -970,6 +970,13 @@ export default function BuyTab() {
             )}
             {selectedToken === "DINVEST" && (
               <>
+                <div className="text-center pb-3 border-b border-zinc-700 mb-4">
+                  <div className="w-12 h-12 bg-gradient-to-r from-blue-400 to-blue-600 rounded-full mx-auto mb-2 flex items-center justify-center shadow-lg">
+                    <FaLock className="text-white text-lg" />
+                  </div>
+                  <h3 className="text-xl font-bold text-white mb-1">D.INVEST kaufen</h3>
+                  <p className="text-zinc-400 text-xs">Investment & Staking Token</p>
+                </div>
                 <div className="mb-3 text-zinc-300 text-sm">
                   <b>Preis:</b> 5€ pro D.INVEST<br />
                   <b>Minimum:</b> 5 EUR

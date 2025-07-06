@@ -624,7 +624,7 @@ const handleSellAllInOne = async () => {
       symbol: "DFAITH",
       balance: dfaithBalance,
       color: "from-amber-400 to-yellow-500",
-      description: "Faith Utility Token",
+      description: "Dawid Faith Token",
       price: dfaithPrice && ethPriceEur ? `~${(dfaithPrice * ethPriceEur).toFixed(4)}€ pro D.FAITH` : (isLoadingPrice ? "Laden..." : (priceError || "Preis nicht verfügbar")),
       sub: dfaithPrice ? `1 D.FAITH = ${dfaithPrice.toFixed(6)} ETH` : "Wird geladen...",
       icon: <FaCoins className="text-amber-400" />,
@@ -725,7 +725,7 @@ const handleSellAllInOne = async () => {
                 <div className="w-12 h-12 bg-gradient-to-r from-amber-400 to-yellow-500 rounded-full mx-auto mb-2 flex items-center justify-center shadow-lg">
                   <FaArrowDown className="text-black text-lg" />
                 </div>
-                <p className="text-zinc-400 text-xs">Faith Utility Token auf Base Network</p>
+                <p className="text-zinc-400 text-xs">Dawid Faith Token auf Base</p>
                 {dfaithPrice && ethPriceEur && (
                   <div className="mt-2 px-2 py-1 bg-amber-500/10 border border-amber-500/20 rounded-full inline-block">
                     <span className="text-amber-400 text-xs font-semibold">
