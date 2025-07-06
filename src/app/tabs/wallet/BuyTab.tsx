@@ -697,10 +697,10 @@ export default function BuyTab() {
 
       {/* Kauf-Modal zentral - Mobile Optimiert und zentriert */}
       {showBuyModal && selectedToken && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 overflow-y-auto p-4">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 overflow-y-auto p-4 pt-20">
           <div
             ref={buyModalRef}
-            className="bg-zinc-900 rounded-xl p-3 sm:p-6 max-w-sm w-full border border-amber-400 max-h-[90vh] overflow-y-auto my-4"
+            className="bg-zinc-900 rounded-xl p-3 sm:p-6 max-w-sm w-full border border-amber-400 max-h-[85vh] overflow-y-auto my-4 relative"
             style={{ boxSizing: 'border-box' }}
           >
             {/* Modal-Header */}
@@ -906,14 +906,7 @@ export default function BuyTab() {
                   </div>
                 )}
 
-                {parseFloat(swapAmountEth) > 0 && parseFloat(swapAmountEth) < 0.001 && (
-                  <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-2 text-yellow-400 text-sm">
-                    <div className="flex items-center gap-2">
-                      <span>💡</span>
-                      <span>Minimum purchase: 0.001 ETH</span>
-                    </div>
-                  </div>
-                )}
+
 
                 {/* Action Buttons */}
                 <div className="space-y-2">
@@ -927,8 +920,7 @@ export default function BuyTab() {
                         isSwapping || 
                         !account?.address || 
                         parseFloat(ethBalance) <= 0 ||
-                        parseFloat(swapAmountEth) > parseFloat(ethBalance) ||
-                        parseFloat(swapAmountEth) < 0.001
+                        parseFloat(swapAmountEth) > parseFloat(ethBalance)
                       }
                     >
                       {isSwapping ? "Processing..." : "Get Quote"}
