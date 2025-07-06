@@ -233,16 +233,45 @@ export default function StakeTab() {
     }
 
     setTxStatus("pending");
+    console.log("🔍 STAKING DEBUG START");
 
     try {
       const staking = getContract({ client, chain: base, address: STAKING_CONTRACT });
       const dinvest = getContract({ client, chain: base, address: DINVEST_TOKEN });
       const amountToStake = BigInt(amountToStakeNum);
 
-      console.log("Staking Betrag:", amountToStakeNum);
-      console.log("Aktuell gestaked:", staked);
+      console.log("🔍 Staking Debug Info:");
+      console.log("- Wallet:", account.address);
+      console.log("- Staking Contract:", STAKING_CONTRACT);
+      console.log("- D.INVEST Token:", DINVEST_TOKEN);
+      console.log("- Staking Betrag:", amountToStakeNum);
+      console.log("- Verfügbare Token:", availableNum);
+      console.log("- Aktuell gestaked:", staked);
       
-      // 1. Aktuelle Allowance prüfen
+      // 1. D.INVEST Token Balance direkt vom Contract abrufen
+      let tokenBalance = BigInt(0);
+      try {
+        tokenBalance = await readContract({
+          contract: dinvest,
+          method: "function balanceOf(address) view returns (uint256)",
+          params: [account.address]
+        });
+        console.log("- D.INVEST Balance (Contract):", tokenBalance.toString());
+      } catch (e) {
+        console.error("❌ Fehler beim Abrufen der Token Balance:", e);
+      }
+
+      // 2. Prüfung ob Token Balance ausreichend ist
+      if (tokenBalance < amountToStake) {
+        console.error("❌ Token Balance nicht ausreichend!");
+        console.log("- Benötigt:", amountToStake.toString());
+        console.log("- Verfügbar:", tokenBalance.toString());
+        setTxStatus("error");
+        setTimeout(() => setTxStatus(null), 5000);
+        return;
+      }
+
+      // 3. Aktuelle Allowance prüfen
       let allowance = BigInt(0);
       try {
         allowance = await readContract({
@@ -250,42 +279,124 @@ export default function StakeTab() {
           method: "function allowance(address,address) view returns (uint256)",
           params: [account.address, STAKING_CONTRACT]
         });
-        console.log("Aktuelle Allowance:", allowance.toString());
+        console.log("- Aktuelle Allowance:", allowance.toString());
       } catch (e) {
-        console.error("Fehler beim Abrufen der Allowance:", e);
+        console.error("❌ Fehler beim Abrufen der Allowance:", e);
         allowance = BigInt(0);
       }
       
-      // 2. Approve, falls nötig (mit etwas Puffer)
+      // 4. Staking Contract Status prüfen
+      try {
+        const contractOwner = await readContract({
+          contract: staking,
+          method: "function owner() view returns (address)",
+          params: []
+        });
+        console.log("- Contract Owner:", contractOwner);
+      } catch (e) {
+        console.error("❌ Contract Owner nicht abrufbar:", e);
+      }
+
+      // 5. Prüfung ob das Staking aktiv ist
+      try {
+        const isPaused = await readContract({
+          contract: staking,
+          method: "function paused() view returns (bool)",
+          params: []
+        });
+        console.log("- Contract Paused:", isPaused);
+        if (isPaused) {
+          console.error("❌ Staking Contract ist pausiert!");
+          setTxStatus("error");
+          setTimeout(() => setTxStatus(null), 5000);
+          return;
+        }
+      } catch (e) {
+        console.log("- Contract Pause Status nicht abrufbar (evtl. kein Pausable Contract)");
+      }
+
+      // 6. Prüfung ob User bereits gestaked hat
+      try {
+        const userStake = await readContract({
+          contract: staking,
+          method: "function stakes(address) view returns (uint256)",
+          params: [account.address]
+        });
+        console.log("- User Stake (Contract):", userStake.toString());
+      } catch (e) {
+        console.log("- User Stake nicht direkt abrufbar (möglicherweise andere Struktur)");
+      }
+
+      // 7. Approve, falls nötig (mit etwas Puffer)
       if (allowance < amountToStake) {
-        console.log("Approval erforderlich");
+        console.log("🔐 Approval erforderlich");
         setTxStatus("approving");
+        
+        const approveAmount = amountToStake * BigInt(2); // Etwas mehr für zukünftige Transaktionen
+        console.log("- Approve Betrag:", approveAmount.toString());
         
         const approveTx = prepareContractCall({
           contract: dinvest,
           method: "function approve(address,uint256) returns (bool)",
-          params: [STAKING_CONTRACT, amountToStake * BigInt(2)] // Etwas mehr für zukünftige Transaktionen
+          params: [STAKING_CONTRACT, approveAmount]
         });
         
         await new Promise<void>((resolve, reject) => {
           sendTransaction(approveTx, {
-            onSuccess: () => {
-              console.log("Approval erfolgreich");
+            onSuccess: (result) => {
+              console.log("✅ Approval erfolgreich:", result);
               resolve();
             },
             onError: (error) => {
-              console.error("Approval fehlgeschlagen:", error);
+              console.error("❌ Approval fehlgeschlagen:", error);
               reject(error);
             }
           });
         });
         
         // Kurz warten für Blockchain-Bestätigung
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        console.log("⏳ Warten auf Blockchain-Bestätigung...");
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        
+        // Allowance nach Approval nochmal prüfen
+        try {
+          const newAllowance = await readContract({
+            contract: dinvest,
+            method: "function allowance(address,address) view returns (uint256)",
+            params: [account.address, STAKING_CONTRACT]
+          });
+          console.log("- Neue Allowance nach Approval:", newAllowance.toString());
+          if (newAllowance < amountToStake) {
+            console.error("❌ Allowance nach Approval immer noch nicht ausreichend!");
+            setTxStatus("error");
+            setTimeout(() => setTxStatus(null), 5000);
+            return;
+          }
+        } catch (e) {
+          console.error("❌ Fehler beim Prüfen der neuen Allowance:", e);
+        }
       }
       
-      // 3. Stake die Token
-      console.log("Staking wird durchgeführt...");
+      // 8. Final Balance Check vor dem Staking
+      try {
+        const finalBalance = await readContract({
+          contract: dinvest,
+          method: "function balanceOf(address) view returns (uint256)",
+          params: [account.address]
+        });
+        console.log("- Final Balance Check:", finalBalance.toString());
+        if (finalBalance < amountToStake) {
+          console.error("❌ Balance hat sich zwischen Checks geändert!");
+          setTxStatus("error");
+          setTimeout(() => setTxStatus(null), 5000);
+          return;
+        }
+      } catch (e) {
+        console.error("❌ Final Balance Check fehlgeschlagen:", e);
+      }
+
+      // 9. Stake die Token
+      console.log("🔒 Staking wird durchgeführt...");
       setTxStatus("staking");
       
       const stakeTx = prepareContractCall({
@@ -294,31 +405,47 @@ export default function StakeTab() {
         params: [amountToStake]
       });
       
+      console.log("- Stake Transaction vorbereitet:");
+      console.log("- Contract:", STAKING_CONTRACT);
+      console.log("- Method: stake(uint256)");
+      console.log("- Params:", [amountToStake.toString()]);
+      
       await new Promise<void>((resolve, reject) => {
         sendTransaction(stakeTx, {
-          onSuccess: () => {
-            console.log("Staking erfolgreich");
+          onSuccess: (result) => {
+            console.log("✅ Staking erfolgreich:", result);
             setTxStatus("success");
             setStakeAmount("");
-            // Status nach 3 Sekunden zurücksetzen
             setTimeout(() => setTxStatus(null), 3000);
             resolve();
           },
-          onError: (error) => {
-            console.error("Staking fehlgeschlagen:", error);
+          onError: (error: any) => {
+            console.error("❌ Staking fehlgeschlagen:", error);
+            console.error("❌ Error Details:", {
+              message: error?.message || "Unbekannter Fehler",
+              code: error?.code || "N/A",
+              data: error?.data || "N/A",
+              stack: error?.stack || "N/A"
+            });
             setTxStatus("error");
             setTimeout(() => setTxStatus(null), 5000);
             reject(error);
           }
         });
-      });
-      
-    } catch (e) {
-      console.error("Stake Fehler:", e);
-      setTxStatus("error");
-      setTimeout(() => setTxStatus(null), 5000);
-    }
-  };
+      });        } catch (e: any) {
+          console.error("❌ Stake Fehler:", e);
+          console.error("❌ Error Details:", {
+            message: e?.message || "Unbekannter Fehler",
+            code: e?.code || "N/A",
+            data: e?.data || "N/A",
+            stack: e?.stack || "N/A"
+          });
+          setTxStatus("error");
+          setTimeout(() => setTxStatus(null), 5000);
+        } finally {
+          console.log("🔍 STAKING DEBUG END");
+        }
+      };
 
   // Unstake Function (unstakes all)
   const handleUnstake = async () => {
