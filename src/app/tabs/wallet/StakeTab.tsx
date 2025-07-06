@@ -906,7 +906,13 @@ export default function StakeTab({ onStakeChanged }: StakeTabProps) {
   const formatTime = (seconds: number) => {
     if (seconds <= 0) return "0h 0m";
     
-    // Maximal 24 Stunden anzeigen (Contract-Logik erlaubt max ~16-17h)
+    // Contract-Logik: Maximal ~60480 Sekunden (16.8 Stunden)
+    // Wenn der Wert größer ist, ist wahrscheinlich ein Fehler aufgetreten
+    if (seconds > 86400) { // Mehr als 24 Stunden = wahrscheinlich Fehler
+      console.warn("formatTime: Unerwarteter großer Zeitwert:", seconds, "Sekunden");
+      return "Fehler";
+    }
+    
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     
@@ -986,7 +992,7 @@ export default function StakeTab({ onStakeChanged }: StakeTabProps) {
                   </div>
                   <div>
                     <span className="text-zinc-500">Aktuelle Stufe:</span>
-                    <div className="text-blue-400 font-semibold">Stufe {currentStage} - {formatRewardRate(currentRewardRate)}% pro Woche</div>
+                    <div className="text-blue-400 font-semibold">Stufe {currentStage} - {(currentRewardRate / 100).toFixed(2)} D.FAITH pro D.INVEST pro Woche</div>
                   </div>
                   <div>
                     <span className="text-zinc-500">Mindest-Claim:</span>
@@ -1005,23 +1011,23 @@ export default function StakeTab({ onStakeChanged }: StakeTabProps) {
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-zinc-500">Stufe 1 (0-10.000 D.FAITH):</span>
-                    <span className="text-green-400">0.10% pro Woche</span>
+                    <span className="text-green-400">0.10 D.FAITH pro D.INVEST/Woche</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-zinc-500">Stufe 2 (10.000-20.000 D.FAITH):</span>
-                    <span className="text-green-400">0.05% pro Woche</span>
+                    <span className="text-green-400">0.05 D.FAITH pro D.INVEST/Woche</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-zinc-500">Stufe 3 (20.000-40.000 D.FAITH):</span>
-                    <span className="text-green-400">0.03% pro Woche</span>
+                    <span className="text-green-400">0.03 D.FAITH pro D.INVEST/Woche</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-zinc-500">Stufe 4 (40.000-60.000 D.FAITH):</span>
-                    <span className="text-green-400">0.02% pro Woche</span>
+                    <span className="text-green-400">0.02 D.FAITH pro D.INVEST/Woche</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-zinc-500">Stufe 5+ (60.000+ D.FAITH):</span>
-                    <span className="text-green-400">0.01% pro Woche</span>
+                    <span className="text-green-400">0.01 D.FAITH pro D.INVEST/Woche</span>
                   </div>
                 </div>
               </div>
@@ -1104,9 +1110,9 @@ export default function StakeTab({ onStakeChanged }: StakeTabProps) {
         <div className="bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl p-4 border border-zinc-700 text-center flex flex-col items-center justify-center">
           <div className="text-sm text-zinc-500 mb-1">Rate</div>
           <div className="text-xl font-bold text-green-400 break-words max-w-full" style={{wordBreak:'break-word'}}>
-            {formatRewardRate(currentRewardRate)}%
+            {getUserWeeklyReward()}
           </div>
-          <div className="text-xs text-zinc-500">pro Woche</div>
+          <div className="text-xs text-zinc-500">D.FAITH/Woche</div>
         </div>
       </div>
 
@@ -1116,7 +1122,7 @@ export default function StakeTab({ onStakeChanged }: StakeTabProps) {
           <div>
             <div className="text-sm font-medium text-blue-400">Aktuelle Reward-Stufe</div>
             <div className="text-xs text-zinc-500">
-              {formatRewardRate(currentRewardRate)}% D.FAITH pro D.INVEST pro Woche
+              {(currentRewardRate / 100).toFixed(2)} D.FAITH pro D.INVEST pro Woche
             </div>
           </div>
           <div className="text-right">
