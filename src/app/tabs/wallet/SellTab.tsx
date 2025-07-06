@@ -124,7 +124,7 @@ export default function SellTab() {
           inTokenAddress: DFAITH_TOKEN,
           outTokenAddress: "0x0000000000000000000000000000000000000000", // Native ETH
           amount: "1",
-          gasPrice: "0.001", // Base Chain: 0.001 Gwei statt 50 Gwei
+          gasPrice: "1000000", // Base Chain: 0.001 Gwei (1000000 Wei)
         });
         const response = await fetch(`https://open-api.openocean.finance/v3/base/quote?${params}`);
         if (response.ok) {
@@ -188,7 +188,7 @@ export default function SellTab() {
       console.log("D.FAITH Amount:", sellAmount);
       
       // Verwende gleiche Logik wie BuyTab für Mengen-Konvertierung
-      const sellAmountRaw = (parseFloat(sellAmount) * Math.pow(10, DFAITH_DECIMALS)).toString();
+      const sellAmountRaw = Math.floor(parseFloat(sellAmount) * Math.pow(10, DFAITH_DECIMALS)).toString();
       
       const quoteParams = new URLSearchParams({
         chain: "base",
@@ -196,7 +196,7 @@ export default function SellTab() {
         outTokenAddress: "0x0000000000000000000000000000000000000000", // Native ETH
         amount: sellAmountRaw,
         slippage: slippage,
-        gasPrice: "0.001", // Base Chain: 0.001 Gwei
+        gasPrice: "1000000", // Base Chain: 0.001 Gwei (1000000 Wei)
         account: account.address,
       });
       
@@ -432,7 +432,9 @@ export default function SellTab() {
         value: BigInt(quoteTxData.value || "0"),
         chain: base, // Explizit Base Chain
         client,
-        // Entferne manuelle Gas-Parameter - lass Base Chain automatisch schätzen
+        // Base Chain optimierte Gas-Parameter
+        gasPrice: BigInt("1000000"), // 0.001 Gwei für Base Chain
+        gas: BigInt(quoteTxData.gas || "300000"),
       });
       
       console.log("Prepared Transaction:", transaction);
@@ -859,7 +861,7 @@ export default function SellTab() {
                 <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-2 text-yellow-400 text-sm">
                   <div className="flex items-center gap-2">
                     <span>⚠️</span>
-                    <span>You're selling almost your entire balance. Consider leaving some D.FAITH for gas or future transactions.</span>
+                    <span>You&apos;re selling almost your entire balance. Consider leaving some D.FAITH for gas or future transactions.</span>
                   </div>
                 </div>
               )}
